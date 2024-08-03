@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Quill Editor with Markdown Support</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/quilljs-markdown@latest/dist/quilljs-markdown-common-style.css" rel="stylesheet"> -->
+    <style>
+      body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+      #popup {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px;
+      border: 1px solid black;
+      display: none;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      z-index: 1001; /* Ensure popup is above other elements */
+      max-width: 90%;
+      max-height: 90%;
+      overflow: auto;
+    }
+    .popup-content {
+      max-width: 100%;
+      max-height: 100%;
+      overflow: auto;
+    }
+    .content-pre {
+      max-height: 200px; /* Limit the height of the content pre element */
+      overflow: auto;
+    }
+    .tag {
+      display: inline-block;
+      padding: 5px;
+      margin: 5px;
+      background-color: azure;
+      border-radius: 5px;
+      color: #000;
+    }
+      .slideout {
+        position: fixed;
+        right: 0;
+        top: 0;
+        width: 300px;
+        height: 100%;
+        background-color: #f1f1f1;
+        box-shadow: -2px 0 5px rgba(0,0,0,0.5);
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        z-index: 1000; /* Ensure slideout is above the canvas */
+      }
+      .slideout.active {
+        transform: translateX(0);
+        /* right: 300px; */
+      }
+      #editor-container {
+        height: 100%;
+        padding: 10px;
+        background-color: white;
+        border: 1px solid #ccc;
+      }
+      .ai-text {
+        background-color: #f0f0f0;
+        color: #007bff;
+        padding: 5px;
+      }
+      #toggleButton {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 10px 20px;
+        background-color: transparent;
+        color: rgb(81, 69, 243);
+        border: 1px solid rgb(81, 69, 243);
+        cursor: pointer;
+        z-index: 1002; /* Ensure button is above other elements */
+      }
+
+      /* INNER SLIDE */
+      .inner-slideout {
+        position: absolute;
+        right: 0px;
+        top: 0;
+        width: 300px;
+        height: 100%;
+        padding-top: 50px; 
+        /* background-color: #e0e0e0; */
+        box-shadow: -2px 0 5px rgba(0,0,0,0.5);
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        z-index: 1001; /* Ensure inner-slideout is above the slideout */
+        
+      }
+      .inner-slideout.active {
+        transform: translateX(-300px);
+      }
+
+      /* TREE */
+
+      .tree {
+        position: relative;
+        background: white;
+        margin-top: 20px;
+        padding: 30px;
+        font-family: 'Roboto Mono', monospace;
+        font-size: .85rem;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+      }
+      .tree span {
+        font-size: 13px;
+        font-style: italic;
+        letter-spacing: .4px;
+        color: #a8a8a8;
+      }
+      .tree .fa-folder-open, .tree .fa-folder {
+        color: #007bff;
+      }
+      .tree .fa-html5 {
+        color: #f21f10;
+      }
+      .tree ul {
+        padding-left: 5px;
+        list-style: none;
+      }
+      .tree li {
+        position: relative;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        padding-left: 15px;
+        box-sizing: border-box;
+      }
+      .tree li:before {
+        position: absolute;
+        top: 15px;
+        left: 0;
+        width: 10px;
+        height: 1px;
+        margin: auto;
+        content: '';
+        background-color: #666;
+      }
+      .tree li:after {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 1px;
+        height: 100%;
+        content: '';
+        background-color: #666;
+      }
+      .tree li:last-child:after {
+        height: 15px;
+      }
+      .tree a {
+        cursor: pointer;
+      }
+      .tree a:hover {
+        text-decoration: none;
+      }
+
+
+
+    /* #popup {
+      display: none;
+      border: 1px solid #ccc;
+      padding: 20px;
+      background: #fff;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    } */
+    </style>
+  </head>
+  <body>
+    <div id="popup"></div>
+    <button id="toggleButton">Chat</button>
+    <div class="slideout" id="chatSlideout">
+      <div id="editor-container"></div>
+
+
+    </div>
+   
+    <div class="inner-slideout" id="innerSlideout">
+      <!-- Content for inner slideout (e.g., file details) -->
+      <div class="tree" id="fileTree">
+        <div class="mt-5 pl-3">
+          <a href="http://blockchain.org">⿻ create story</a> |
+          <a href="http://blockchain.org">⿻ create quest</a> |
+          <a href="http://blockchain.org">⿻ create friend</a> <br> <br>
+          <strong>File Viewer:</strong> File structure viewable in a TREE
+          </div>
+        <div class="tree">
+          <ul>
+            <li><i class="fa fa-folder-open"></i> Project
+              <ul>
+                <li><i class="fa fa-folder-open"></i> Opened Folder <span>- 15kb</span>
+                  <ul>
+                    <li><i class="fa fa-folder-open"></i> css
+                      <ul>
+                        <li><i class="fa fa-code"></i> CSS Files <span>- 3kb</span>
+                        </li>
+
+                      </ul>
+                    </li>
+                    <li><i class="fa fa-folder"></i> Folder close <span>- 10kb</span>
+                    </li>
+                    <li><i class="fab fa-html5"></i> index.html</li>
+                    <li><i class="fa fa-picture-o"></i> favicon.ico</li>
+                  </ul>
+                </li>
+                <li><i class="fa fa-folder"></i> Folder close <span>- 420kb</span>
+
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+
+
+      </div>
+    </div>
+    <script type="module" src="/main.js"></script>
+
+    <script>
+      let isShowingMenu = false
+      const toggleButton = document.getElementById('toggleButton');
+      const chatSlideout = document.getElementById('chatSlideout');
+      const innerSlideout = document.getElementById('innerSlideout');
+
+    toggleButton.addEventListener('click', () => {
+        chatSlideout.classList.toggle('active');
+        innerSlideout.classList.toggle('active'); // Close inner slideout if open
+      });
+    </script>
+  </body>
+</html>
