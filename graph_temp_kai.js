@@ -7,7 +7,6 @@
     import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
     import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
     import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-    import {} from './graph_drag.js'
 
     const BLOOM_SCENE = 1;
 
@@ -21,21 +20,12 @@
       exposure: 1
     };
 
-    // const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
-// Create nonBloomRT once
-const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { 
-  minFilter: THREE.LinearFilter, 
-  magFilter: THREE.LinearFilter, 
-  format: THREE.RGBAFormat 
-});
 
 
     const darkMaterial = new THREE.MeshBasicMaterial( { color: 'black' } );
     const materials = {};
 
-    // const renderer = new THREE.WebGLRenderer( { antialias: true } );
-    const renderer = new THREE.WebGLRenderer({ antialias: false });
-
+    const renderer = new THREE.WebGLRenderer( { antialias: true } );
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize( window.innerWidth, window.innerHeight );
     renderer.toneMapping = THREE.ReinhardToneMapping;
@@ -46,27 +36,20 @@ const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHe
     const camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 200 );
     camera.position.set( 0, 0, 20 );
     camera.lookAt( 0, 0, 0 );
-    console.log("camera ", camera)
 
     const controls = new OrbitControls( camera, renderer.domElement );
     controls.maxPolarAngle = Math.PI * 0.5;
     controls.minDistance = 1;
     controls.maxDistance = 100;
-    // controls.addEventListener( 'change', render );
-    // controls.addEventListener('change', () => {
-    //   requestAnimationFrame(render);
-    // });
-    let needsRender = false;
-
-
-    controls.addEventListener('change', () => {
-      needsRender = true;
-    });
+    controls.addEventListener( 'change', render );
 
     const renderScene = new RenderPass( scene, camera );
     
     // ------------------ cube ----------------
     
+    // Add this at the top where other constants are defined
+    const NON_BLOOM_SCENE = 2;
+
     // Initialize the non-bloom scene
     const nonBloomScene = new THREE.Scene();
 
@@ -104,67 +87,17 @@ const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHe
     finalComposer.addPass( mixPass );
     finalComposer.addPass( outputPass );
 
+
+    // ------------- cube ----------------
+
+
+    const nonBloomRenderPass = new RenderPass(nonBloomScene, camera);
+    // Comment this out initially
+    // finalComposer.addPass(nonBloomRenderPass);
     
-  const bloomTexturePass = new ShaderPass(
-    new THREE.ShaderMaterial({
-      uniforms: {
-        baseTexture: { value: null },
-        bloomTexture: { value: bloomComposer.renderTarget2.texture }
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D baseTexture;
-        uniform sampler2D bloomTexture;
-        varying vec2 vUv;
-        void main() {
-          vec4 baseColor = texture2D(baseTexture, vUv);
-          vec4 bloomColor = texture2D(bloomTexture, vUv);
-          gl_FragColor = baseColor + bloomColor;
-        }
-      `,
-      defines: {}
-    }), "baseTexture"
-  );
-
-
-  
-  const nonBloomTexturePass = new ShaderPass(
-    new THREE.ShaderMaterial({
-      uniforms: {
-        baseTexture: { value: null },
-        nonBloomTexture: { value: nonBloomRT.texture }
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D baseTexture;
-        uniform sampler2D nonBloomTexture;
-        varying vec2 vUv;
-        void main() {
-          vec4 baseColor = texture2D(baseTexture, vUv);
-          vec4 nonBloomColor = texture2D(nonBloomTexture, vUv);
-          gl_FragColor = baseColor + nonBloomColor;
-        }
-      `,
-      defines: {}
-    }), "baseTexture"
-  );
-
-  bloomTexturePass.uniforms["bloomTexture"].value = bloomComposer.renderTarget2.texture;
-  
-  nonBloomTexturePass.uniforms["nonBloomTexture"].value = nonBloomRT.texture;
-
+    
+    // ------------------- cube --------------------------
+    
     const raycaster = new THREE.Raycaster();
 
     const mouse = new THREE.Vector2();
@@ -175,6 +108,8 @@ const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHe
     setupScene();
 
 
+    
+    // ----------------- CUBES ---------------------
 
 
 
@@ -194,7 +129,6 @@ const sampleData = [
 
   // Initialize the graph with the sample data
   initiateGraph(sampleData);
-  // buildScene()
 
   
 function getBrightColor() {
@@ -251,6 +185,9 @@ function createWireframeCube(size, x, y, z, color) {
 
   return cube;
 }
+
+    // ----------------- CUBES ---------------------
+
     
 
     function onPointerDown( event ) {
@@ -270,40 +207,25 @@ function createWireframeCube(size, x, y, z, color) {
 
     }
 
-
-    // window.onresize = function () {
-
-    //   const width = window.innerWidth;
-    //   const height = window.innerHeight;
-
-    //   camera.aspect = width / height;
-    //   camera.updateProjectionMatrix();
-
-    //   renderer.setSize( width, height );
-
-    //   bloomComposer.setSize( width, height );
-    //   finalComposer.setSize( width, height );
-
-    //   render();
-
-    // };
-
+    
 
     window.onresize = function () {
+
       const width = window.innerWidth;
       const height = window.innerHeight;
-    
+
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-    
-      renderer.setSize(width, height);
-      bloomComposer.setSize(width, height);
-      finalComposer.setSize(width, height);
-    
+
+      renderer.setSize( width, height );
+
+      bloomComposer.setSize( width, height );
+      finalComposer.setSize( width, height );
+
       render();
+
     };
 
-    
     function setupScene() {
 
       scene.traverse( disposeMaterial );
@@ -333,44 +255,6 @@ function createWireframeCube(size, x, y, z, color) {
 
     }
 
-
-   let first = 1;
-    
-    export function createSphere(x,y,z, size) {
-
-      if(first){
-      scene.traverse( disposeMaterial );
-      scene.children.length = 0;
-}
-
-    first = 0;
-
-      const geometry = new THREE.IcosahedronGeometry( 1, 15 );
-
-      // for ( let i = 0; i < 50; i ++ ) {
-
-        const color = new THREE.Color();
-        color.setHSL( Math.random(), 0.7, Math.random() * 0.2 + 0.05 );
-
-        const material = new THREE.MeshBasicMaterial( { color: color } );
-        const sphere = new THREE.Mesh( geometry, material );
-        sphere.position.x = x//Math.random() * 10 - 5;
-        sphere.position.y = y//Math.random() * 10 - 5;
-        sphere.position.z = z //Math.random() * 10 - 5;
-        sphere.position.normalize().multiplyScalar( Math.random() * 4.0 + 2.0 );
-        // sphere.scale.setScalar( Math.random() * Math.random() + 0.5 );
-        sphere.scale.setScalar(size* 0.05 );
-
-        scene.add( sphere );
-
-        if ( Math.random() < 0.25 ) sphere.layers.enable( BLOOM_SCENE );
-
-      console.log("i am sphere", sphere)
-
-      render();
-
-    }
-
     function disposeMaterial( obj ) {
 
       if ( obj.material ) {
@@ -381,52 +265,129 @@ function createWireframeCube(size, x, y, z, color) {
 
     }
 
+    // function render() {
+    //   // Render the non-bloom scene
+    //   renderer.setRenderTarget(null);
+    //   renderer.clear();
+    //   renderer.render(nonBloomScene, camera);
     
-  // Combine the bloom and non-bloom scenes
-  finalComposer.addPass(new RenderPass(scene, camera)); // Add a render pass for the main scene
-  finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom scene
-  finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
+    //   // Render the bloom scene
+    //   scene.traverse(darkenNonBloomed);
+    //   bloomComposer.render();
+    //   scene.traverse(restoreMaterial);
+    
+    //   // Render the entire scene, then render bloom scene on top
+    //   finalComposer.render();
+    // }
+  // Modify the existing render function
 
- /**
- * Renders the scene with bloom and non-bloom effects.
- */
-export function render() {
-  // Clear the renderer
-  renderer.setRenderTarget(null); // Set the render target to null (render to screen)
-  renderer.clear(); // Clear the render target
 
-  // Render the bloom scene
-  scene.traverse(darkenNonBloomed); // Traverse the scene and darken non-bloomed objects
-  bloomComposer.render(); // Render the bloom scene using the bloom composer
-  scene.traverse(restoreMaterial); // Traverse the scene and restore original materials
 
-  renderer.setRenderTarget(nonBloomRT); // Set the render target to the non-bloom render target
-  renderer.clear(); // Clear the render target
-  renderer.render(nonBloomScene, camera); // Render the non-bloom scene to the render target
 
-  // // Combine the bloom and non-bloom scenes
-  // finalComposer.addPass(new RenderPass(scene, camera)); // Add a render pass for the main scene
-  // finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom scene
-  // finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
-
-  // Render the final combined scene
-  finalComposer.render(); // Render the final combined scene using the final composer
-
-  // Clean up
-  nonBloomRT.dispose(); // Dispose of the non-bloom render target
-}
+  
+  function render() {
+    // Clear the renderer
+    renderer.setRenderTarget(null);
+    renderer.clear();
+  
+    // Render the bloom scene
+    scene.traverse(darkenNonBloomed);
+    bloomComposer.render();
+    scene.traverse(restoreMaterial);
+  
+    // Render the non-bloom scene to a separate render target
+    const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+    renderer.setRenderTarget(nonBloomRT);
+    renderer.clear();
+    renderer.render(nonBloomScene, camera);
+  
+    // Combine the bloom and non-bloom scenes
+    const finalComposer = new EffectComposer(renderer);
+    finalComposer.addPass(new RenderPass(scene, camera));
+    
+    const bloomTexturePass = new ShaderPass(
+      new THREE.ShaderMaterial({
+        uniforms: {
+          baseTexture: { value: null },
+          bloomTexture: { value: bloomComposer.renderTarget2.texture }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D baseTexture;
+          uniform sampler2D bloomTexture;
+          varying vec2 vUv;
+          void main() {
+            vec4 baseColor = texture2D(baseTexture, vUv);
+            vec4 bloomColor = texture2D(bloomTexture, vUv);
+            gl_FragColor = baseColor + bloomColor;
+          }
+        `,
+        defines: {}
+      }), "baseTexture"
+    );
+    bloomTexturePass.uniforms["bloomTexture"].value = bloomComposer.renderTarget2.texture;
+    finalComposer.addPass(bloomTexturePass);
+  
+    const nonBloomTexturePass = new ShaderPass(
+      new THREE.ShaderMaterial({
+        uniforms: {
+          baseTexture: { value: null },
+          nonBloomTexture: { value: nonBloomRT.texture }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D baseTexture;
+          uniform sampler2D nonBloomTexture;
+          varying vec2 vUv;
+          void main() {
+            vec4 baseColor = texture2D(baseTexture, vUv);
+            vec4 nonBloomColor = texture2D(nonBloomTexture, vUv);
+            gl_FragColor = baseColor + nonBloomColor;
+          }
+        `,
+        defines: {}
+      }), "baseTexture"
+    );
+    nonBloomTexturePass.uniforms["nonBloomTexture"].value = nonBloomRT.texture;
+    finalComposer.addPass(nonBloomTexturePass);
+  
+    // Render the final combined scene
+    finalComposer.render();
+  
+    // Clean up
+    nonBloomRT.dispose();
+  }
+  
   
 
 
-    function darkenNonBloomed(obj) {
-      if (obj.isMesh && !bloomLayer.test(obj.layers)) {
-        if (!materials[obj.uuid]) {
-          materials[obj.uuid] = obj.material;
-          obj.material = darkMaterial;
-        }
+
+
+
+
+
+    function darkenNonBloomed( obj ) {
+
+      if ( obj.isMesh && bloomLayer.test( obj.layers ) === false ) {
+
+        materials[ obj.uuid ] = obj.material;
+        obj.material = darkMaterial;
+
       }
+
     }
-        
 
     function restoreMaterial( obj ) {
 
@@ -440,18 +401,6 @@ export function render() {
     }
 
 
-    function animate() {
-      requestAnimationFrame(animate);
-    
-      if (needsRender) {
-        render();
-        needsRender = false;
-      }
-    }
-    
-    animate();
-
-    
 // window.addEventListener('mousemove', (event) => {
 //   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
 //   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -511,6 +460,26 @@ export function render() {
 // });
 
 // for debugging mouse position
+function addMouseTrail(x, y) {
+console.log("addMouseTrail", x, y);
+raycaster.setFromCamera({ x, y }, camera);
+const intersects = raycaster.intersectObjects(scene.children, true);
+
+let point;
+if (intersects.length > 0) {
+  point = intersects[0].point;
+} else {
+  const direction = raycaster.ray.direction.clone().multiplyScalar(1000);
+  point = raycaster.ray.origin.clone().add(direction);
+}
+
+const geometry = new THREE.SphereGeometry(2, 8, 8);
+const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+const sphere = new THREE.Mesh(geometry, material);
+sphere.position.copy(point);
+
+scene.add(sphere);
+}
 
 // window.addEventListener('resize', () => {
 //   camera.aspect = window.innerWidth / window.innerHeight;
@@ -523,8 +492,6 @@ export function isRendererReady() {
 return true;
 }
 
-
-
 export function graphInit(initScene, initCamera, initRenderer) {
 // Placeholder implementation
 }
@@ -535,15 +502,4 @@ export function updateGraph(newNodes, newLinks) {
 
 export function addNode(id, name = '', size = 1, x = Math.random() * 100 - 50, y = Math.random() * 100 - 50, z = Math.random() * 100 - 50, color = Math.random() * 0xffffff) {
 // Placeholder implementation
-}
-export function share3dDat() {
-  return {
-    camera: typeof camera !== 'undefined' ? camera : null,
-    nonBloomScene: typeof nonBloomScene !== 'undefined' ? nonBloomScene : null,
-    renderer: typeof renderer !== 'undefined' ? renderer : null,
-    mouse: typeof mouse !== 'undefined' ? mouse : null,
-    raycaster: typeof raycaster !== 'undefined' ? raycaster : null,
-    scene: typeof scene !== 'undefined' ? scene : null
-
-  };
 }
