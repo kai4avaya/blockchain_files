@@ -10,7 +10,7 @@
     import {} from './graph_drag.js'
 
     const BLOOM_SCENE = 1;
-
+    let lastTime = 0;
     const bloomLayer = new THREE.Layers();
     bloomLayer.set( BLOOM_SCENE );
 
@@ -65,6 +65,10 @@ const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHe
 
     const renderScene = new RenderPass( scene, camera );
     
+    let isDragging = false;
+let selectedSphere = null;
+let longPressTimeout;
+
     // ------------------ cube ----------------
     
     // Initialize the non-bloom scene
@@ -170,7 +174,8 @@ const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHe
     const mouse = new THREE.Vector2();
 
     window.addEventListener( 'pointerdown', onPointerDown );
-
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
 
     setupScene();
 
@@ -230,7 +235,7 @@ function initiateGraph(data) {
 }
 
 
-function createWireframeCube(size, x, y, z, color) {
+export function createWireframeCube(size, x, y, z, color) {
   const geometry = new THREE.BoxGeometry(size, size, size);
   const edges = new THREE.EdgesGeometry(geometry);
   const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
@@ -261,33 +266,68 @@ function createWireframeCube(size, x, y, z, color) {
       raycaster.setFromCamera( mouse, camera );
       const intersects = raycaster.intersectObjects( scene.children, false );
       if ( intersects.length > 0 ) {
+        controls.enabled = false; // Disable OrbitControls during dragging
+
+        // object.layers.toggle( BLOOM_SCENE );
+        isDragging = true;
+
+        selectedSphere = intersects[0].object;
+
 
         const object = intersects[ 0 ].object;
+
         object.layers.toggle( BLOOM_SCENE );
+
         render();
 
       }
 
+      if (intersects.length > 0) {
+        // selectedSphere = intersects[0].object;
+        longPressTimeout = setTimeout(() => {
+
+
+        }, 500); // 500ms for long press
+      }
+
     }
 
+    
+function onPointerMove(event) {
+  const now = performance.now();
+  if (now - lastTime < 16) { // roughly 60fps
+    return;
+  }
+  lastTime = now;
 
-    // window.onresize = function () {
+  if (isDragging && selectedSphere) {
+    const { camera, raycaster, mouse } = share3dDat();
 
-    //   const width = window.innerWidth;
-    //   const height = window.innerHeight;
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    //   camera.aspect = width / height;
-    //   camera.updateProjectionMatrix();
+    raycaster.setFromCamera(mouse, camera);
 
-    //   renderer.setSize( width, height );
+    const planeDistance = -10;
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion), planeDistance);
+    const intersectPoint = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, intersectPoint);
 
-    //   bloomComposer.setSize( width, height );
-    //   finalComposer.setSize( width, height );
+    selectedSphere.position.copy(intersectPoint);
 
-    //   render();
+    render();
+  }
+}
 
-    // };
+function onPointerUp(event) {
+  clearTimeout(longPressTimeout);
 
+  if (isDragging) {
+    isDragging = false;
+    controls.enabled = true; // Re-enable OrbitControls after dragging
+    selectedSphere = null;
+  }
+}
 
     window.onresize = function () {
       const width = window.innerWidth;
@@ -354,10 +394,14 @@ function createWireframeCube(size, x, y, z, color) {
 
         const material = new THREE.MeshBasicMaterial( { color: color } );
         const sphere = new THREE.Mesh( geometry, material );
-        sphere.position.x = x//Math.random() * 10 - 5;
-        sphere.position.y = y//Math.random() * 10 - 5;
-        sphere.position.z = z //Math.random() * 10 - 5;
-        sphere.position.normalize().multiplyScalar( Math.random() * 4.0 + 2.0 );
+        // sphere.position.x = x//Math.random() * 10 - 5;
+        // sphere.position.y = y//Math.random() * 10 - 5;
+        // sphere.position.z = z //Math.random() * 10 - 5;
+        sphere.position.set(x, y, z);
+        // sphere.position.normalize().multiplyScalar( Math.random() * 4.0 + 2.0 );
+
+        console.log("i am x,y,z", x,y,z)
+
         // sphere.scale.setScalar( Math.random() * Math.random() + 0.5 );
         sphere.scale.setScalar(size* 0.05 );
 
