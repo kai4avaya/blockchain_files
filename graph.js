@@ -8,6 +8,7 @@
     import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
     import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     import {} from './graph_drag.js'
+    import {dragCube, isSphereInsideCube, removeSphereFromCube, resizeCubeToFitSpheres} from "./dragging_shapes.js"
 
     const BLOOM_SCENE = 1;
     let lastTime = 0;
@@ -21,7 +22,6 @@
       exposure: 1
     };
 
-    // const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 // Create nonBloomRT once
 const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { 
   minFilter: THREE.LinearFilter, 
@@ -179,12 +179,6 @@ let longPressTimeout;
 
     setupScene();
 
-
-
-
-
-    let files = [];
-    let filePoints = [];
     let cubes = [];
 
 
@@ -236,6 +230,8 @@ function initiateGraph(data) {
 
 
 export function createWireframeCube(size, x, y, z, color) {
+
+  
   const geometry = new THREE.BoxGeometry(size, size, size);
   const edges = new THREE.EdgesGeometry(geometry);
   const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
@@ -376,7 +372,7 @@ function onPointerUp(event) {
 
    let first = 1;
     
-    export function createSphere(x,y,z, size) {
+    export function createSphere(x,y,z, size, id='') {
 
       if(first){
       scene.traverse( disposeMaterial );
@@ -387,23 +383,20 @@ function onPointerUp(event) {
 
       const geometry = new THREE.IcosahedronGeometry( 1, 15 );
 
-      // for ( let i = 0; i < 50; i ++ ) {
-
         const color = new THREE.Color();
         color.setHSL( Math.random(), 0.7, Math.random() * 0.2 + 0.05 );
 
         const material = new THREE.MeshBasicMaterial( { color: color } );
         const sphere = new THREE.Mesh( geometry, material );
-        // sphere.position.x = x//Math.random() * 10 - 5;
-        // sphere.position.y = y//Math.random() * 10 - 5;
-        // sphere.position.z = z //Math.random() * 10 - 5;
         sphere.position.set(x, y, z);
-        // sphere.position.normalize().multiplyScalar( Math.random() * 4.0 + 2.0 );
 
         console.log("i am x,y,z", x,y,z)
 
-        // sphere.scale.setScalar( Math.random() * Math.random() + 0.5 );
         sphere.scale.setScalar(size* 0.05 );
+
+        sphere.userData = {
+          id: id,          // Unique ID
+      };
 
         scene.add( sphere );
 
@@ -448,10 +441,6 @@ export function render() {
   renderer.clear(); // Clear the render target
   renderer.render(nonBloomScene, camera); // Render the non-bloom scene to the render target
 
-  // // Combine the bloom and non-bloom scenes
-  // finalComposer.addPass(new RenderPass(scene, camera)); // Add a render pass for the main scene
-  // finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom scene
-  // finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
 
   // Render the final combined scene
   finalComposer.render(); // Render the final combined scene using the final composer
@@ -496,72 +485,6 @@ export function render() {
     animate();
 
     
-// window.addEventListener('mousemove', (event) => {
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-//   // addMouseTrail(mouse.x, mouse.y);
-// });
-
-// window.addEventListener('dragover', (event) => {
-//   event.preventDefault();
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-//   checkIntersections();
-// });
-
-// window.addEventListener('dragleave', (event) => {
-//   event.preventDefault();
-//   if (INTERSECTED) {
-//     INTERSECTED.material.color.setHex(INTERSECTED.currentHex);
-//     INTERSECTED.material.opacity = INTERSECTED.currentOpacity;
-//     INTERSECTED = null;
-//   }
-// });
-
-// window.addEventListener('drop', (event) => {
-//   event.preventDefault();
-//   const dt = event.dataTransfer;
-//   const fileList = dt.files;
-
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-//   raycaster.setFromCamera(mouse, camera);
-//   const intersects = raycaster.intersectObjects(cubes.map(cube => cube.solidCube), false);
-
-//   for (let i = 0; i < fileList.length; i++) {
-//     const file = fileList[i];
-
-//     if (intersects.length > 0) {
-//       const cube = intersects[0].object;
-//       const data = { file, position: cube.position, cube };
-//       createFilePoint(data);
-//     } else {
-//       const dropPosition = new THREE.Vector3(
-//         THREE.MathUtils.randFloatSpread(400),
-//         THREE.MathUtils.randFloatSpread(400),
-//         THREE.MathUtils.randFloatSpread(400)
-//       );
-//       const data = { file, position: dropPosition };
-//       createFilePoint(data);
-//     }
-//   }
-
-//   if (INTERSECTED) {
-//     INTERSECTED.material.color.setHex(INTERSECTED.currentHex);
-//     INTERSECTED.material.opacity = INTERSECTED.currentOpacity;
-//     INTERSECTED = null;
-//   }
-// });
-
-// for debugging mouse position
-
-// window.addEventListener('resize', () => {
-//   camera.aspect = window.innerWidth / window.innerHeight;
-//   camera.updateProjectionMatrix();
-//   renderer.setSize(window.innerWidth, window.innerHeight);
-// });
-
 // Placeholder functions for exporting
 export function isRendererReady() {
 return true;

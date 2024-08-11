@@ -18,6 +18,8 @@ interface DirectoryMetadata {
   id: number;
   name: string;
   fileIds: number[]; // Array of IDs of files in this directory
+  tags?: string[]; // Array of tags related to the directory build by llm
+  summary?: string; // Summary of the directory built by llm
 }
 
 class FileStore {

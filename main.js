@@ -1,6 +1,6 @@
-import { handleFileDrop } from './memory/fileHandler.js';
-import { graphInit, isRendererReady } from './graph.js';
-import * as THREE from 'three';
+// import { handleFileDrop } from './memory/fileHandler.js';
+// import { graphInit, isRendererReady } from './graph.js';
+// import * as THREE from 'three';
 import { editor } from './quillEditor.js';
 import fileStore from './memory/stores/fileStore';
 import userActionStore from './memory/stores/userActionStore';
@@ -50,7 +50,7 @@ document.body.addEventListener('dragover', event => {
 document.body.addEventListener('drop', event => {
     event.preventDefault();
     console.log('File(s) dropped');
-    handleFileDrop(event);
+    // handleFileDrop(event);
 });
 
 // Raycaster for detecting clicks on objects
