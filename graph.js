@@ -1,128 +1,136 @@
-    import * as THREE from 'three';
+import * as THREE from "three";
 
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import {} from "./graph_drag.js";
+import { generateUniqueId } from "./utils/utils.js";
+import {} from "./dragging_shapes.js";
+// import {dragCube, isSphereInsideCube, removeSphereFromCube, resizeCubeToFitSpheres} from "./dragging_shapes.js"
+const DEBUG = true;
+const BLOOM_SCENE = 1;
+let lastTime = 0;
+const bloomLayer = new THREE.Layers();
+bloomLayer.set(BLOOM_SCENE);
 
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-    import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-    import {} from './graph_drag.js'
-    import {dragCube, isSphereInsideCube, removeSphereFromCube, resizeCubeToFitSpheres} from "./dragging_shapes.js"
-
-    const BLOOM_SCENE = 1;
-    let lastTime = 0;
-    const bloomLayer = new THREE.Layers();
-    bloomLayer.set( BLOOM_SCENE );
-
-    const params = {
-      threshold: 0,
-      strength: 1,
-      radius: 0.5,
-      exposure: 1
-    };
+const params = {
+  threshold: 0,
+  strength: 1,
+  radius: 0.5,
+  exposure: 1,
+};
 
 // Create nonBloomRT once
-const nonBloomRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { 
-  minFilter: THREE.LinearFilter, 
-  magFilter: THREE.LinearFilter, 
-  format: THREE.RGBAFormat 
+const nonBloomRT = new THREE.WebGLRenderTarget(
+  window.innerWidth,
+  window.innerHeight,
+  {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    format: THREE.RGBAFormat,
+  }
+);
+
+const darkMaterial = new THREE.MeshBasicMaterial({ color: "black" });
+const materials = {};
+
+// const renderer = new THREE.WebGLRenderer( { antialias: true } );
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ReinhardToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+  40,
+  window.innerWidth / window.innerHeight,
+  1,
+  200
+);
+camera.position.set(0, 0, 20);
+camera.lookAt(0, 0, 0);
+console.log("camera ", camera);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.maxPolarAngle = Math.PI * 0.5;
+controls.minDistance = 1;
+controls.maxDistance = 100;
+
+let needsRender = false;
+
+controls.addEventListener("change", () => {
+  needsRender = true;
 });
 
+const renderScene = new RenderPass(scene, camera);
 
-    const darkMaterial = new THREE.MeshBasicMaterial( { color: 'black' } );
-    const materials = {};
-
-    // const renderer = new THREE.WebGLRenderer( { antialias: true } );
-    const renderer = new THREE.WebGLRenderer({ antialias: false });
-
-    renderer.setPixelRatio( window.devicePixelRatio );
-    renderer.setSize( window.innerWidth, window.innerHeight );
-    renderer.toneMapping = THREE.ReinhardToneMapping;
-    document.body.appendChild( renderer.domElement );
-
-    const scene = new THREE.Scene();
-
-    const camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 200 );
-    camera.position.set( 0, 0, 20 );
-    camera.lookAt( 0, 0, 0 );
-    console.log("camera ", camera)
-
-    const controls = new OrbitControls( camera, renderer.domElement );
-    controls.maxPolarAngle = Math.PI * 0.5;
-    controls.minDistance = 1;
-    controls.maxDistance = 100;
-    // controls.addEventListener( 'change', render );
-    // controls.addEventListener('change', () => {
-    //   requestAnimationFrame(render);
-    // });
-    let needsRender = false;
-
-
-    controls.addEventListener('change', () => {
-      needsRender = true;
-    });
-
-    const renderScene = new RenderPass( scene, camera );
-    
-    let isDragging = false;
+let isDragging = false;
 let selectedSphere = null;
 let longPressTimeout;
 
-    // ------------------ cube ----------------
-    
-    // Initialize the non-bloom scene
-    const nonBloomScene = new THREE.Scene();
+// ------------------ cube ----------------
 
-    // ------------------ cube ----------------
-    
+// Initialize the non-bloom scene
+const nonBloomScene = new THREE.Scene();
 
+// ------------------ cube ----------------
 
-    const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
-    bloomPass.threshold = params.threshold;
-    bloomPass.strength = params.strength;
-    bloomPass.radius = params.radius;
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.5,
+  0.4,
+  0.85
+);
+bloomPass.threshold = params.threshold;
+bloomPass.strength = params.strength;
+bloomPass.radius = params.radius;
 
-    const bloomComposer = new EffectComposer( renderer );
-    bloomComposer.renderToScreen = false;
-    bloomComposer.addPass( renderScene );
-    bloomComposer.addPass( bloomPass );
+const bloomComposer = new EffectComposer(renderer);
+bloomComposer.renderToScreen = false;
+bloomComposer.addPass(renderScene);
+bloomComposer.addPass(bloomPass);
 
-    const mixPass = new ShaderPass(
-      new THREE.ShaderMaterial( {
-        uniforms: {
-          baseTexture: { value: null },
-          bloomTexture: { value: bloomComposer.renderTarget2.texture }
-        },
-        vertexShader: document.getElementById( 'vertexshader' ).textContent,
-        fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
-        defines: {}
-      } ), 'baseTexture'
-    );
-    mixPass.needsSwap = true;
+const mixPass = new ShaderPass(
+  new THREE.ShaderMaterial({
+    uniforms: {
+      baseTexture: { value: null },
+      bloomTexture: { value: bloomComposer.renderTarget2.texture },
+    },
+    vertexShader: document.getElementById("vertexshader").textContent,
+    fragmentShader: document.getElementById("fragmentshader").textContent,
+    defines: {},
+  }),
+  "baseTexture"
+);
+mixPass.needsSwap = true;
 
-    const outputPass = new OutputPass();
+const outputPass = new OutputPass();
 
-    const finalComposer = new EffectComposer( renderer );
-    finalComposer.addPass( renderScene );
-    finalComposer.addPass( mixPass );
-    finalComposer.addPass( outputPass );
+const finalComposer = new EffectComposer(renderer);
+finalComposer.addPass(renderScene);
+finalComposer.addPass(mixPass);
+finalComposer.addPass(outputPass);
 
-    
-  const bloomTexturePass = new ShaderPass(
-    new THREE.ShaderMaterial({
-      uniforms: {
-        baseTexture: { value: null },
-        bloomTexture: { value: bloomComposer.renderTarget2.texture }
-      },
-      vertexShader: `
+const bloomTexturePass = new ShaderPass(
+  new THREE.ShaderMaterial({
+    uniforms: {
+      baseTexture: { value: null },
+      bloomTexture: { value: bloomComposer.renderTarget2.texture },
+    },
+    vertexShader: `
         varying vec2 vUv;
         void main() {
           vUv = uv;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
-      fragmentShader: `
+    fragmentShader: `
         uniform sampler2D baseTexture;
         uniform sampler2D bloomTexture;
         varying vec2 vUv;
@@ -132,26 +140,25 @@ let longPressTimeout;
           gl_FragColor = baseColor + bloomColor;
         }
       `,
-      defines: {}
-    }), "baseTexture"
-  );
+    defines: {},
+  }),
+  "baseTexture"
+);
 
-
-  
-  const nonBloomTexturePass = new ShaderPass(
-    new THREE.ShaderMaterial({
-      uniforms: {
-        baseTexture: { value: null },
-        nonBloomTexture: { value: nonBloomRT.texture }
-      },
-      vertexShader: `
+const nonBloomTexturePass = new ShaderPass(
+  new THREE.ShaderMaterial({
+    uniforms: {
+      baseTexture: { value: null },
+      nonBloomTexture: { value: nonBloomRT.texture },
+    },
+    vertexShader: `
         varying vec2 vUv;
         void main() {
           vUv = uv;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
-      fragmentShader: `
+    fragmentShader: `
         uniform sampler2D baseTexture;
         uniform sampler2D nonBloomTexture;
         varying vec2 vUv;
@@ -161,47 +168,77 @@ let longPressTimeout;
           gl_FragColor = baseColor + nonBloomColor;
         }
       `,
-      defines: {}
-    }), "baseTexture"
-  );
+    defines: {},
+  }),
+  "baseTexture"
+);
 
-  bloomTexturePass.uniforms["bloomTexture"].value = bloomComposer.renderTarget2.texture;
-  
-  nonBloomTexturePass.uniforms["nonBloomTexture"].value = nonBloomRT.texture;
+bloomTexturePass.uniforms["bloomTexture"].value =
+  bloomComposer.renderTarget2.texture;
 
-    const raycaster = new THREE.Raycaster();
+nonBloomTexturePass.uniforms["nonBloomTexture"].value = nonBloomRT.texture;
 
-    const mouse = new THREE.Vector2();
+const raycaster = new THREE.Raycaster();
 
-    window.addEventListener( 'pointerdown', onPointerDown );
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
+const mouse = new THREE.Vector2();
 
-    setupScene();
+window.addEventListener("pointerdown", onPointerDown);
+window.addEventListener("pointermove", onPointerMove);
+window.addEventListener("pointerup", onPointerUp);
 
-    let cubes = [];
+setupScene();
 
-
+let cubes = [];
 
 // Sample data
 const sampleData = [
-  { id: 1, name: 'Cube 1', size: 1, x: 1, y: 0.88, z: 1, color: getBrightColor() },
-  { id: 2, name: 'Cube 2', size: 2, x: -0.1, y: 1, z: -1, color: getBrightColor() },
-  { id: 3, name: 'Cube 3', size: 3, x: 1, y: -1, z: 0.11, color: getBrightColor() },
-  { id: 4, name: 'Cube 4', size: 1, x: -1, y: -1, z: -1, color: getBrightColor() }
+  {
+    id: 1,
+    name: "Cube 1",
+    size: 1,
+    x: 1,
+    y: 0.88,
+    z: 1,
+    color: getBrightColor(),
+  },
+  {
+    id: 2,
+    name: "Cube 2",
+    size: 2,
+    x: -0.1,
+    y: 1,
+    z: -1,
+    color: getBrightColor(),
+  },
+  {
+    id: 3,
+    name: "Cube 3",
+    size: 3,
+    x: 1,
+    y: -1,
+    z: 0.11,
+    color: getBrightColor(),
+  },
+  {
+    id: 4,
+    name: "Cube 4",
+    size: 1,
+    x: -1,
+    y: -1,
+    z: -1,
+    color: getBrightColor(),
+  },
 ];
 
-  // Initialize the graph with the sample data
-  initiateGraph(sampleData);
-  // buildScene()
+// Initialize the graph with the sample data
+initiateGraph(sampleData);
+// buildScene()
 
-  
 function getBrightColor() {
   const colors = [0xff00ff, 0x00ffff, 0xffff00, 0xffa500, 0x00ff00, 0x0000ff];
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
-  
 function initiateGraph(data) {
   data.forEach((cubeData) => {
     let { id, name, size, x, y, z, color } = cubeData;
@@ -211,12 +248,16 @@ function initiateGraph(data) {
     while (isColliding) {
       isColliding = false;
       for (const existingCube of cubes) {
-        const cubeBoundingBox = new THREE.Box3().setFromObject(cube.wireframeCube);
-        const existingCubeBoundingBox = new THREE.Box3().setFromObject(existingCube.wireframeCube);
+        const cubeBoundingBox = new THREE.Box3().setFromObject(
+          cube.wireframeCube
+        );
+        const existingCubeBoundingBox = new THREE.Box3().setFromObject(
+          existingCube.wireframeCube
+        );
         if (cubeBoundingBox.intersectsBox(existingCubeBoundingBox)) {
-          x += (Math.random() * 40 - 20);
-          y += (Math.random() * 40 - 20);
-          z += (Math.random() * 40 - 20);
+          x += Math.random() * 40 - 20;
+          y += Math.random() * 40 - 20;
+          z += Math.random() * 40 - 20;
           cube.wireframeCube.position.set(x, y, z);
           cube.solidCube.position.set(x, y, z);
           isColliding = true;
@@ -228,23 +269,34 @@ function initiateGraph(data) {
   });
 }
 
-
-export function createWireframeCube(size, x, y, z, color) {
-
-  
+export function createWireframeCube(size, x, y, z, color, id = 0) {
   const geometry = new THREE.BoxGeometry(size, size, size);
   const edges = new THREE.EdgesGeometry(geometry);
   const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
   const wireframeCube = new THREE.LineSegments(edges, material);
   wireframeCube.position.set(x, y, z);
 
-  const solidCubeMaterial = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0 });
+  const solidCubeMaterial = new THREE.MeshBasicMaterial({
+    color: color,
+    transparent: true,
+    opacity: 0,
+  });
   const solidCube = new THREE.Mesh(geometry, solidCubeMaterial);
   solidCube.position.set(x, y, z);
 
+  // Ensure `userData` is assigned
+  const userData = {
+    id: generateUniqueId(),
+  };
+  wireframeCube.userData = userData;
+  solidCube.userData = userData;
+
+  console.log("Wireframe Cube userData:", wireframeCube.userData); // Debugging statement
+  console.log("Solid Cube userData:", solidCube.userData); // Debugging statement
+
   const cube = {
     wireframeCube: wireframeCube,
-    solidCube: solidCube
+    solidCube: solidCube,
   };
 
   nonBloomScene.add(wireframeCube);
@@ -252,67 +304,74 @@ export function createWireframeCube(size, x, y, z, color) {
 
   return cube;
 }
-    
 
-    function onPointerDown( event ) {
+function onPointerDown(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-      mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
-      mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(scene.children, false);
+  if (intersects.length > 0) {
+    controls.enabled = false; // Disable OrbitControls during dragging
 
-      raycaster.setFromCamera( mouse, camera );
-      const intersects = raycaster.intersectObjects( scene.children, false );
-      if ( intersects.length > 0 ) {
-        controls.enabled = false; // Disable OrbitControls during dragging
+    // object.layers.toggle( BLOOM_SCENE );
+    isDragging = true;
 
-        // object.layers.toggle( BLOOM_SCENE );
-        isDragging = true;
+    selectedSphere = intersects[0].object;
 
-        selectedSphere = intersects[0].object;
+    const object = intersects[0].object;
 
+    object.layers.toggle(BLOOM_SCENE);
 
-        const object = intersects[ 0 ].object;
+    render();
+  }
 
-        object.layers.toggle( BLOOM_SCENE );
+  if (intersects.length > 0) {
+    // selectedSphere = intersects[0].object;
+    longPressTimeout = setTimeout(() => {}, 500); // 500ms for long press
+  }
+}
 
-        render();
-
-      }
-
-      if (intersects.length > 0) {
-        // selectedSphere = intersects[0].object;
-        longPressTimeout = setTimeout(() => {
-
-
-        }, 500); // 500ms for long press
-      }
-
-    }
-
-    
 function onPointerMove(event) {
   const now = performance.now();
-  if (now - lastTime < 16) { // roughly 60fps
+  if (now - lastTime < 16) {
+    // roughly 60fps
     return;
   }
   lastTime = now;
 
   if (isDragging && selectedSphere) {
-    const { camera, raycaster, mouse } = share3dDat();
-
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-
-    const planeDistance = -10;
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion), planeDistance);
-    const intersectPoint = new THREE.Vector3();
-    raycaster.ray.intersectPlane(plane, intersectPoint);
-
-    selectedSphere.position.copy(intersectPoint);
-
-    render();
+    moveSphere(event);
   }
+}
+
+
+export function moveSphere(event, sphere) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  if (DEBUG){
+    console.log("I AM SPHERE PASSED IN TO MOVESPHERE", sphere);
+    console.log("I AM SELECTED SPHERE IN GRAPH", selectedSphere);
+  }
+
+  raycaster.setFromCamera(mouse, camera);
+
+  const planeDistance = -10;
+  const plane = new THREE.Plane(
+    new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
+    planeDistance
+  );
+
+  const intersectPoint = new THREE.Vector3();
+  raycaster.ray.intersectPlane(plane, intersectPoint);
+
+  console.log("intersectPoint moveSphere:", intersectPoint);
+
+  if (sphere) sphere.position.copy(intersectPoint);
+  else selectedSphere.position.copy(intersectPoint);
+
+  render();
 }
 
 function onPointerUp(event) {
@@ -325,106 +384,93 @@ function onPointerUp(event) {
   }
 }
 
-    window.onresize = function () {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-    
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    
-      renderer.setSize(width, height);
-      bloomComposer.setSize(width, height);
-      finalComposer.setSize(width, height);
-    
-      render();
-    };
+window.onresize = function () {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
 
-    
-    function setupScene() {
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
 
-      scene.traverse( disposeMaterial );
-      scene.children.length = 0;
+  renderer.setSize(width, height);
+  bloomComposer.setSize(width, height);
+  finalComposer.setSize(width, height);
 
-      const geometry = new THREE.IcosahedronGeometry( 1, 15 );
+  render();
+};
 
-      for ( let i = 0; i < 50; i ++ ) {
+function setupScene() {
+  scene.traverse(disposeMaterial);
+  scene.children.length = 0;
 
-        const color = new THREE.Color();
-        color.setHSL( Math.random(), 0.7, Math.random() * 0.2 + 0.05 );
+  const geometry = new THREE.IcosahedronGeometry(1, 15);
 
-        const material = new THREE.MeshBasicMaterial( { color: color } );
-        const sphere = new THREE.Mesh( geometry, material );
-        sphere.position.x = Math.random() * 10 - 5;
-        sphere.position.y = Math.random() * 10 - 5;
-        sphere.position.z = Math.random() * 10 - 5;
-        sphere.position.normalize().multiplyScalar( Math.random() * 4.0 + 2.0 );
-        sphere.scale.setScalar( Math.random() * Math.random() + 0.5 );
-        scene.add( sphere );
+  for (let i = 0; i < 50; i++) {
+    const color = new THREE.Color();
+    color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
 
-        if ( Math.random() < 0.25 ) sphere.layers.enable( BLOOM_SCENE );
+    const material = new THREE.MeshBasicMaterial({ color: color });
+    const sphere = new THREE.Mesh(geometry, material);
+    sphere.position.x = Math.random() * 10 - 5;
+    sphere.position.y = Math.random() * 10 - 5;
+    sphere.position.z = Math.random() * 10 - 5;
+    sphere.position.normalize().multiplyScalar(Math.random() * 4.0 + 2.0);
+    sphere.scale.setScalar(Math.random() * Math.random() + 0.5);
+    scene.add(sphere);
 
-      }
+    if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
+  }
 
-      render();
-
-    }
-
-
-   let first = 1;
-    
-    export function createSphere(x,y,z, size, id='') {
-
-      if(first){
-      scene.traverse( disposeMaterial );
-      scene.children.length = 0;
+  render();
 }
 
-    first = 0;
+let first = 1;
 
-      const geometry = new THREE.IcosahedronGeometry( 1, 15 );
+export function createSphere(x, y, z, size, id = "") {
+  if (first) {
+    scene.traverse(disposeMaterial);
+    scene.children.length = 0;
+  }
 
-        const color = new THREE.Color();
-        color.setHSL( Math.random(), 0.7, Math.random() * 0.2 + 0.05 );
+  first = 0;
 
-        const material = new THREE.MeshBasicMaterial( { color: color } );
-        const sphere = new THREE.Mesh( geometry, material );
-        sphere.position.set(x, y, z);
+  const geometry = new THREE.IcosahedronGeometry(1, 15);
 
-        console.log("i am x,y,z", x,y,z)
+  const color = new THREE.Color();
+  color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
 
-        sphere.scale.setScalar(size* 0.05 );
+  const material = new THREE.MeshBasicMaterial({ color: color });
+  const sphere = new THREE.Mesh(geometry, material);
+  sphere.position.set(x, y, z);
 
-        sphere.userData = {
-          id: id,          // Unique ID
-      };
+  console.log("i am x,y,z", x, y, z);
 
-        scene.add( sphere );
+  sphere.scale.setScalar(size * 0.05);
 
-        if ( Math.random() < 0.25 ) sphere.layers.enable( BLOOM_SCENE );
+  sphere.userData = {
+    id: id, // Unique ID
+  };
 
-      console.log("i am sphere", sphere)
+  scene.add(sphere);
 
-      render();
+  if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
 
-    }
+  console.log("i am sphere", sphere);
 
-    function disposeMaterial( obj ) {
+  render();
+}
 
-      if ( obj.material ) {
+function disposeMaterial(obj) {
+  if (obj.material) {
+    obj.material.dispose();
+  }
+}
 
-        obj.material.dispose();
+// Combine the bloom and non-bloom scenes
+finalComposer.addPass(new RenderPass(scene, camera)); // Add a render pass for the main scene
+finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom scene
+finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
 
-      }
-
-    }
-
-    
-  // Combine the bloom and non-bloom scenes
-  finalComposer.addPass(new RenderPass(scene, camera)); // Add a render pass for the main scene
-  finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom scene
-  finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
-
- /**
+/**
  * Renders the scene with bloom and non-bloom effects.
  */
 export function render() {
@@ -441,76 +487,73 @@ export function render() {
   renderer.clear(); // Clear the render target
   renderer.render(nonBloomScene, camera); // Render the non-bloom scene to the render target
 
-
   // Render the final combined scene
   finalComposer.render(); // Render the final combined scene using the final composer
 
   // Clean up
   nonBloomRT.dispose(); // Dispose of the non-bloom render target
 }
-  
 
-
-    function darkenNonBloomed(obj) {
-      if (obj.isMesh && !bloomLayer.test(obj.layers)) {
-        if (!materials[obj.uuid]) {
-          materials[obj.uuid] = obj.material;
-          obj.material = darkMaterial;
-        }
-      }
+function darkenNonBloomed(obj) {
+  if (obj.isMesh && !bloomLayer.test(obj.layers)) {
+    if (!materials[obj.uuid]) {
+      materials[obj.uuid] = obj.material;
+      obj.material = darkMaterial;
     }
-        
-
-    function restoreMaterial( obj ) {
-
-      if ( materials[ obj.uuid ] ) {
-
-        obj.material = materials[ obj.uuid ];
-        delete materials[ obj.uuid ];
-
-      }
-
-    }
-
-
-    function animate() {
-      requestAnimationFrame(animate);
-    
-      if (needsRender) {
-        render();
-        needsRender = false;
-      }
-    }
-    
-    animate();
-
-    
-// Placeholder functions for exporting
-export function isRendererReady() {
-return true;
+  }
 }
 
+function restoreMaterial(obj) {
+  if (materials[obj.uuid]) {
+    obj.material = materials[obj.uuid];
+    delete materials[obj.uuid];
+  }
+}
 
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (needsRender) {
+    render();
+    needsRender = false;
+  }
+}
+
+animate();
+
+// Placeholder functions for exporting
+export function isRendererReady() {
+  return true;
+}
 
 export function graphInit(initScene, initCamera, initRenderer) {
-// Placeholder implementation
+  // Placeholder implementation
 }
 
 export function updateGraph(newNodes, newLinks) {
-// Placeholder implementation
+  // Placeholder implementation
 }
 
-export function addNode(id, name = '', size = 1, x = Math.random() * 100 - 50, y = Math.random() * 100 - 50, z = Math.random() * 100 - 50, color = Math.random() * 0xffffff) {
-// Placeholder implementation
+export function addNode(
+  id,
+  name = "",
+  size = 1,
+  x = Math.random() * 100 - 50,
+  y = Math.random() * 100 - 50,
+  z = Math.random() * 100 - 50,
+  color = Math.random() * 0xffffff
+) {
+  // Placeholder implementation
 }
 export function share3dDat() {
   return {
-    camera: typeof camera !== 'undefined' ? camera : null,
-    nonBloomScene: typeof nonBloomScene !== 'undefined' ? nonBloomScene : null,
-    renderer: typeof renderer !== 'undefined' ? renderer : null,
-    mouse: typeof mouse !== 'undefined' ? mouse : null,
-    raycaster: typeof raycaster !== 'undefined' ? raycaster : null,
-    scene: typeof scene !== 'undefined' ? scene : null
-
+    camera: typeof camera !== "undefined" ? camera : null,
+    nonBloomScene: typeof nonBloomScene !== "undefined" ? nonBloomScene : null,
+    renderer: typeof renderer !== "undefined" ? renderer : null,
+    mouse: typeof mouse !== "undefined" ? mouse : null,
+    raycaster: typeof raycaster !== "undefined" ? raycaster : null,
+    scene: typeof scene !== "undefined" ? scene : null,
+    cubes: typeof cubes !== "undefined" ? cubes : null,
+    controls: typeof controls !== "undefined" ? controls : null,
   };
 }

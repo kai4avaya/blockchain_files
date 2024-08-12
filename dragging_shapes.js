@@ -1,35 +1,91 @@
 import * as THREE from 'three';
-
-
+import { share3dDat, render} from './graph';
+import { getSceneSnapshot,getCubeAndContainedSpheresById, getObjectById } from './graph_snapshot';
+import { moveSphere } from './graph';
 
 const cubeGroups = new Map(); // Map of cube UUIDs to arrays of spheres inside them
 let dragging = false;
 let selectedObject = null;
+let currentSnapshot = null;
 
-export function dragCube(cube, deltaX, deltaY, deltaZ) {
-    // Move the cube by the delta values
-    cube.position.x += deltaX;
-    cube.position.y += deltaY;
-    cube.position.z += deltaZ;
+
+function getCubeUnderPointer(event) {
+    const { camera, raycaster,scene, nonBloomScene, mouse, controls } = share3dDat();
+    
+    // Update mouse position
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Cast a ray from the camera to the mouse position
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(nonBloomScene.children, true);
+
+    if (intersects.length > 0) {
+        currentSnapshot = getSceneSnapshot([scene, nonBloomScene]); // Pass the scenes to get the snapshot
+
+        for (const intersectedObject of intersects) {
+            // Find the intersected object in the snapshot cubes using the userData.id or uuid
+            const matchingCube = currentSnapshot.cubes.find(cube => 
+                cube.id === intersectedObject.object.userData.id || 
+                cube.id === intersectedObject.object.uuid
+            );
+
+            if (matchingCube) {
+                controls.enabled = false; // Disable OrbitControls during dragging
+
+                // Use the matching cube's ID to get the full cube and contained spheres
+                const result = getCubeAndContainedSpheresById(currentSnapshot, matchingCube.id);
+
+                return result; // Return the cube, its twin, and the contained spheres
+            }
+        }
+    }
+    
+    return null; // Return null if no cube is found
+}
+
+
+export function dragCube(event, cube, intersectPoint, snapshot) {
+    if (!cube) {
+        console.error("No cube provided to drag."); // Log if the cube is undefined
+        return;
+    }
+    const { nonBloomScene, scene } = share3dDat();
+
+
+    const cubeId = cube.wireframeCube.id || cube.wireframeCube.uuid;
+
+    const cubes = getObjectById([nonBloomScene, scene], cubeId)
+
+    console.log("Dragging cube by:", intersectPoint); 
+    cubes[0].position.copy(intersectPoint);
+    cubes[1].position.copy(intersectPoint);
+
+    console.log(" cubes[0] ", cubes[0]);
+    console.log(" cubes[1]", cubes[1]);
+    
+
+    cube.wireframeCube.frustumCulled = false;
+    cube.solidCube.frustumCulled = false;
 
     // Move all spheres inside this cube
-    const spheres = cubeGroups.get(cube.uuid);
-    if (spheres) {
-        spheres.forEach(sphere => {
-            sphere.position.x += deltaX;
-            sphere.position.y += deltaY;
-            sphere.position.z += deltaZ;
-
-            // Check if the sphere is still inside the cube
-            if (!isSphereInsideCube(sphere, cube)) {
-                // If the sphere is outside, remove it from the group
-                removeSphereFromCube(sphere, cube);
+    const containedSphereIds = snapshot.containment[cubeId];
+    if (containedSphereIds && containedSphereIds.length > 0) {
+        containedSphereIds.forEach(sphereId => {
+            let sphere = findSphereById(snapshot.spheres, sphereId);
+            if (sphere) {
+                const {nonBloomScene, scene} = share3dDat();
+                sphere = getObjectById([nonBloomScene, scene], sphereId)[0]
+                moveSphere(event,sphere)
             }
         });
     }
+    // render();
 
-    // Resize the cube to fit remaining spheres
-    resizeCubeToFitSpheres(cube);
+}
+
+function findSphereById(spheres, id) {
+    return spheres.find(sphere => sphere.id === id);
 }
 
 
@@ -57,6 +113,7 @@ export function removeSphereFromCube(sphere, cube) {
 }
 
 
+// removing this for now..
 export function resizeCubeToFitSpheres(cube) {
     const spheres = cubeGroups.get(cube.uuid);
     if (!spheres || spheres.length === 0) return;
@@ -83,25 +140,38 @@ export function resizeCubeToFitSpheres(cube) {
 }
 
 
+
 document.addEventListener('pointerdown', (event) => {
     const selectedCube = getCubeUnderPointer(event);
     if (selectedCube) {
+        console.log("Pointer down on cube:", selectedCube); // Log when a cube is selected for dragging
         dragging = true;
         selectedObject = selectedCube;
+    } else {
+        console.log("No cube selected.");
     }
 });
 
 document.addEventListener('pointermove', (event) => {
     if (dragging && selectedObject) {
-        const deltaX = event.movementX; // Or calculate based on raycaster
-        const deltaY = event.movementY;
-        const deltaZ = 0; // Assuming movement on a 2D plane
-
-        dragCube(selectedObject, deltaX, deltaY, deltaZ);
+        console.log("Pointer move while dragging.", selectedObject); // Log when dragging is in progress
+        const { camera, raycaster, mouse } = share3dDat();
+        // Convert mouse movement to scene coordinates
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion), 0);
+        const intersectPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersectPoint);
+        dragCube(event, selectedObject, intersectPoint, currentSnapshot);
     }
 });
 
 document.addEventListener('pointerup', () => {
+    const { controls } = share3dDat();
+    console.log("Pointer up. Dragging ended."); // Log when dragging ends
     dragging = false;
     selectedObject = null;
+    currentSnapshot = null; // Clear the snapshot after dragging ends
+    controls.enabled = true;
 });

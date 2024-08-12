@@ -66,8 +66,10 @@ function changeCubeColor(intersects, isHovering) {
     resetCubeColor(CUBEINTERSECTED);
     CUBEINTERSECTED = null;
   }
-  render
+  render();
 }
+
+
 function highlightCube(cube) {
   console.log("Highlighting cube:", cube);
   if (!cube.originalMaterial) {
@@ -157,7 +159,6 @@ function setupDragAndDrop() {
     }
    const snapshot = getSceneSnapshot([scene, nonBloomScene]);
    console.log("Drop snapshot:", snapshot);
-
   });
 
   window.addEventListener("dragleave", (event) => {

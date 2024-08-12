@@ -1,4 +1,56 @@
-import * as THREE from 'three';
+
+
+// export function getSceneSnapshot(scenes) {
+//     const snapshot = {
+//         cubes: [],
+//         spheres: [],
+//         containment: {}
+//     };
+
+//     const cubes = [];
+//     const spheres = [];
+
+//     // Traverse both scenes
+//     scenes.forEach((currentScene) => {
+//         currentScene.traverse((object) => {
+//             if (object.isMesh) {
+//                 if (object.geometry.type === "BoxGeometry") {
+//                     cubes.push({
+//                         id: object.userData.id || object.uuid,
+//                         position: object.position.clone(),
+//                         scale: object.scale.clone(),
+//                         type: object.geometry.type,
+//                     });
+//                 } else if (object.geometry.type === "IcosahedronGeometry") {
+//                     spheres.push({
+//                         id: object.userData.id || object.uuid,
+//                         position: object.position.clone(),
+//                         scale: object.scale.clone(),
+//                         type: object.geometry.type,
+//                     });
+//                 }
+//             }
+//         });
+//     });
+
+//     // Calculate containment
+//     cubes.forEach(cube => {
+//         snapshot.containment[cube.id] = [];
+//         spheres.forEach(sphere => {
+//             if (isSphereInsideCube(sphere, cube)) {
+//                 snapshot.containment[cube.id].push(sphere.id);
+//             }
+//         });
+
+//         console.log(`Cube ${cube.id} contains spheres: `, snapshot.containment[cube.id]);
+//     });
+
+//     snapshot.cubes = cubes;
+//     snapshot.spheres = spheres;
+
+//     return snapshot;
+// }
+
 
 export function getSceneSnapshot(scenes) {
     const snapshot = {
@@ -7,48 +59,122 @@ export function getSceneSnapshot(scenes) {
         containment: {}
     };
 
-    scenes.forEach(scene => {
-        scene.traverse((object) => {
+    // Traverse both scenes
+    scenes.forEach((currentScene, sceneIndex) => {
+        currentScene.traverse((object) => {
             if (object.isMesh) {
-                const objectId = object.userData.id || object.id; // Check userData.id first, fallback to object.id
-
-                const data = {
-                    id: objectId,
-                    title: object.userData.title || null,
-                    position: object.position.clone(),
-                    scale: object.scale.clone(),
-                    type: object.geometry.type,
-                };
-
-                if (object.geometry.type === 'BoxGeometry') {
-                    snapshot.cubes.push(data);
-                } else if (object.geometry.type === 'IcosahedronGeometry') {
-                    snapshot.spheres.push(data);
+                if (object.geometry.type === "BoxGeometry") {
+                    snapshot.cubes.push({
+                        id: object.userData.id || object.uuid,
+                        position: object.position.clone(),
+                        scale: object.scale.clone(),
+                        type: object.geometry.type,
+                        scene: sceneIndex // Store the scene index or identifier
+                    });
+                } else if (object.geometry.type === "IcosahedronGeometry") {
+                    snapshot.spheres.push({
+                        id: object.userData.id || object.uuid,
+                        position: object.position.clone(),
+                        scale: object.scale.clone(),
+                        type: object.geometry.type,
+                        scene: sceneIndex // Store the scene index or identifier
+                    });
                 }
             }
         });
     });
 
-    snapshot.cubes.forEach((cube) => {
-        const cubeBoundingBox = new THREE.Box3().setFromCenterAndSize(
-            cube.position,
-            new THREE.Vector3(cube.scale.x, cube.scale.y, cube.scale.z)
-        );
-
-        snapshot.spheres.forEach((sphere) => {
-            const sphereBoundingBox = new THREE.Box3().setFromCenterAndSize(
-                sphere.position,
-                new THREE.Vector3(sphere.scale.x, sphere.scale.y, sphere.scale.z)
-            );
-
-            if (cubeBoundingBox.containsBox(sphereBoundingBox)) {
-                if (!snapshot.containment[cube.id]) {
-                    snapshot.containment[cube.id] = [];
-                }
+    // Calculate containment
+    snapshot.cubes.forEach(cube => {
+        snapshot.containment[cube.id] = [];
+        snapshot.spheres.forEach(sphere => {
+            if (isSphereInsideCube(sphere, cube)) {
                 snapshot.containment[cube.id].push(sphere.id);
             }
         });
+
+        console.log(`Cube ${cube.id} contains spheres: `, snapshot.containment[cube.id]);
     });
 
     return snapshot;
+}
+
+
+// Example isSphereInsideCube function
+function isSphereInsideCube(sphere, cube) {
+    const spherePosition = sphere.position;
+    const cubePosition = cube.position;
+    const cubeSize = cube.scale.x; // Assuming uniform scale for simplicity
+
+    const inside = (
+        Math.abs(spherePosition.x - cubePosition.x) <= cubeSize / 2 &&
+        Math.abs(spherePosition.y - cubePosition.y) <= cubeSize / 2 &&
+        Math.abs(spherePosition.z - cubePosition.z) <= cubeSize / 2
+    );
+
+    if (inside) {
+        console.log(`Sphere ${sphere.id} is inside Cube ${cube.id}`);
+    } else {
+        console.log(`Sphere ${sphere.id} is outside Cube ${cube.id}`);
+    }
+
+    return inside;
+}
+
+
+export function getCubeAndContainedSpheresById(snapshot, cubeId) {
+    const result = {
+        wireframeCube: null,
+        solidCube: null,
+        containedSpheres: []
+    };
+
+    // Find the wireframe cube and its corresponding solid cube
+    const cube = snapshot.cubes.find(cube => cube.id === cubeId);
+    if (!cube) {
+        console.error(`Cube with id ${cubeId} not found.`);
+        return result; // Return an empty result if the cube isn't found
+    }
+
+    // Traverse the scenes to find the wireframe and solid cubes
+    snapshot.cubes.forEach(cubeData => {
+        if (cubeData.id === cubeId) {
+            result.wireframeCube = cubeData;
+        }
+    });
+
+    // The solid cube should share the same id as the wireframe cube
+    snapshot.cubes.forEach(cubeData => {
+        if (cubeData.id === cubeId && cubeData.type === "BoxGeometry") {
+            result.solidCube = cubeData;
+        }
+    });
+
+    // Get the IDs of the spheres contained within this cube
+    const containedSphereIds = snapshot.containment[cubeId];
+    if (containedSphereIds && containedSphereIds.length > 0) {
+        containedSphereIds.forEach(sphereId => {
+            const sphere = snapshot.spheres.find(sphere => sphere.id === sphereId);
+            if (sphere) {
+                result.containedSpheres.push(sphere);
+            }
+        });
+    }
+
+    return result;
+}
+
+export function getObjectById(scenes, id) {
+    const foundObjects = [];
+
+    // Iterate through the scenes and traverse each to find the objects by ID
+    scenes.forEach((currentScene) => {
+        currentScene.traverse((object) => {
+            if ((object.userData.id && object.userData.id === id) || object.uuid === id) {
+                foundObjects.push(object);
+            }
+        });
+    });
+
+    return foundObjects; // Return the array of found objects
 }
