@@ -95,7 +95,7 @@ function setupDragAndDrop() {
     onPointerMove(event, true);
   });
 
-  window.addEventListener("drop", (event) => {
+  window.addEventListener("drop", async (event) => {
     event.preventDefault();
     console.log("Drop event");
 
@@ -114,7 +114,9 @@ function setupDragAndDrop() {
       const file = fileList[i];
       const size = normalizeSize(file.size);
       let dropPosition;
-      const uuids = handleFileDrop(event);
+      const uuids = await handleFileDrop(event);
+
+      console.log("uuids from file drop", uuids)
 
       if (allIntersects.length > 0) {
         const intersect = allIntersects[0];
@@ -122,6 +124,7 @@ function setupDragAndDrop() {
 
         if (intersect.object.geometry.type === "EdgesGeometry" || intersect.object.geometry.type === "BoxGeometry") {
           intersect.object.material.color.set(0xff0000);
+          // x, y, z, size, id = ""
           createSphere(dropPosition.x, dropPosition.y, dropPosition.z, size, uuids[i]);
         } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
           const actualSphereSize = size * 0.05;

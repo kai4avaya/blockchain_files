@@ -447,7 +447,7 @@ export function createSphere(x, y, z, size, id = "") {
   sphere.scale.setScalar(size * 0.05);
 
   sphere.userData = {
-    id: id, // Unique ID
+    id: id  // Unique ID
   };
 
   scene.add(sphere);

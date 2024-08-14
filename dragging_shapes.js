@@ -113,8 +113,33 @@ export function removeSphereFromCube(sphere, cube) {
 }
 
 
-// removing this for now..
-export function resizeCubeToFitSpheres(cube) {
+// // removing this for now..
+// export function resizeCubeToFitSpheres(cube) {
+//     const spheres = cubeGroups.get(cube.uuid);
+//     if (!spheres || spheres.length === 0) return;
+
+//     // Calculate the bounding box that fits all spheres
+//     let minX = Infinity, minY = Infinity, minZ = Infinity;
+//     let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+//     spheres.forEach(sphere => {
+//         const spherePosition = sphere.position;
+//         const sphereRadius = sphere.scale.x; // Assuming uniform scale for simplicity
+
+//         minX = Math.min(minX, spherePosition.x - sphereRadius);
+//         minY = Math.min(minY, spherePosition.y - sphereRadius);
+//         minZ = Math.min(minZ, spherePosition.z - sphereRadius);
+//         maxX = Math.max(maxX, spherePosition.x + sphereRadius);
+//         maxY = Math.max(maxY, spherePosition.y + sphereRadius);
+//         maxZ = Math.max(maxZ, spherePosition.z + sphereRadius);
+//     });
+
+//     // Set the cube size to fit all spheres
+//     const newCubeSize = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
+//     cube.scale.set(newCubeSize, newCubeSize, newCubeSize);
+// }
+
+export function resizeCubeToFitSpheres(cube, minSizeAllowed = false, buffer = 5) {
     const spheres = cubeGroups.get(cube.uuid);
     if (!spheres || spheres.length === 0) return;
 
@@ -134,11 +159,55 @@ export function resizeCubeToFitSpheres(cube) {
         maxZ = Math.max(maxZ, spherePosition.z + sphereRadius);
     });
 
-    // Set the cube size to fit all spheres
+    // Add buffer to the bounding box dimensions
+    minX -= buffer;
+    minY -= buffer;
+    minZ -= buffer;
+    maxX += buffer;
+    maxY += buffer;
+    maxZ += buffer;
+
+    // Calculate the new size of the cube based on the bounding box
     const newCubeSize = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
-    cube.scale.set(newCubeSize, newCubeSize, newCubeSize);
+
+    // Get the current size of the cube
+    const currentCubeSize = cube.scale.x; // Assuming uniform scale for simplicity
+
+    // Determine the final cube size
+    let finalCubeSize;
+    if (minSizeAllowed) {
+        // Allow shrinking to the new calculated size with the buffer
+        finalCubeSize = newCubeSize;
+    } else {
+        // Do not allow shrinking below the current size
+        finalCubeSize = Math.max(newCubeSize, currentCubeSize);
+    }
+
+    // Set the cube size to the final calculated size
+    cube.scale.set(finalCubeSize, finalCubeSize, finalCubeSize);
 }
 
+
+
+export function getObjectUnderPointer(event) {
+    const { camera, raycaster, mouse, scene, nonBloomScene } = share3dDat();
+    
+    // Update mouse position
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Cast a ray from the camera to the mouse position
+    raycaster.setFromCamera(mouse, camera);
+
+    // Check for intersections in both scenes
+    const intersects = raycaster.intersectObjects([...scene.children, ...nonBloomScene.children], true);
+
+    if (intersects.length > 0) {
+        return intersects[0].object; // Return the first intersected object
+    }
+
+    return null; // Return null if no object is found
+}
 
 
 document.addEventListener('pointerdown', (event) => {

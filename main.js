@@ -1,5 +1,5 @@
 // import { handleFileDrop } from './memory/fileHandler.js';
-// import { graphInit, isRendererReady } from './graph.js';
+import { share3dDat } from './graph.js';
 // import * as THREE from 'three';
 import { editor } from './quillEditor.js';
 import fileStore from './memory/stores/fileStore';
@@ -7,13 +7,14 @@ import userActionStore from './memory/stores/userActionStore';
 // import graphStore from './memory/stores/graphStore';
 import { showPopup } from './ui/popup.js';
 import { initializeDB } from './memory/local/db.js'; // Initialize the database and create stores if they don't exist
-
+import {getObjectUnderPointer} from './dragging_shapes'
 // Initialize Quill editor
 editor();
-let camera;
-let scene;
+// let camera;
+// let scene;
 async function main() {
     await initializeDB(); // Initialize the database and create stores if they don't exist
+    // const { camera, raycaster,scene, nonBloomScene, mouse, controls } = share3dDat();
 
     // Initialize Three.js scene and camera
     // scene = new THREE.Scene();
@@ -82,7 +83,25 @@ window.addEventListener('click', async event => {
     // }
 
     userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target); // Log mouse up
+
+    const selectedObject = getObjectUnderPointer(event);
+    if (selectedObject) {
+        console.log("Object under click:", selectedObject); // Log the selected object
+        // Perform operations on the selected object
+        const nodeId = selectedObject.userData.id;
+        await fileStore.selectFile(nodeId); // Fetch and update selected file in MobX store
+        console.log("nodeId", nodeId)
+        showPopup(fileStore.selectedFile, event.clientX, event.clientY); // Display the selected file's metadata
+    } else {
+        document.getElementById('popup').style.display = 'none';
+        console.log("No object under click.");
+    }
 });
+
+// document.addEventListener('pointerdown', (event) => {
+    
+// });
+
 
 // Track mouse movements
 window.addEventListener('mousemove', event => {
