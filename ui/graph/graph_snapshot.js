@@ -1,57 +1,3 @@
-
-
-// export function getSceneSnapshot(scenes) {
-//     const snapshot = {
-//         cubes: [],
-//         spheres: [],
-//         containment: {}
-//     };
-
-//     const cubes = [];
-//     const spheres = [];
-
-//     // Traverse both scenes
-//     scenes.forEach((currentScene) => {
-//         currentScene.traverse((object) => {
-//             if (object.isMesh) {
-//                 if (object.geometry.type === "BoxGeometry") {
-//                     cubes.push({
-//                         id: object.userData.id || object.uuid,
-//                         position: object.position.clone(),
-//                         scale: object.scale.clone(),
-//                         type: object.geometry.type,
-//                     });
-//                 } else if (object.geometry.type === "IcosahedronGeometry") {
-//                     spheres.push({
-//                         id: object.userData.id || object.uuid,
-//                         position: object.position.clone(),
-//                         scale: object.scale.clone(),
-//                         type: object.geometry.type,
-//                     });
-//                 }
-//             }
-//         });
-//     });
-
-//     // Calculate containment
-//     cubes.forEach(cube => {
-//         snapshot.containment[cube.id] = [];
-//         spheres.forEach(sphere => {
-//             if (isSphereInsideCube(sphere, cube)) {
-//                 snapshot.containment[cube.id].push(sphere.id);
-//             }
-//         });
-
-//         console.log(`Cube ${cube.id} contains spheres: `, snapshot.containment[cube.id]);
-//     });
-
-//     snapshot.cubes = cubes;
-//     snapshot.spheres = spheres;
-
-//     return snapshot;
-// }
-
-
 export function getSceneSnapshot(scenes) {
     const snapshot = {
         cubes: [],
@@ -105,11 +51,12 @@ function isSphereInsideCube(sphere, cube) {
     const spherePosition = sphere.position;
     const cubePosition = cube.position;
     const cubeSize = cube.scale.x; // Assuming uniform scale for simplicity
+    const sphereRadius = sphere.scale.x / 2; // Assuming uniform scale for simplicity
 
     const inside = (
-        Math.abs(spherePosition.x - cubePosition.x) <= cubeSize / 2 &&
-        Math.abs(spherePosition.y - cubePosition.y) <= cubeSize / 2 &&
-        Math.abs(spherePosition.z - cubePosition.z) <= cubeSize / 2
+        Math.abs(spherePosition.x - cubePosition.x) + sphereRadius <= cubeSize / 2 &&
+        Math.abs(spherePosition.y - cubePosition.y) + sphereRadius <= cubeSize / 2 &&
+        Math.abs(spherePosition.z - cubePosition.z) + sphereRadius <= cubeSize / 2
     );
 
     if (inside) {

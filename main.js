@@ -1,5 +1,5 @@
 // import { handleFileDrop } from './memory/fileHandler.js';
-import { share3dDat } from './graph.js';
+// import { share3dDat } from './graph.js';
 // import * as THREE from 'three';
 import { editor } from './quillEditor.js';
 import fileStore from './memory/stores/fileStore';
@@ -7,7 +7,7 @@ import userActionStore from './memory/stores/userActionStore';
 // import graphStore from './memory/stores/graphStore';
 import { showPopup } from './ui/popup.js';
 import { initializeDB } from './memory/local/db.js'; // Initialize the database and create stores if they don't exist
-import {getObjectUnderPointer} from './dragging_shapes'
+import {getObjectUnderPointer} from './ui/graph/dragging_shapes'
 // Initialize Quill editor
 editor();
 // let camera;

@@ -7,10 +7,9 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./graph_drag.js";
-import { generateUniqueId } from "./utils/utils.js";
+import { generateUniqueId } from "../../utils/utils.js";
 import {} from "./dragging_shapes.js";
 // import {dragCube, isSphereInsideCube, removeSphereFromCube, resizeCubeToFitSpheres} from "./dragging_shapes.js"
-const DEBUG = true;
 const BLOOM_SCENE = 1;
 let lastTime = 0;
 const bloomLayer = new THREE.Layers();
@@ -55,7 +54,6 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.set(0, 0, 20);
 camera.lookAt(0, 0, 0);
-console.log("camera ", camera);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.maxPolarAngle = Math.PI * 0.5;
@@ -291,9 +289,6 @@ export function createWireframeCube(size, x, y, z, color, id = 0) {
   wireframeCube.userData = userData;
   solidCube.userData = userData;
 
-  console.log("Wireframe Cube userData:", wireframeCube.userData); // Debugging statement
-  console.log("Solid Cube userData:", solidCube.userData); // Debugging statement
-
   const cube = {
     wireframeCube: wireframeCube,
     solidCube: solidCube,
@@ -350,11 +345,6 @@ export function moveSphere(event, sphere) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  if (DEBUG){
-    console.log("I AM SPHERE PASSED IN TO MOVESPHERE", sphere);
-    console.log("I AM SELECTED SPHERE IN GRAPH", selectedSphere);
-  }
-
   raycaster.setFromCamera(mouse, camera);
 
   const planeDistance = -10;
@@ -366,7 +356,6 @@ export function moveSphere(event, sphere) {
   const intersectPoint = new THREE.Vector3();
   raycaster.ray.intersectPlane(plane, intersectPoint);
 
-  console.log("intersectPoint moveSphere:", intersectPoint);
 
   if (sphere) sphere.position.copy(intersectPoint);
   else selectedSphere.position.copy(intersectPoint);
@@ -442,7 +431,6 @@ export function createSphere(x, y, z, size, id = "") {
   const sphere = new THREE.Mesh(geometry, material);
   sphere.position.set(x, y, z);
 
-  console.log("i am x,y,z", x, y, z);
 
   sphere.scale.setScalar(size * 0.05);
 
@@ -454,7 +442,6 @@ export function createSphere(x, y, z, size, id = "") {
 
   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
 
-  console.log("i am sphere", sphere);
 
   render();
 }

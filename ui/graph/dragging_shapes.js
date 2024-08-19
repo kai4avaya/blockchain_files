@@ -1,3 +1,5 @@
+//  TO DO  call this cube drag
+
 import * as THREE from 'three';
 import { share3dDat, render} from './graph';
 import { getSceneSnapshot,getCubeAndContainedSpheresById, getObjectById } from './graph_snapshot';
@@ -47,7 +49,6 @@ function getCubeUnderPointer(event) {
 
 export function dragCube(event, cube, intersectPoint, snapshot) {
     if (!cube) {
-        console.error("No cube provided to drag."); // Log if the cube is undefined
         return;
     }
     const { nonBloomScene, scene } = share3dDat();
@@ -57,23 +58,21 @@ export function dragCube(event, cube, intersectPoint, snapshot) {
 
     const cubes = getObjectById([nonBloomScene, scene], cubeId)
 
-    console.log("Dragging cube by:", intersectPoint); 
     cubes[0].position.copy(intersectPoint);
     cubes[1].position.copy(intersectPoint);
 
-    console.log(" cubes[0] ", cubes[0]);
-    console.log(" cubes[1]", cubes[1]);
-    
 
     cube.wireframeCube.frustumCulled = false;
     cube.solidCube.frustumCulled = false;
 
     // Move all spheres inside this cube
     const containedSphereIds = snapshot.containment[cubeId];
+    console.log("containedSphereIds", containedSphereIds)
     if (containedSphereIds && containedSphereIds.length > 0) {
         containedSphereIds.forEach(sphereId => {
             let sphere = findSphereById(snapshot.spheres, sphereId);
             if (sphere) {
+                console.log("i am sphere", sphere)
                 const {nonBloomScene, scene} = share3dDat();
                 sphere = getObjectById([nonBloomScene, scene], sphereId)[0]
                 moveSphere(event,sphere)
@@ -213,17 +212,15 @@ export function getObjectUnderPointer(event) {
 document.addEventListener('pointerdown', (event) => {
     const selectedCube = getCubeUnderPointer(event);
     if (selectedCube) {
-        console.log("Pointer down on cube:", selectedCube); // Log when a cube is selected for dragging
         dragging = true;
         selectedObject = selectedCube;
     } else {
-        console.log("No cube selected.");
+
     }
 });
 
 document.addEventListener('pointermove', (event) => {
     if (dragging && selectedObject) {
-        console.log("Pointer move while dragging.", selectedObject); // Log when dragging is in progress
         const { camera, raycaster, mouse } = share3dDat();
         // Convert mouse movement to scene coordinates
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -238,7 +235,6 @@ document.addEventListener('pointermove', (event) => {
 
 document.addEventListener('pointerup', () => {
     const { controls } = share3dDat();
-    console.log("Pointer up. Dragging ended."); // Log when dragging ends
     dragging = false;
     selectedObject = null;
     currentSnapshot = null; // Clear the snapshot after dragging ends

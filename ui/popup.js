@@ -1,5 +1,6 @@
 export function showPopup(metadata) {
     console.log("metadata", metadata)
+    if(!metadata) return
     const popup = document.getElementById('popup');
     popup.innerHTML = `
       <div class="popup-content">

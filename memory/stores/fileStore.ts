@@ -1,6 +1,6 @@
 import { makeObservable, observable, action, runInAction, autorun } from "mobx";
 import { saveData, getData } from '../local/db.js';
-import { updateGraph, isRendererReady } from '../../graph.js'; // Import isRendererReady
+import { updateGraph, isRendererReady } from '../../ui/graph/graph.js'; // Import isRendererReady
 
 interface FileMetadata {
   id: number;
@@ -22,7 +22,7 @@ interface DirectoryMetadata {
   summary?: string; // Summary of the directory built by llm
 }
 
-class FileStore {
+export class FileStore {
   @observable files: FileMetadata[] = [];
   @observable directories: DirectoryMetadata[] = [];
   @observable selectedFile: FileMetadata | null = null;
@@ -115,12 +115,11 @@ class FileStore {
   async saveDirectories() {
     await saveData('directories', this.directories);
   }
-
   @action.bound
   async selectFile(id: number) {
-    const metadata = await getData('files');
+    const metadata: FileMetadata[] = await getData('files');
     runInAction(() => {
-      this.selectedFile = metadata.find(file => file.id === id) || null;
+      this.selectedFile = metadata.find((file: FileMetadata) => file.id === id) || null;
     });
   }
 

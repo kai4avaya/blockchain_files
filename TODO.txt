@@ -1,0 +1,12 @@
+simplied
+
+
+filestore i believe should be immudatable... ie its our first entry when someone drags file and keeps original immudatable
+graph is repreesentations of the changes over time
+  - i need to update graphstore with islands  
+  - so that instead of snapshot i think we need graphstore  
+   - graphstore will keep the views that a person creates
+    - 
+
+ = will need to update sphere drag to record this inside of graphstore (aka islands)
+  - then on cubedrag need to obtain this graphstore data to update rather than snapshot...

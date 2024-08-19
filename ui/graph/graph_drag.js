@@ -1,12 +1,14 @@
+// TO DO call this sphere_drag or something
+
 import {
   createSphere,
   share3dDat,
   createWireframeCube,
   render
 } from "./graph.js";
-import {handleFileDrop} from "./memory/fileHandler.js";
+import {handleFileDrop} from "../../memory/fileHandler.js";
 import * as THREE from "three";
-import { getSceneSnapshot } from "./graph_snapshot.js";
+// import { getSceneSnapshot } from "./graph_snapshot.js";
 
 setupDragAndDrop();
 let CUBEINTERSECTED;
@@ -40,17 +42,14 @@ function changeCubeColor(intersects, isHovering) {
 
     if (intersectedObject.isMesh && intersectedObject.geometry.type === "BoxGeometry") {
       foundSolidCube = true;
-      console.log("Found solid cube, isHovering:", isHovering);
 
       if (CUBEINTERSECTED !== intersectedObject) {
         if (CUBEINTERSECTED) {
-          console.log("Resetting previous cube");
           resetCubeColor(CUBEINTERSECTED);
         }
 
         CUBEINTERSECTED = intersectedObject;
         if (isHovering) {
-          console.log("Highlighting new cube");
           highlightCube(CUBEINTERSECTED);
         }
       } else if (isHovering) {
@@ -62,7 +61,6 @@ function changeCubeColor(intersects, isHovering) {
   }
 
   if (!foundSolidCube && CUBEINTERSECTED) {
-    console.log("No solid cube found, resetting");
     resetCubeColor(CUBEINTERSECTED);
     CUBEINTERSECTED = null;
   }
@@ -71,7 +69,6 @@ function changeCubeColor(intersects, isHovering) {
 
 
 function highlightCube(cube) {
-  console.log("Highlighting cube:", cube);
   if (!cube.originalMaterial) {
     cube.originalMaterial = cube.material.clone();
   }
@@ -80,7 +77,6 @@ function highlightCube(cube) {
 }
 
 function resetCubeColor(cube) {
-  console.log("Resetting cube color:", cube);
   if (cube.originalMaterial) {
     cube.material = cube.originalMaterial;
     cube.material.needsUpdate = true;
@@ -91,13 +87,11 @@ function resetCubeColor(cube) {
 function setupDragAndDrop() {
   window.addEventListener("dragover", (event) => {
     event.preventDefault();
-    console.log("Drag over event");
     onPointerMove(event, true);
   });
 
   window.addEventListener("drop", async (event) => {
     event.preventDefault();
-    console.log("Drop event");
 
     const { camera, scene, nonBloomScene, raycaster, mouse } = share3dDat();
 
@@ -116,7 +110,6 @@ function setupDragAndDrop() {
       let dropPosition;
       const uuids = await handleFileDrop(event);
 
-      console.log("uuids from file drop", uuids)
 
       if (allIntersects.length > 0) {
         const intersect = allIntersects[0];
@@ -160,13 +153,11 @@ function setupDragAndDrop() {
       resetCubeColor(CUBEINTERSECTED);
       CUBEINTERSECTED = null;
     }
-   const snapshot = getSceneSnapshot([scene, nonBloomScene]);
-   console.log("Drop snapshot:", snapshot);
+  //  const snapshot = getSceneSnapshot([scene, nonBloomScene]);
   });
 
   window.addEventListener("dragleave", (event) => {
     event.preventDefault();
-    console.log("Drag leave event");
     if (CUBEINTERSECTED) {
       resetCubeColor(CUBEINTERSECTED);
       CUBEINTERSECTED = null;
@@ -185,6 +176,5 @@ function onPointerMove(event, isDragging = false) {
 
   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
 
-  console.log("Pointer move, isDragging:", isDragging);
   changeCubeColor(allIntersects, isDragging);
 }

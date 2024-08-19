@@ -1,4 +1,4 @@
-import { createSphere, share3dDat, render } from './graph.js';
+import { createSphere, share3dDat, render } from '../ui/graph/graph.js';
 import * as THREE from 'three';
 
 let camera, scene, renderer, mouse;
