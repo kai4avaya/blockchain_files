@@ -1,51 +1,87 @@
 import { makeObservable, observable, action, runInAction, autorun } from "mobx";
-import { saveData, getData } from '../local/db.js';
-import { updateGraph, isRendererReady } from '../../ui/graph/graph.js'; // Import isRendererReady
-import { fileStore } from './fileStore';
+// import { saveData, getData } from '../local/db.js';
+import { saveData, getData } from '../local/dbgeneral';
+import { updateGraph, isRendererReady } from '../../ui/graph/graph.js';
+import { FileStore } from './fileStore';
+import { fetchGraphDataFromServer } from '../../services/graphqlLayer'; // Hypothetical function to fetch data from server
 
-// Define interfaces for the data structures
 interface Node {
   id: string;
   fileId?: string;
   name?: string;
   size?: number;
+  shapeType?: string; // E.g., "sphere", "cube", "customShape"
+  geometry?: { [key: string]: any }; // Geometry-specific data (e.g., radius, width, height)
+  material?: { [key: string]: any }; // Material-specific data (e.g., color, texture)
+  position?: { x: number; y: number; z: number }; // Position in 3D space
+  rotation?: { x: number; y: number; z: number }; // Rotation in 3D space
+  scale?: { x: number; y: number; z: number }; // Scale in 3D space
   [key: string]: any; // Additional properties
 }
+
 
 interface Edge {
   id: string;
   source: string;
   target: string;
-  [key: string]: any; // Additional properties
+  [key: string]: any;
 }
 
 interface Island {
   id: string;
   nodeIds: string[];
 }
-
 class GraphStore {
   @observable nodes: Node[] = [];
   @observable edges: Edge[] = [];
   @observable islands: Island[] = [];
 
+  
   constructor() {
     makeObservable(this);
-    this.loadInitialState();
+    this.initializeGraphData();
+  }
 
-    autorun(() => {
-      if (!isRendererReady()) {
-        return; // Skip calling updateGraph if renderer is not ready
-      }
-      
-      const nodesWithFiles = this.nodes.map(node => {
-        const file = fileStore.files.find(file => file.id === node.fileId);
-        return { ...node, name: file?.name || "Unknown", size: file?.size || 0 };
+  @action.bound
+  async initializeGraphData(): Promise<void> {
+    try {
+      // First, attempt to load data from the server
+      const serverData = await fetchGraphDataFromServer();
+      runInAction(() => {
+        this.nodes = serverData.nodes || [];
+        this.edges = serverData.edges || [];
+        this.islands = serverData.islands || [];
       });
-      console.log("AUTORUN: nodes", nodesWithFiles);
-      updateGraph(nodesWithFiles);
+    } catch (error) {
+      console.warn("Failed to fetch data from server, loading from IndexedDB", error);
+
+      // If server data fails, load from IndexedDB
+      const graphData = await getData('graph');
+      runInAction(() => {
+        this.nodes = graphData.nodes || [];
+        this.edges = graphData.edges || [];
+        this.islands = graphData.islands || [];
+      });
+    }
+
+    this.updateGraphState();
+  }
+
+  @action.bound
+  async updateGraphState(): Promise<void> {
+    // Trigger a UI update
+    if (isRendererReady()) {
+      updateGraph(this.nodes, this.edges, this.islands);
+    }
+
+    // Save the current graph state to IndexedDB
+    await saveData('graph', {
+      nodes: this.nodes,
+      edges: this.edges,
+      islands: this.islands
     });
   }
+
 
   @action.bound
   async loadInitialState(): Promise<void> {
@@ -64,54 +100,48 @@ class GraphStore {
 
   @action.bound
   async addNode(node: Node): Promise<void> {
-    this.nodes.push(node);
-    await this.saveData('nodes', this.nodes);
+    runInAction(() => this.nodes.push(node));
+    await this.updateGraphState();
   }
 
   @action.bound
   async updateNode(node: Node): Promise<void> {
-    const index = this.nodes.findIndex(n => n.id === node.id);
-    if (index !== -1) {
-      this.nodes[index] = node;
-      await this.saveData('nodes', this.nodes);
-    }
+    runInAction(() => {
+      const index = this.nodes.findIndex(n => n.id === node.id);
+      if (index !== -1) this.nodes[index] = node;
+    });
+    await this.updateGraphState();
   }
 
   @action.bound
   async removeNode(nodeId: string): Promise<void> {
-    this.nodes = this.nodes.filter(node => node.id !== nodeId);
-    await this.saveData('nodes', this.nodes);
+    runInAction(() => this.nodes = this.nodes.filter(node => node.id !== nodeId));
+    await this.updateGraphState();
   }
 
   @action.bound
-  async addIsland(island: Island): Promise<void> {
-    this.islands.push({
-      id: island.id,
-      nodeIds: island.nodeIds || []
+  async upsertIsland(islandId: string, nodeIds: string[]): Promise<void> {
+    runInAction(() => {
+      let island = this.islands.find(i => i.id === islandId);
+
+      if (island) {
+        island.nodeIds = [...island.nodeIds, ...nodeIds];
+      } else {
+        this.islands.push({ id: islandId || `island-${Date.now()}`, nodeIds });
+      }
     });
-    await this.saveData('islands', this.islands);
+    await this.updateGraphState();
   }
 
   @action.bound
-  async updateIsland(islandId: string, newNodeIds: string[]): Promise<void> {
-    const island = this.islands.find(i => i.id === islandId);
-    if (island) {
-      island.nodeIds = newNodeIds;
-      await this.saveData('islands', this.islands);
-    }
-  }
-
-  @action.bound
-  async removeIsland(islandId: string): Promise<void> {
-    this.islands = this.islands.filter(island => island.id !== islandId);
-    await this.saveData('islands', this.islands);
-  }
-
-  @action.bound
-  async saveData(storeName: string, data: any): Promise<void> {
-    await saveData(storeName, data);
+  async updateGraphState(): Promise<void> {
+    await Promise.all([
+      this.saveData('nodes', this.nodes),
+      this.saveData('islands', this.islands)
+    ]);
   }
 }
 
 const graphStore = new GraphStore();
 export default graphStore;
+

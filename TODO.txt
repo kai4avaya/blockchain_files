@@ -1,12 +1,20 @@
 simplied
 
 
-filestore i believe should be immudatable... ie its our first entry when someone drags file and keeps original immudatable
-graph is repreesentations of the changes over time
-  - i need to update graphstore with islands  
-  - so that instead of snapshot i think we need graphstore  
-   - graphstore will keep the views that a person creates
-    - 
+I built graphstore 
+the graph is the ui layer that controls this store
+but there is a server
+  that is called to update the indexdb
+  whether or not it updates the indexdb we will still update the code from the indexdb
 
- = will need to update sphere drag to record this inside of graphstore (aka islands)
-  - then on cubedrag need to obtain this graphstore data to update rather than snapshot...
+  i need to update graphstore and the graph so they talk to each other
+    the graph has to be initated be graphstore 
+      then the graph has to update graphstore
+
+STEPS:
+1) initiate graphstore from indexdb
+2) also call server maybe in a worker to update from server in another thread
+3) if indexdb is changed it will always push a graph update
+4) update graph from graphstore
+5) graphstore updated by graph when any change happens
+6) graphstore wuill update indexdb as well

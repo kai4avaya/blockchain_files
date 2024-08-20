@@ -188,49 +188,51 @@ setupScene();
 
 let cubes = [];
 
-// Sample data
-const sampleData = [
-  {
-    id: 1,
-    name: "Cube 1",
-    size: 1,
-    x: 1,
-    y: 0.88,
-    z: 1,
-    color: getBrightColor(),
-  },
-  {
-    id: 2,
-    name: "Cube 2",
-    size: 2,
-    x: -0.1,
-    y: 1,
-    z: -1,
-    color: getBrightColor(),
-  },
-  {
-    id: 3,
-    name: "Cube 3",
-    size: 3,
-    x: 1,
-    y: -1,
-    z: 0.11,
-    color: getBrightColor(),
-  },
-  {
-    id: 4,
-    name: "Cube 4",
-    size: 1,
-    x: -1,
-    y: -1,
-    z: -1,
-    color: getBrightColor(),
-  },
-];
+// // Sample data
+// const sampleData = [
+//   {
+//     id: 1,
+//     name: "Cube 1",
+//     size: 1,
+//     x: 1,
+//     y: 0.88,
+//     z: 1,
+//     color: getBrightColor(),
+//   },
+//   {
+//     id: 2,
+//     name: "Cube 2",
+//     size: 2,
+//     x: -0.1,
+//     y: 1,
+//     z: -1,
+//     color: getBrightColor(),
+//   },
+//   {
+//     id: 3,
+//     name: "Cube 3",
+//     size: 3,
+//     x: 1,
+//     y: -1,
+//     z: 0.11,
+//     color: getBrightColor(),
+//   },
+//   {
+//     id: 4,
+//     name: "Cube 4",
+//     size: 1,
+//     x: -1,
+//     y: -1,
+//     z: -1,
+//     color: getBrightColor(),
+//   },
+// ];
 
 // Initialize the graph with the sample data
-initiateGraph(sampleData);
+// initiateGraph(sampleData);
 // buildScene()
+initiateGraph([]);
+
 
 function getBrightColor() {
   const colors = [0xff00ff, 0x00ffff, 0xffff00, 0xffa500, 0x00ff00, 0x0000ff];
