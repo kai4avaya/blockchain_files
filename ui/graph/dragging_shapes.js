@@ -47,40 +47,73 @@ function getCubeUnderPointer(event) {
 }
 
 
+// export function dragCube(event, cube, intersectPoint, snapshot) {
+//     if (!cube) {
+//         return;
+//     }
+//     const { nonBloomScene, scene } = share3dDat();
+
+
+//     const cubeId = cube.wireframeCube.id || cube.wireframeCube.uuid;
+
+//     const cubes = getObjectById([nonBloomScene, scene], cubeId)
+
+//     cubes[0].position.copy(intersectPoint);
+//     cubes[1].position.copy(intersectPoint);
+
+//     console.log("i am cube 0", cubes[0])
+//     console.log("i am cube 1", cubes[1])
+
+//     // Move all spheres inside this cube
+//     const containedSphereIds = snapshot.containment[cubeId];
+
+//     console.log("containedSphereIds", containedSphereIds)
+//     if (containedSphereIds && containedSphereIds.length > 0) {
+//         containedSphereIds.forEach(sphereId => {
+//             let sphere = findSphereById(snapshot.spheres, sphereId);
+//             if (sphere) {
+//                 console.log("i am sphere", sphere)
+//                 // const {nonBloomScene, scene} = share3dDat();
+//                 sphere = getObjectById([nonBloomScene, scene], sphereId)[0]
+//                 moveSphere(event,sphere, intersectPoint)
+//             }
+//         });
+//     }
+//     // render();
+
+// }
+
+
+let camera; // Make sure to initialize this with your camera
+
 export function dragCube(event, cube, intersectPoint, snapshot) {
-    if (!cube) {
-        return;
-    }
+    if (!cube) return;
+
     const { nonBloomScene, scene } = share3dDat();
-
-
     const cubeId = cube.wireframeCube.id || cube.wireframeCube.uuid;
+    const cubes = getObjectById([nonBloomScene, scene], cubeId);
 
-    const cubes = getObjectById([nonBloomScene, scene], cubeId)
+    // Calculate the movement delta
+    const movementDelta = new THREE.Vector3().subVectors(intersectPoint, cubes[0].position);
 
-    cubes[0].position.copy(intersectPoint);
-    cubes[1].position.copy(intersectPoint);
-
-
-    cube.wireframeCube.frustumCulled = false;
-    cube.solidCube.frustumCulled = false;
+    // Update cube positions
+    cubes.forEach(cubeObj => {
+        cubeObj.position.add(movementDelta);
+    });
 
     // Move all spheres inside this cube
     const containedSphereIds = snapshot.containment[cubeId];
-    console.log("containedSphereIds", containedSphereIds)
     if (containedSphereIds && containedSphereIds.length > 0) {
         containedSphereIds.forEach(sphereId => {
-            let sphere = findSphereById(snapshot.spheres, sphereId);
-            if (sphere) {
-                console.log("i am sphere", sphere)
-                const {nonBloomScene, scene} = share3dDat();
-                sphere = getObjectById([nonBloomScene, scene], sphereId)[0]
-                moveSphere(event,sphere)
-            }
+            const sphereObjects = getObjectById([nonBloomScene, scene], sphereId);
+            sphereObjects.forEach(sphereObj => {
+                // Move sphere by the same delta as the cube
+                sphereObj.position.add(movementDelta);
+            });
         });
     }
-    // render();
 
+    render();
 }
 
 function findSphereById(spheres, id) {
@@ -240,3 +273,8 @@ document.addEventListener('pointerup', () => {
     currentSnapshot = null; // Clear the snapshot after dragging ends
     controls.enabled = true;
 });
+
+// Make sure to call this function when you set up your scene
+export function initializeDragFunctions(cameraInstance) {
+    camera = cameraInstance;
+}
