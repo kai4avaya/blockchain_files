@@ -44,35 +44,50 @@ export function getSceneSnapshot(scenes) {
 
     return snapshot;
 }
-
-
-function isSphereInsideCube(sphere, cube) {
+export function isSphereInsideCube(sphere, cube, buffer = 0.1) {
+    if (! sphere || ! cube) return false;
     const spherePosition = sphere.position;
     const cubePosition = cube.position;
-    const cubeHalfSize = cube.scale.x / 2; // Assuming uniform scale for simplicity
-    const sphereRadius = sphere.scale.x / 2; // Assuming uniform scale for simplicity
+    const cubeHalfSize = (cube.scale.x / 2) + buffer;
+    const sphereRadius = (sphere.scale.x / 2) + buffer;
 
-    // Check if the sphere's center is within the cube's boundaries
-    const withinX = Math.abs(spherePosition.x - cubePosition.x) <= cubeHalfSize;
-    const withinY = Math.abs(spherePosition.y - cubePosition.y) <= cubeHalfSize;
-    const withinZ = Math.abs(spherePosition.z - cubePosition.z) <= cubeHalfSize;
 
-    // Check if the sphere intersects with the cube's faces
-    const intersectsX = Math.abs(spherePosition.x - cubePosition.x) <= cubeHalfSize + sphereRadius;
-    const intersectsY = Math.abs(spherePosition.y - cubePosition.y) <= cubeHalfSize + sphereRadius;
-    const intersectsZ = Math.abs(spherePosition.z - cubePosition.z) <= cubeHalfSize + sphereRadius;
 
-    const inside = (withinX && withinY && withinZ) || (intersectsX && intersectsY && intersectsZ);
+    // Calculate the vector from the cube center to the sphere center
+    const dx = Math.abs(spherePosition.x - cubePosition.x);
+    const dy = Math.abs(spherePosition.y - cubePosition.y);
+    const dz = Math.abs(spherePosition.z - cubePosition.z);
 
-    if (inside) {
-        console.log(`Sphere ${sphere.id} is inside or intersects with Cube ${cube.id}`);
-    } else {
-        console.log(`Sphere ${sphere.id} is outside Cube ${cube.id}`);
-    }
+    // // Check if the sphere is too far away to possibly intersect
+    // if (dx > cubeHalfSize + sphereRadius) return false;
+    // if (dy > cubeHalfSize + sphereRadius) return false;
+    // if (dz > cubeHalfSize + sphereRadius) return false;
 
-    return inside;
+    // Check if the sphere center is within the cube
+    if (dx <= cubeHalfSize) return true;
+    if (dy <= cubeHalfSize) return true;
+    if (dz <= cubeHalfSize) return true;
+
+    // Check corner cases
+    const cornerDistanceSq = 
+        (dx - cubeHalfSize) * (dx - cubeHalfSize) +
+        (dy - cubeHalfSize) * (dy - cubeHalfSize) +
+        (dz - cubeHalfSize) * (dz - cubeHalfSize);
+
+    const intersects = cornerDistanceSq <= (sphereRadius * sphereRadius);
+    
+    console.log(`Sphere ${sphere.id} ${intersects ? 'intersects with or is inside' : 'is outside'} Cube ${cube.id}`);
+    console.log(`Sphere position: (${spherePosition.x}, ${spherePosition.y}, ${spherePosition.z}), radius: ${sphereRadius}`);
+    console.log(`Cube position: (${cubePosition.x}, ${cubePosition.y}, ${cubePosition.z}), half size: ${cubeHalfSize}`);
+    console.log(`Distances: dx=${dx}, dy=${dy}, dz=${dz}, Corner distance squared: ${cornerDistanceSq}`);
+
+        // Check if the sphere is too far away to possibly intersect
+        if (dx > cubeHalfSize + sphereRadius) return false;
+        if (dy > cubeHalfSize + sphereRadius) return false;
+        if (dz > cubeHalfSize + sphereRadius) return false;
+
+    return intersects;
 }
-
 
 export function getCubeAndContainedSpheresById(snapshot, cubeId) {
     const result = {

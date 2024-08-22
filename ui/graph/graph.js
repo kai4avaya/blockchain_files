@@ -302,6 +302,7 @@ export function createWireframeCube(size, x, y, z, color, id = 0) {
   return cube;
 }
 
+// allows me to change color of spheres
 function onPointerDown(event) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -341,76 +342,6 @@ function onPointerMove(event) {
     moveSphere(event);
   }
 }
-
-
-// export function moveSphere(event, sphere, intersectPointIn = null) {
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-//   raycaster.setFromCamera(mouse, camera);
-
-//   const planeDistance = -10;
-//   const plane = new THREE.Plane(
-//     new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-//     planeDistance
-//   );
-
-
-//   let intersectPoint;
-//   if(intersectPointIn)
-//     intersectPoint = intersectPointIn;
-//   else
-//     intersectPoint = new THREE.Vector3();
-
-//   console.log("i am intersect point", intersectPoint);
-//   raycaster.ray.intersectPlane(plane, intersectPoint);
-
-
-//   if (sphere) sphere.position.copy(intersectPoint);
-//   else selectedSphere.position.copy(intersectPoint);
-
-//   render();
-// }
-
-
-// export function moveSphere(event, sphere, intersectPointIn = null) {
-//   // if (!sphere) return;
-
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-//   raycaster.setFromCamera(mouse, camera);
-//   let  planeDistance
-//   let plane;
-//   if(sphere){
-//    planeDistance = sphere.position.z - camera.position.z;
-//    plane = new THREE.Plane(
-//     new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-//     planeDistance
-// );}
-//   else {
-//   // planeDistance = selectedSphere.position.z - camera.position.z;
-//      planeDistance = -10;
-//      plane = new THREE.Plane(
-//       new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-//       planeDistance
-//     );
-
-// }
-
-//   let intersectPoint = intersectPointIn || new THREE.Vector3();
-//   raycaster.ray.intersectPlane(plane, intersectPoint);
-
-//   // Move the sphere to the new position
-//   // sphere.position.copy(intersectPoint);
-//   console.log("sphere moving", sphere)
-//   console.log("selectedSphere moving", selectedSphere)
-
-//     if (sphere) sphere.position.copy(intersectPoint);
-//   else selectedSphere.position.copy(intersectPoint);
-
-//   render();
-// }
 
 
 

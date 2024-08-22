@@ -21,3 +21,7 @@ STEPS:
 
 
 pop ui should not appear on drag
+
+
+ERRORS
+drag cube everything drags!

@@ -21,7 +21,7 @@ function normalizeSize(fileSize) {
   );
 }
 
-function checkIntersections(raycaster, scenes) {
+export function checkIntersections(raycaster, scenes) {
   let allIntersects = [];
 
   scenes.forEach(scene => {
