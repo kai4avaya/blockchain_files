@@ -3,10 +3,10 @@ import {
   share3dDat,
   createWireframeCube,
   render,
+  removeEmptyCubes
 } from "./create.js";
 import {
-  getSceneSnapshot,
-  getCubeAndContainedSpheresById,
+    createSceneSnapshot,
   getObjectById,
 } from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
@@ -19,87 +19,154 @@ const cubeGroups = new Map(); // Map of cube UUIDs to arrays of spheres inside t
 let selectedObject = null;
 let currentSnapshot = null;
 const BLOOM_SCENE = 1;
-
+let isFileDragging = false;
 
 setupDragAndDrop();
 
+// function getCubeUnderPointer(event) {
+//   const { camera, raycaster, scene, nonBloomScene, mouse, controls } =
+//     share3dDat();
+
+//   // Update mouse position
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+//   // Cast a ray from the camera to the mouse position
+//   raycaster.setFromCamera(mouse, camera);
+//   const intersects = raycaster.intersectObjects(nonBloomScene.children, true);
+
+//   if (intersects.length > 0) {
+//     currentSnapshot = getSceneSnapshot([scene, nonBloomScene]); // Pass the scenes to get the snapshot
+
+//     console.log("currentSnapshot!!!", currentSnapshot);
+//     for (const intersectedObject of intersects) {
+//       // Find the intersected object in the snapshot cubes using the userData.id or uuid
+//       const matchingCube = currentSnapshot.cubes.find(
+//         (cube) =>
+//           cube.id === intersectedObject.object.userData.id ||
+//           cube.id === intersectedObject.object.uuid
+//       );
+
+//       if (matchingCube) {
+//         controls.enabled = false; // Disable OrbitControls during dragging
+
+//         // Use the matching cube's ID to get the full cube and contained spheres
+//         const result = getCubeAndContainedSpheresById(
+//           currentSnapshot,
+//           matchingCube.id
+//         );
+
+//         return result; // Return the cube, its twin, and the contained spheres
+//       }
+//     }
+//   }
+
+//   return null; // Return null if no cube is found
+// }
+
+
+// returns the actual cubes and the spheres inside them
 function getCubeUnderPointer(event) {
-  const { camera, raycaster, scene, nonBloomScene, mouse, controls } =
-    share3dDat();
+    const { camera, raycaster, scene, nonBloomScene, mouse, controls } = share3dDat();
+    // Update mouse position
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  
+    // Cast a ray from the camera to the mouse position
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(nonBloomScene.children, true);
+  
+    if (intersects.length > 0) {
+      currentSnapshot = createSceneSnapshot([scene, nonBloomScene]);
 
-  // Update mouse position
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-  // Cast a ray from the camera to the mouse position
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(nonBloomScene.children, true);
-
-  if (intersects.length > 0) {
-    currentSnapshot = getSceneSnapshot([scene, nonBloomScene]); // Pass the scenes to get the snapshot
-
-    console.log("currentSnapshot!!!", currentSnapshot);
-    for (const intersectedObject of intersects) {
-      // Find the intersected object in the snapshot cubes using the userData.id or uuid
-      const matchingCube = currentSnapshot.cubes.find(
-        (cube) =>
-          cube.id === intersectedObject.object.userData.id ||
-          cube.id === intersectedObject.object.uuid
-      );
-
-      if (matchingCube) {
-        controls.enabled = false; // Disable OrbitControls during dragging
-
-        // Use the matching cube's ID to get the full cube and contained spheres
-        const result = getCubeAndContainedSpheresById(
-          currentSnapshot,
-          matchingCube.id
+      console.log("currentSnapshot!!!", currentSnapshot);
+  
+      for (const intersectedObject of intersects) {
+        // Find the intersected object in the snapshot boxes
+        const matchingBox = currentSnapshot.boxes.find(
+          (box) =>
+            box.id === intersectedObject.object.userData.id ||
+            box.id === intersectedObject.object.uuid
         );
-
-        return result; // Return the cube, its twin, and the contained spheres
+  
+        if (matchingBox) {
+          controls.enabled = false; // Disable OrbitControls during dragging
+  
+          return {
+            wireframeCube: matchingBox.wireframe,
+            solidCube: matchingBox.solid,
+            containedSpheres: currentSnapshot.containment[matchingBox.id].map(id => 
+              getObjectById(currentSnapshot, id)
+            )
+          };
+        }
       }
     }
+    return null; // Return null if no cube is found
   }
+  
+// export function dragCube(event, cube, intersectPoint, snapshot) {
+//   if (!cube) return;
+//   if (!cube.wireframeCube) return;
 
-  return null; // Return null if no cube is found
-}
+//   const { nonBloomScene, scene } = share3dDat();
 
-export function dragCube(event, cube, intersectPoint, snapshot) {
-  if (!cube) return;
-  if (!cube.wireframeCube) return;
+//   const cubeId = cube.wireframeCube.id || cube.wireframeCube.uuid;
+//   const cubes = getObjectById([nonBloomScene, scene], cubeId);
 
-  const { nonBloomScene, scene } = share3dDat();
+//   // Calculate the movement delta
+//   const movementDelta = new THREE.Vector3().subVectors(
+//     intersectPoint,
+//     cubes[0].position
+//   );
 
-  const cubeId = cube.wireframeCube.id || cube.wireframeCube.uuid;
-  const cubes = getObjectById([nonBloomScene, scene], cubeId);
+//   // Update cube positions
+//   cubes.forEach((cubeObj) => {
+//     cubeObj.position.add(movementDelta);
+//   });
 
-  // Calculate the movement delta
-  const movementDelta = new THREE.Vector3().subVectors(
-    intersectPoint,
-    cubes[0].position
-  );
+//   // Move all spheres inside this cube
+//   const containedSphereIds = snapshot.containment[cubeId];
 
-  // Update cube positions
-  cubes.forEach((cubeObj) => {
-    cubeObj.position.add(movementDelta);
-  });
+//   console.log("containedSphereIds", containedSphereIds);
+//   if (containedSphereIds && containedSphereIds.length > 0) {
+//     containedSphereIds.forEach((sphereId) => {
+//       const sphereObjects = getObjectById([nonBloomScene, scene], sphereId);
+//       sphereObjects.forEach((sphereObj) => {
+//         // Move sphere by the same delta as the cube
+//         sphereObj.position.add(movementDelta);
+//       });
+//     });
+//   }
 
-  // Move all spheres inside this cube
-  const containedSphereIds = snapshot.containment[cubeId];
+//   render();
+// }
 
-  console.log("containedSphereIds", containedSphereIds);
-  if (containedSphereIds && containedSphereIds.length > 0) {
-    containedSphereIds.forEach((sphereId) => {
-      const sphereObjects = getObjectById([nonBloomScene, scene], sphereId);
-      sphereObjects.forEach((sphereObj) => {
-        // Move sphere by the same delta as the cube
-        sphereObj.position.add(movementDelta);
+
+export function dragCube(cubes_and_containtedSpheres, intersectPoint) {
+    if (!cubes_and_containtedSpheres || !cubes_and_containtedSpheres.wireframeCube) return;
+  
+    // const cubeId = cubes_and_containtedSpheres.wireframeCube.id || cubes_and_containtedSpheres.wireframeCube.uuid;
+    console.log("cubes_and_containtedSpheres", cubes_and_containtedSpheres)
+    const cubes = [cubes_and_containtedSpheres.wireframeCube, cubes_and_containtedSpheres.solidCube].filter(Boolean);
+  
+    // Calculate the movement delta
+    const movementDelta = new THREE.Vector3().subVectors(
+      intersectPoint,
+      cubes[0].position
+    );
+
+    cubes_and_containtedSpheres.wireframeCube.position.add(movementDelta);
+    cubes_and_containtedSpheres.solidCube.position.add(movementDelta)
+  
+    // Move all spheres inside this cube
+    const containedSpheres = cubes_and_containtedSpheres.containedSpheres
+        containedSpheres.forEach((sphere) => {
+            sphere.object.position.add(movementDelta);
       });
-    });
+  
+    render();
   }
-
-  render();
-}
 
 export function removeSphereFromCube(sphere, cube) {
   const spheres = cubeGroups.get(cube.uuid);
@@ -111,6 +178,50 @@ export function removeSphereFromCube(sphere, cube) {
   }
 }
 
+
+
+function handleDragOver(event) {
+    const { camera, scene, nonBloomScene, raycaster, mouse } = share3dDat();
+  
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+  
+    const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+    const cubeIntersect = allIntersects.find(intersect => 
+      intersect.object.geometry.type === "BoxGeometry" || 
+      intersect.object.geometry.type === "EdgesGeometry"
+    );
+  
+    if (cubeIntersect) {
+      highlightCube(cubeIntersect.object);
+    } else {
+      resetCubeHighlight();
+    }
+  }
+  
+function highlightCube(cube) {
+    if (CUBEINTERSECTED !== cube) {
+      resetCubeHighlight();
+      CUBEINTERSECTED = cube;
+    }
+    
+    if (!cube.originalMaterial) {
+      cube.originalMaterial = cube.material.clone();
+    }
+    
+    cube.material = new THREE.MeshBasicMaterial({
+      color: 0x39ff14,  // Bright green
+      transparent: true,
+      opacity: 0.8,
+    });
+    cube.material.needsUpdate = true;
+    render();
+  }
+  
+
+  
+  
 export function resizeCubeToFitSpheres(
   cube,
   minSizeAllowed = false,
@@ -191,7 +302,7 @@ export function getObjectUnderPointer(event) {
 }
 
 export function moveSphere(event, sphere, intersectPointIn = null) {
-  const { mouse, raycaster, camera } = share3dDat();
+  const { mouse, raycaster, camera, scene, nonBloomScene } = share3dDat();
 
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -199,6 +310,9 @@ export function moveSphere(event, sphere, intersectPointIn = null) {
   raycaster.setFromCamera(mouse, camera);
 
   const targetSphere = sphere || selectedSphere;
+
+  console.log("moving me sphere", targetSphere)
+
   if (!targetSphere) return;
 
   // Store the original distance from the camera
@@ -224,6 +338,7 @@ export function moveSphere(event, sphere, intersectPointIn = null) {
   const scaleFactor = newDistance / originalDistance;
   targetSphere.scale.multiplyScalar(scaleFactor);
 
+  removeEmptyCubes(scene, nonBloomScene);
   render();
 }
 
@@ -247,71 +362,62 @@ export function checkIntersections(raycaster, scenes) {
 
   return allIntersects;
 }
+function handleFileDragOver(event) {
+  const { camera, scene, nonBloomScene, raycaster, mouse } = share3dDat();
 
-function changeCubeColor(intersects, isHovering) {
-  let foundSolidCube = false;
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
 
-  for (let i = 0; i < intersects.length; i++) {
-    const intersectedObject = intersects[i].object;
+  const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+  const solidCubeIntersect = allIntersects.find(intersect => 
+    intersect.object.geometry.type === "BoxGeometry"
+  );
 
-    if (
-      intersectedObject.isMesh &&
-      intersectedObject.geometry.type === "BoxGeometry"
-    ) {
-      foundSolidCube = true;
-
-      if (CUBEINTERSECTED !== intersectedObject) {
-        if (CUBEINTERSECTED) {
-          resetCubeColor(CUBEINTERSECTED);
-        }
-
-        CUBEINTERSECTED = intersectedObject;
-        if (isHovering) {
-          highlightCube(CUBEINTERSECTED);
-        }
-      } else if (isHovering) {
-        // Ensure the cube stays highlighted while hovering
-        highlightCube(CUBEINTERSECTED);
+  if (solidCubeIntersect) {
+    highlightCube(solidCubeIntersect.object);
+  } else {
+    resetCubeHighlight();
+  }
+}
+  
+  
+  
+  function resetCubeHighlight() {
+    if (CUBEINTERSECTED) {
+      if (CUBEINTERSECTED.originalMaterial) {
+        CUBEINTERSECTED.material = CUBEINTERSECTED.originalMaterial;
+        CUBEINTERSECTED.material.needsUpdate = true;
       }
-      break;
+      CUBEINTERSECTED = null;
+      render();
     }
   }
 
-  if (!foundSolidCube && CUBEINTERSECTED) {
-    resetCubeColor(CUBEINTERSECTED);
-    CUBEINTERSECTED = null;
+  function resetCubeColor(cube) {
+    if (cube && cube.originalMaterial) {
+      cube.material = cube.originalMaterial;
+      cube.material.needsUpdate = true;
+    }
   }
-  render();
-}
-
-function highlightCube(cube) {
-  if (!cube.originalMaterial) {
-    cube.originalMaterial = cube.material.clone();
-  }
-  cube.material = new THREE.MeshBasicMaterial({
-    color: 0x39ff14,
-    transparent: true,
-    opacity: 0.8,
-  });
-  cube.material.needsUpdate = true;
-}
-
-function resetCubeColor(cube) {
-  if (cube.originalMaterial) {
-    cube.material = cube.originalMaterial;
-    cube.material.needsUpdate = true;
-  }
-}
-
 function setupDragAndDrop() {
+    window.addEventListener("dragenter", (event) => {
+      event.preventDefault();
+      isFileDragging = true;
+    });
+
+    
   window.addEventListener("dragover", (event) => {
     event.preventDefault();
-    onPointerMove(event, true);
+    if (isFileDragging) {
+      handleFileDragOver(event);
+    }
   });
 
   window.addEventListener("drop", async (event) => {
     event.preventDefault();
-
+    isFileDragging = false;
+    resetCubeHighlight();
     const { camera, scene, nonBloomScene, raycaster, mouse } = share3dDat();
 
     const dt = event.dataTransfer;
@@ -402,51 +508,66 @@ function setupDragAndDrop() {
 
   window.addEventListener("dragleave", (event) => {
     event.preventDefault();
-    if (CUBEINTERSECTED) {
-      resetCubeColor(CUBEINTERSECTED);
-      CUBEINTERSECTED = null;
-    }
+    isFileDragging = false;
+    resetCubeHighlight();
   });
 }
-
-// allows me to change color of spheres
-export function onPointerDown(event) {
-  const { mouse, raycaster, scene, camera, controls } = share3dDat();
-
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(scene.children, false);
-
-  // First, check for sphere intersections
-  const sphereIntersect = intersects.find(
-    (intersect) =>
-      intersect.object.geometry.type === "IcosahedronGeometry" ||
-      intersect.object.geometry.type === "SphereGeometry"
-  );
-
-  if (sphereIntersect) {
-    isDragging = true;
-    controls.enabled = false; // Disable OrbitControls during dragging
-
-    selectedSphere = sphereIntersect.object;
-    selectedObject = selectedSphere;
-
-    const object = intersects[0].object;
-
-    object.layers.toggle(BLOOM_SCENE);
-  } else {
-    // If no sphere is intersected, check for cube intersections
-    const selectedCube = getCubeUnderPointer(event);
-    if (selectedCube) {
-    isDragging = true;
-
-      controls.enabled = false; // Disable OrbitControls during dragging
-      selectedObject = selectedCube;
+function getObjectType(object) {
+    if (!object) return 'No object';
+    if (!object.geometry) return 'No geometry';
+    
+    const geometryType = object.geometry.type;
+    
+    // Check for specific geometry types
+    switch(geometryType) {
+      case 'IcosahedronGeometry':
+      case 'SphereGeometry':
+        return 'Sphere';
+      case 'BoxGeometry':
+        return 'Cube';
+      default:
+        return geometryType;
     }
   }
-}
+  
+  export function onPointerDown(event) {
+    const { mouse, raycaster, scene, nonBloomScene, camera, controls } = share3dDat();
+    
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    raycaster.setFromCamera(mouse, camera);
+    const intersectsBloom = raycaster.intersectObjects(scene.children, true);
+    const intersectsNonBloom = raycaster.intersectObjects(nonBloomScene.children, true);
+
+    const intersects = [...intersectsBloom, ...intersectsNonBloom]
+    
+    console.log("All intersects:", intersects.map(intersect => getObjectType(intersect.object)));
+    
+    const sphereIntersect = intersects.find(
+      intersect => getObjectType(intersect.object) === 'Sphere'
+    );
+    
+    console.log("Sphere intersect:", sphereIntersect);
+    
+    if (sphereIntersect) {
+      isDragging = true;
+      controls.enabled = false;
+      selectedSphere = sphereIntersect.object;
+      selectedObject = selectedSphere;
+      console.log("isDragging", isDragging);
+      sphereIntersect.object.layers.toggle(BLOOM_SCENE);
+    } else {
+      const selectedCube = getCubeUnderPointer(event);
+      console.log("i am selectedCube", selectedCube)
+      if (selectedCube) {
+        isDragging = true;
+        controls.enabled = false;
+        selectedObject = selectedCube;
+      }
+    }
+  }
+
 
 function onPointerUp(event) {
   const { controls } = share3dDat();
@@ -457,41 +578,69 @@ function onPointerUp(event) {
     selectedSphere = null;
     selectedObject = null;
     currentSnapshot = null;
-  
+    if (CUBEINTERSECTED) {
+      resetCubeColor(CUBEINTERSECTED);
+      CUBEINTERSECTED = null;
+    }
   }
 }
 
-function onPointerMove(event, isDragging = false) {
+// function onPointerMove(event) {
+//   const now = performance.now();
+//   if (now - lastTime < 16) {
+//     return;
+//   }
+//   lastTime = now;
+
+//   if (isDragging && selectedSphere) {
+//     console.log("calling, moveSphere")
+//     moveSphere(event);
+//   } else {
+//     const { camera, scene, nonBloomScene, raycaster, mouse } = share3dDat();
+
+//     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+//     raycaster.setFromCamera(mouse, camera);
+//     const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+//     changeCubeColor(allIntersects, isDragging);
+
+//     const plane = new THREE.Plane(
+//       new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
+//       0
+//     );
+//     const intersectPoint = new THREE.Vector3();
+//     raycaster.ray.intersectPlane(plane, intersectPoint);
+//     dragCube(event, selectedObject, intersectPoint, currentSnapshot);
+//   }
+// }
+
+function onPointerMove(event) {
   const now = performance.now();
   if (now - lastTime < 16) {
-    // roughly 60fps
     return;
   }
   lastTime = now;
 
   if (isDragging && selectedSphere) {
     moveSphere(event);
-    return;
-  } else {
-    const { camera, scene, nonBloomScene, raycaster, mouse } = share3dDat();
-
+  } else if (isDragging && selectedObject) {
+    const { camera, raycaster, mouse } = share3dDat();
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
     raycaster.setFromCamera(mouse, camera);
-    const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
-    changeCubeColor(allIntersects, isDragging);
-
     const plane = new THREE.Plane(
       new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
       0
     );
     const intersectPoint = new THREE.Vector3();
     raycaster.ray.intersectPlane(plane, intersectPoint);
-    dragCube(event, selectedObject, intersectPoint, currentSnapshot);
+    dragCube(selectedObject, intersectPoint);
   }
+  // Remove the else block that was calling handleDragOver
 }
 
+  
 window.addEventListener("pointerdown", onPointerDown);
 window.addEventListener("pointermove", onPointerMove);
 window.addEventListener("pointerup", onPointerUp);

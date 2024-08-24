@@ -1,163 +1,82 @@
-export function getSceneSnapshot(scenes) {
+import * as THREE from 'three';
+
+// Comprehensive function to create scene snapshot with bounding boxes and containment
+export function createSceneSnapshot(scenes) {
     const snapshot = {
-        cubes: [],
-        spheres: [],
+        objects: [],
+        boxes: [],
         containment: {}
     };
 
-    // Traverse both scenes
+    // Create a Map to store bounding boxes for quick lookup
+    const boundingBoxes = new Map();
+
     scenes.forEach((currentScene, sceneIndex) => {
         currentScene.traverse((object) => {
-            if (object.isMesh) {
-                if (object.geometry.type === "BoxGeometry") {
-                    snapshot.cubes.push({
-                        id: object.userData.id || object.uuid,
-                        position: object.position.clone(),
-                        scale: object.scale.clone(),
-                        type: object.geometry.type,
-                        scene: sceneIndex // Store the scene index or identifier
-                    });
-                } else if (object.geometry.type === "IcosahedronGeometry") {
-                    snapshot.spheres.push({
-                        id: object.userData.id || object.uuid,
-                        position: object.position.clone(),
-                        scale: object.scale.clone(),
-                        type: object.geometry.type,
-                        scene: sceneIndex // Store the scene index or identifier
-                    });
+            if (object.isMesh || object instanceof THREE.LineSegments) {
+                const objectData = {
+                    id: object.userData.id || object.uuid,
+                    object: object,
+                    type: object.geometry.type,
+                    scene: sceneIndex
+                };
+
+                snapshot.objects.push(objectData);
+
+                // Handle boxes (both wireframe and solid versions)
+                if (object.geometry.type === "BoxGeometry" || object.geometry instanceof THREE.EdgesGeometry) {
+                    const boxId = object.userData.id || object.uuid;
+                    let existingBox = snapshot.boxes.find(box => box.id === boxId);
+                    
+                    if (!existingBox) {
+                        existingBox = { id: boxId, wireframe: null, solid: null };
+                        snapshot.boxes.push(existingBox);
+                    }
+
+                    if (object instanceof THREE.LineSegments) {
+                        existingBox.wireframe = object;
+                    } else {
+                        existingBox.solid = object;
+                    }
+
+                    // Create bounding box if not exists
+                    if (!boundingBoxes.has(boxId)) {
+                        const boundingBox = new THREE.Box3().setFromObject(object);
+                        boundingBoxes.set(boxId, boundingBox);
+                    }
                 }
             }
         });
     });
 
-    // Calculate containment
-    snapshot.cubes.forEach(cube => {
-        snapshot.containment[cube.id] = [];
-        snapshot.spheres.forEach(sphere => {
-            if (isSphereInsideCube(sphere, cube)) {
-                snapshot.containment[cube.id].push(sphere.id);
-            }
-        });
+    // Compute containment
+    snapshot.boxes.forEach(box => {
+        const boxBoundingBox = boundingBoxes.get(box.id);
+        snapshot.containment[box.id] = [];
 
-        console.log(`Cube ${cube.id} contains spheres: `, snapshot.containment[cube.id]);
-    });
-
-    return snapshot;
-}
-export function isSphereInsideCube(sphere, cube, buffer = 0.1) {
-    if (! sphere || ! cube) return false;
-    const spherePosition = sphere.position;
-    const cubePosition = cube.position;
-    const cubeHalfSize = (cube.scale.x / 2) + buffer;
-    const sphereRadius = (sphere.scale.x / 2) + buffer;
-
-
-
-    // Calculate the vector from the cube center to the sphere center
-    const dx = Math.abs(spherePosition.x - cubePosition.x);
-    const dy = Math.abs(spherePosition.y - cubePosition.y);
-    const dz = Math.abs(spherePosition.z - cubePosition.z);
-
-    // // Check if the sphere is too far away to possibly intersect
-    // if (dx > cubeHalfSize + sphereRadius) return false;
-    // if (dy > cubeHalfSize + sphereRadius) return false;
-    // if (dz > cubeHalfSize + sphereRadius) return false;
-
-    // Check if the sphere center is within the cube
-    if (dx <= cubeHalfSize) return true;
-    if (dy <= cubeHalfSize) return true;
-    if (dz <= cubeHalfSize) return true;
-
-    // Check corner cases
-    const cornerDistanceSq = 
-        (dx - cubeHalfSize) * (dx - cubeHalfSize) +
-        (dy - cubeHalfSize) * (dy - cubeHalfSize) +
-        (dz - cubeHalfSize) * (dz - cubeHalfSize);
-
-    const intersects = cornerDistanceSq <= (sphereRadius * sphereRadius);
-    
-    console.log(`Sphere ${sphere.id} ${intersects ? 'intersects with or is inside' : 'is outside'} Cube ${cube.id}`);
-    console.log(`Sphere position: (${spherePosition.x}, ${spherePosition.y}, ${spherePosition.z}), radius: ${sphereRadius}`);
-    console.log(`Cube position: (${cubePosition.x}, ${cubePosition.y}, ${cubePosition.z}), half size: ${cubeHalfSize}`);
-    console.log(`Distances: dx=${dx}, dy=${dy}, dz=${dz}, Corner distance squared: ${cornerDistanceSq}`);
-
-        // Check if the sphere is too far away to possibly intersect
-        if (dx > cubeHalfSize + sphereRadius) return false;
-        if (dy > cubeHalfSize + sphereRadius) return false;
-        if (dz > cubeHalfSize + sphereRadius) return false;
-
-    return intersects;
-}
-
-export function getCubeAndContainedSpheresById(snapshot, cubeId) {
-    const result = {
-        wireframeCube: null,
-        solidCube: null,
-        containedSpheres: []
-    };
-
-    // Find the wireframe cube and its corresponding solid cube
-    const cubes = snapshot.cubes.filter(cube => cube.id === cubeId);
-    if (cubes.length === 0) {
-        console.error(`Cube with id ${cubeId} not found.`);
-        return result;
-    }
-
-    // Assume the first cube is wireframe and the second (if exists) is solid
-    result.wireframeCube = cubes[0];
-    if (cubes.length > 1) {
-        result.solidCube = cubes[1];
-    }
-
-    // Get all spheres contained within this cube
-    const containedSphereIds = snapshot.containment[cubeId] || [];
-    result.containedSpheres = snapshot.spheres.filter(sphere => containedSphereIds.includes(sphere.id));
-
-    return result;
-}
-
-export function getObjectById(scenes, id) {
-    const foundObjects = [];
-
-    // Iterate through the scenes and traverse each to find the objects by ID
-    scenes.forEach((currentScene) => {
-        currentScene.traverse((object) => {
-            if ((object.userData.id && object.userData.id === id) || object.uuid === id) {
-                foundObjects.push(object);
+        snapshot.objects.forEach(obj => {
+            if (obj.type === "IcosahedronGeometry" || obj.type === "SphereGeometry") {
+                const sphereBoundingBox = new THREE.Box3().setFromObject(obj.object);
+                if (boxBoundingBox.containsBox(sphereBoundingBox)) {
+                    snapshot.containment[box.id].push(obj.id);
+                }
             }
         });
     });
 
-    return foundObjects; // Return the array of found objects
+    return snapshot;
 }
 
+// Function to retrieve a specific object by ID
+export function getObjectById(snapshot, id) {
+    // Check in objects
+    const object = snapshot.objects.find(obj => obj.id === id);
+    if (object) return object;
 
-// Function to update the snapshot when spheres are moved
-export function updateSnapshotAfterSphereDrag(snapshot, draggedSphereId, newPosition) {
-    // Update the sphere's position in the snapshot
-    const sphereIndex = snapshot.spheres.findIndex(s => s.id === draggedSphereId);
-    if (sphereIndex !== -1) {
-        snapshot.spheres[sphereIndex].position = newPosition.clone();
-    }
+    // Check in boxes
+    const box = snapshot.boxes.find(box => box.id === id);
+    if (box) return box;
 
-    // Update containment
-    for (let cubeId in snapshot.containment) {
-        const index = snapshot.containment[cubeId].indexOf(draggedSphereId);
-        if (index !== -1) {
-            // Remove the sphere from this cube's containment
-            snapshot.containment[cubeId].splice(index, 1);
-        }
-    }
-
-    // Check if the sphere is now contained by any cube
-    snapshot.cubes.forEach(cube => {
-        if (isSphereInsideCube(snapshot.spheres[sphereIndex], cube)) {
-            if (!snapshot.containment[cube.id]) {
-                snapshot.containment[cube.id] = [];
-            }
-            snapshot.containment[cube.id].push(draggedSphereId);
-        }
-    });
-
-    return snapshot;
+    // If not found
+    return null;
 }

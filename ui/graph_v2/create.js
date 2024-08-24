@@ -8,6 +8,7 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
 import { generateUniqueId } from "../../utils/utils.js";
+import {createSceneSnapshot} from "./snapshot.js";
 
 const BLOOM_SCENE = 1;
 const bloomLayer = new THREE.Layers();
@@ -380,4 +381,53 @@ export function share3dDat() {
     cubes: typeof cubes !== "undefined" ? cubes : null,
     controls: typeof controls !== "undefined" ? controls : null,
   };
+}
+
+
+
+export function removeEmptyCubes(scene, nonBloomScene) {
+  // Create a snapshot of the current scene
+  const snapshot = createSceneSnapshot([scene, nonBloomScene]);
+
+  // Array to store cubes that need to be removed
+  const cubesToRemove = [];
+
+  // Check each cube in the snapshot
+  snapshot.boxes.forEach(box => {
+      const containedSpheres = snapshot.containment[box.id];
+      
+      // If the cube contains no spheres, add it to the removal list
+      if (!containedSpheres || containedSpheres.length <= 1) {
+          cubesToRemove.push(box);
+      }
+  });
+
+  // Remove the empty cubes from the scenes
+  cubesToRemove.forEach(box => {
+      if (box.wireframe) {
+          nonBloomScene.remove(box.wireframe);
+          box.wireframe.geometry.dispose();
+          box.wireframe.material.dispose();
+      }
+      if (box.solid) {
+          nonBloomScene.remove(box.solid);
+          box.solid.geometry.dispose();
+          box.solid.material.dispose();
+      }
+      
+      // Remove from the snapshot as well
+      const boxIndex = snapshot.boxes.findIndex(b => b.id === box.id);
+      if (boxIndex !== -1) {
+          snapshot.boxes.splice(boxIndex, 1);
+      }
+      delete snapshot.containment[box.id];
+  });
+
+  // Log the number of cubes removed
+  console.log(`Removed ${cubesToRemove.length} empty cubes`);
+
+  // Render the scene to reflect the changes
+  render();
+
+  // return snapshot; // Return the updated snapshot
 }
