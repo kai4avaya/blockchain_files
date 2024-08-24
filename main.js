@@ -7,7 +7,10 @@ import userActionStore from './memory/stores/userActionStore';
 // import graphStore from './memory/stores/graphStore';
 import { showPopup } from './ui/popup.js';
 import { initializeDB } from './memory/local/db.js'; // Initialize the database and create stores if they don't exist
-import {getObjectUnderPointer} from './ui/graph/dragging_shapes'
+// import {getObjectUnderPointer} from './ui/graph/dragging_shapes'
+import {getObjectUnderPointer} from './ui/graph_v2/move'
+
+
 // Initialize Quill editor
 editor();
 // let camera;

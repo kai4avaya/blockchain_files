@@ -3,7 +3,6 @@
 import * as THREE from 'three';
 import { share3dDat, render} from './graph';
 import { getSceneSnapshot,getCubeAndContainedSpheresById, getObjectById } from './graph_snapshot';
-import { moveSphere } from './graph';
 import {checkIntersections} from './graph_drag'
 
 const cubeGroups = new Map(); // Map of cube UUIDs to arrays of spheres inside them

@@ -1,6 +1,7 @@
 import { makeObservable, observable, action, runInAction, autorun } from "mobx";
 import { saveData, getData } from '../local/db.js';
-import { updateGraph, isRendererReady } from '../../ui/graph/graph.js'; // Import isRendererReady
+// import { updateGraph, isRendererReady } from '../../ui/graph/graph.js'; // Import isRendererReady
+import { updateGraph, isRendererReady } from '../../ui/graph_v2/create.js'; // Import isRendererReady
 
 interface FileMetadata {
   id: number;

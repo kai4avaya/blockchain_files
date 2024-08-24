@@ -6,12 +6,10 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import {} from "./graph_drag.js";
+import {} from "./move.js";
 import { generateUniqueId } from "../../utils/utils.js";
-import {} from "./dragging_shapes.js";
-// import {dragCube, isSphereInsideCube, removeSphereFromCube, resizeCubeToFitSpheres} from "./dragging_shapes.js"
+
 const BLOOM_SCENE = 1;
-let lastTime = 0;
 const bloomLayer = new THREE.Layers();
 bloomLayer.set(BLOOM_SCENE);
 
@@ -68,16 +66,7 @@ controls.addEventListener("change", () => {
 
 const renderScene = new RenderPass(scene, camera);
 
-let isDragging = false;
-let selectedSphere = null;
-let longPressTimeout;
-
-// ------------------ cube ----------------
-
-// Initialize the non-bloom scene
 const nonBloomScene = new THREE.Scene();
-
-// ------------------ cube ----------------
 
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
@@ -180,10 +169,6 @@ const raycaster = new THREE.Raycaster();
 
 const mouse = new THREE.Vector2();
 
-window.addEventListener("pointerdown", onPointerDown);
-window.addEventListener("pointermove", onPointerMove);
-window.addEventListener("pointerup", onPointerUp);
-
 setupScene();
 
 let cubes = [];
@@ -221,96 +206,10 @@ export function createWireframeCube(size, x, y, z, color, id = 0) {
   return cube;
 }
 
-// allows me to change color of spheres
-function onPointerDown(event) {
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(scene.children, false);
-  if (intersects.length > 0) {
-    controls.enabled = false; // Disable OrbitControls during dragging
-
-    // object.layers.toggle( BLOOM_SCENE );
-    isDragging = true;
-
-    selectedSphere = intersects[0].object;
-
-    const object = intersects[0].object;
-
-    object.layers.toggle(BLOOM_SCENE);
-
-    render();
-  }
-
-  if (intersects.length > 0) {
-    // selectedSphere = intersects[0].object;
-    longPressTimeout = setTimeout(() => {}, 500); // 500ms for long press
-  }
-}
-
-function onPointerMove(event) {
-  const now = performance.now();
-  if (now - lastTime < 16) {
-    // roughly 60fps
-    return;
-  }
-  lastTime = now;
-
-  if (isDragging && selectedSphere) {
-    moveSphere(event);
-  }
-}
-
-
-
-export function moveSphere(event, sphere, intersectPointIn = null) {
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-  raycaster.setFromCamera(mouse, camera);
-
-  const targetSphere = sphere || selectedSphere;
-  if (!targetSphere) return;
-
-  // Store the original distance from the camera
-  const originalDistance = camera.position.distanceTo(targetSphere.position);
-
-  // Create a plane at the sphere's current position
-  const planeNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
-  const planeConstant = -targetSphere.position.dot(planeNormal);
-  const plane = new THREE.Plane(planeNormal, planeConstant);
-
-  let intersectPoint = intersectPointIn || new THREE.Vector3();
-  raycaster.ray.intersectPlane(plane, intersectPoint);
-
-  // Move the sphere to the new position
-  targetSphere.position.copy(intersectPoint);
-
-  // Calculate the new distance from the camera
-  const newDistance = camera.position.distanceTo(targetSphere.position);
-
-  // Adjust the scale to maintain apparent size
-  const scaleFactor = newDistance / originalDistance;
-  targetSphere.scale.multiplyScalar(scaleFactor);
-
-  render();
-}
-
 export function resetSphereScales(spheres, defaultScale = 1) {
-  spheres.forEach(sphere => {
+  spheres.forEach((sphere) => {
     sphere.scale.set(defaultScale, defaultScale, defaultScale);
   });
-}
-
-function onPointerUp(event) {
-  clearTimeout(longPressTimeout);
-
-  if (isDragging) {
-    isDragging = false;
-    controls.enabled = true; // Re-enable OrbitControls after dragging
-    selectedSphere = null;
-  }
 }
 
 window.onresize = function () {
@@ -371,17 +270,15 @@ export function createSphere(x, y, z, size, id = "") {
   const sphere = new THREE.Mesh(geometry, material);
   sphere.position.set(x, y, z);
 
-
   sphere.scale.setScalar(size * 0.05);
 
   sphere.userData = {
-    id: id  // Unique ID
+    id: id, // Unique ID
   };
 
   scene.add(sphere);
 
   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
-
 
   render();
 }
