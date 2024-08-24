@@ -423,11 +423,8 @@ export function removeEmptyCubes(scene, nonBloomScene) {
       delete snapshot.containment[box.id];
   });
 
-  // Log the number of cubes removed
   console.log(`Removed ${cubesToRemove.length} empty cubes`);
 
-  // Render the scene to reflect the changes
   render();
 
-  // return snapshot; // Return the updated snapshot
 }
