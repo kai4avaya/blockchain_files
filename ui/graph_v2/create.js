@@ -428,3 +428,146 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   render();
 
 }
+
+
+// ---------------- CREATING ----------------------------------------
+
+
+// Helper function to check if two objects are approximately equal
+function approxEqual(obj1, obj2, epsilon = 0.001) {
+  if (typeof obj1 !== typeof obj2) return false;
+  if (typeof obj1 !== 'object') return Math.abs(obj1 - obj2) < epsilon;
+  for (let key in obj1) {
+    if (!approxEqual(obj1[key], obj2[key], epsilon)) return false;
+  }
+  return true;
+}
+
+// Helper function to normalize positions based on canvas size
+function normalizePosition(position, canvasWidth, canvasHeight) {
+  return {
+    x: position.x / canvasWidth,
+    y: position.y / canvasHeight,
+    z: position.z
+  };
+}
+
+// Helper function to denormalize positions
+function denormalizePosition(normalizedPosition, canvasWidth, canvasHeight) {
+  return {
+    x: normalizedPosition.x * canvasWidth,
+    y: normalizedPosition.y * canvasHeight,
+    z: normalizedPosition.z
+  };
+}
+
+export function efficientGraphUpdate(snapshot, container) {
+  const canvasWidth = container.clientWidth;
+  const canvasHeight = container.clientHeight;
+
+  if (!scene) {
+    // Initial setup
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(75, canvasWidth / canvasHeight, 0.1, 1000);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(canvasWidth, canvasHeight);
+    container.appendChild(renderer.domElement);
+    controls = new OrbitControls(camera, renderer.domElement);
+    camera.position.z = 5;
+  }
+
+  const existingObjects = new Map();
+  scene.traverse(object => {
+    if (object.userData.id) {
+      existingObjects.set(object.userData.id, object);
+    }
+  });
+
+  // Update or create boxes
+  snapshot.boxes.forEach(box => {
+    let wireframeCube = existingObjects.get(box.id + '_wireframe');
+    let solidCube = existingObjects.get(box.id + '_solid');
+
+    const normalizedPosition = normalizePosition(box.position, canvasWidth, canvasHeight);
+
+    if (!wireframeCube || !solidCube) {
+      const denormalizedPosition = denormalizePosition(normalizedPosition, canvasWidth, canvasHeight);
+      const newCube = createWireframeCube(
+        box.size || 1,
+        denormalizedPosition.x,
+        denormalizedPosition.y,
+        denormalizedPosition.z,
+        box.color || 0xffffff,
+        box.id
+      );
+      wireframeCube = newCube.wireframeCube;
+      solidCube = newCube.solidCube;
+      scene.add(wireframeCube);
+      scene.add(solidCube);
+    } else {
+      // Update existing cube properties if changed
+      const currentNormalizedPosition = normalizePosition(wireframeCube.position, canvasWidth, canvasHeight);
+      if (!approxEqual(currentNormalizedPosition, normalizedPosition)) {
+        const denormalizedPosition = denormalizePosition(normalizedPosition, canvasWidth, canvasHeight);
+        wireframeCube.position.set(denormalizedPosition.x, denormalizedPosition.y, denormalizedPosition.z);
+        solidCube.position.set(denormalizedPosition.x, denormalizedPosition.y, denormalizedPosition.z);
+      }
+      if (!approxEqual(wireframeCube.scale, box.scale)) {
+        wireframeCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
+        solidCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
+      }
+      if (wireframeCube.material.color.getHex() !== box.color) {
+        wireframeCube.material.color.setHex(box.color);
+        solidCube.material.color.setHex(box.color);
+      }
+    }
+    existingObjects.delete(box.id + '_wireframe');
+    existingObjects.delete(box.id + '_solid');
+  });
+
+  // Update or create spheres
+  snapshot.objects.forEach(obj => {
+    if (obj.type === "IcosahedronGeometry" || obj.type === "SphereGeometry") {
+      let sphere = existingObjects.get(obj.id);
+      const normalizedPosition = normalizePosition(obj.position, canvasWidth, canvasHeight);
+
+      if (!sphere) {
+        const denormalizedPosition = denormalizePosition(normalizedPosition, canvasWidth, canvasHeight);
+        sphere = createSphere(
+          denormalizedPosition.x,
+          denormalizedPosition.y,
+          denormalizedPosition.z,
+          obj.scale.x * 20,
+          obj.id
+        );
+        scene.add(sphere);
+      } else {
+        // Update existing sphere properties if changed
+        const currentNormalizedPosition = normalizePosition(sphere.position, canvasWidth, canvasHeight);
+        if (!approxEqual(currentNormalizedPosition, normalizedPosition)) {
+          const denormalizedPosition = denormalizePosition(normalizedPosition, canvasWidth, canvasHeight);
+          sphere.position.set(denormalizedPosition.x, denormalizedPosition.y, denormalizedPosition.z);
+        }
+        if (!approxEqual(sphere.scale, obj.scale)) {
+          sphere.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+        }
+        if (sphere.material.color.getHex() !== obj.color) {
+          sphere.material.color.setHex(obj.color);
+        }
+      }
+      existingObjects.delete(obj.id);
+    }
+  });
+
+  // Remove objects that no longer exist in the snapshot
+  existingObjects.forEach(object => {
+    scene.remove(object);
+    if (object.material) object.material.dispose();
+    if (object.geometry) object.geometry.dispose();
+  });
+
+  // Update containment relationships
+  // This part depends on how you want to visually represent containment
+
+  render();
+}
