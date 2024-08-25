@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import graphStore from './memory/stores/graphStore';
 
 // Comprehensive function to create scene snapshot with bounding boxes, containment, and debug visuals
 export function createSceneSnapshot(scenes) {
@@ -86,10 +85,6 @@ export function createSceneSnapshot(scenes) {
 });
 
 return snapshot;
-}
-
-export async function updateGraphStore(snapshot){
-    await graphStore.updateFromSnapshot(snapshot);
 }
 
 // Function to retrieve a specific object by ID

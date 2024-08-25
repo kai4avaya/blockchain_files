@@ -1,5 +1,4 @@
 import * as THREE from "three";
-
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -7,8 +6,10 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
-import { generateUniqueId } from "../../utils/utils.js";
-import {createSceneSnapshot} from "./snapshot.js";
+import { generateUniqueId } from "../../utils/utils";
+import { createSceneSnapshot } from "./snapshot.js";
+import graphStore from '../../memory/stores/graphStore';
+import loroCRDTManager from '../../memory/collaboration/graphcolab';
 
 const BLOOM_SCENE = 1;
 const bloomLayer = new THREE.Layers();
@@ -31,20 +32,15 @@ const nonBloomRT = new THREE.WebGLRenderTarget(
     format: THREE.RGBAFormat,
   }
 );
-
 const darkMaterial = new THREE.MeshBasicMaterial({ color: "black" });
 const materials = {};
-
 // const renderer = new THREE.WebGLRenderer( { antialias: true } );
 const renderer = new THREE.WebGLRenderer({ antialias: false });
-
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ReinhardToneMapping;
 document.body.appendChild(renderer.domElement);
-
 const scene = new THREE.Scene();
-
 const camera = new THREE.PerspectiveCamera(
   40,
   window.innerWidth / window.innerHeight,
@@ -53,22 +49,16 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.set(0, 0, 20);
 camera.lookAt(0, 0, 0);
-
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.maxPolarAngle = Math.PI * 0.5;
 controls.minDistance = 1;
 controls.maxDistance = 100;
-
 let needsRender = false;
-
 controls.addEventListener("change", () => {
   needsRender = true;
 });
-
 const renderScene = new RenderPass(scene, camera);
-
 const nonBloomScene = new THREE.Scene();
-
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
   1.5,
@@ -78,12 +68,10 @@ const bloomPass = new UnrealBloomPass(
 bloomPass.threshold = params.threshold;
 bloomPass.strength = params.strength;
 bloomPass.radius = params.radius;
-
 const bloomComposer = new EffectComposer(renderer);
 bloomComposer.renderToScreen = false;
 bloomComposer.addPass(renderScene);
 bloomComposer.addPass(bloomPass);
-
 const mixPass = new ShaderPass(
   new THREE.ShaderMaterial({
     uniforms: {
@@ -97,14 +85,11 @@ const mixPass = new ShaderPass(
   "baseTexture"
 );
 mixPass.needsSwap = true;
-
 const outputPass = new OutputPass();
-
 const finalComposer = new EffectComposer(renderer);
 finalComposer.addPass(renderScene);
 finalComposer.addPass(mixPass);
 finalComposer.addPass(outputPass);
-
 const bloomTexturePass = new ShaderPass(
   new THREE.ShaderMaterial({
     uniforms: {
@@ -132,7 +117,6 @@ const bloomTexturePass = new ShaderPass(
   }),
   "baseTexture"
 );
-
 const nonBloomTexturePass = new ShaderPass(
   new THREE.ShaderMaterial({
     uniforms: {
@@ -160,19 +144,26 @@ const nonBloomTexturePass = new ShaderPass(
   }),
   "baseTexture"
 );
-
 bloomTexturePass.uniforms["bloomTexture"].value =
   bloomComposer.renderTarget2.texture;
-
 nonBloomTexturePass.uniforms["nonBloomTexture"].value = nonBloomRT.texture;
-
 const raycaster = new THREE.Raycaster();
-
 const mouse = new THREE.Vector2();
-
-setupScene();
-
+setupScene()
 let cubes = [];
+
+
+export async function initializeGraph() {
+  setupScene();
+  graphStore.setScenes(scene, nonBloomScene);
+
+  const initialSceneData = await loroCRDTManager.initialize();
+  if (initialSceneData) {
+    await graphStore.applyUpdatedData(initialSceneData);
+    efficientGraphUpdate(initialSceneData)
+  }
+}
+
 
 export function createWireframeCube(size, x, y, z, color, id = 0) {
   const geometry = new THREE.BoxGeometry(size, size, size);
@@ -317,6 +308,7 @@ export function render() {
 
   // Clean up
   nonBloomRT.dispose(); // Dispose of the non-bloom render target
+  graphStore.setScenes(scene, nonBloomScene);
 }
 
 function darkenNonBloomed(obj) {
@@ -383,8 +375,6 @@ export function share3dDat() {
   };
 }
 
-
-
 export function removeEmptyCubes(scene, nonBloomScene) {
   // Create a snapshot of the current scene
   const snapshot = createSceneSnapshot([scene, nonBloomScene]);
@@ -393,50 +383,47 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   const cubesToRemove = [];
 
   // Check each cube in the snapshot
-  snapshot.boxes.forEach(box => {
-      const containedSpheres = snapshot.containment[box.id];
-      
-      // If the cube contains no spheres, add it to the removal list
-      if (!containedSpheres || containedSpheres.length <= 1) {
-          cubesToRemove.push(box);
-      }
+  snapshot.boxes.forEach((box) => {
+    const containedSpheres = snapshot.containment[box.id];
+
+    // If the cube contains no spheres, add it to the removal list
+    if (!containedSpheres || containedSpheres.length <= 1) {
+      cubesToRemove.push(box);
+    }
   });
 
   // Remove the empty cubes from the scenes
-  cubesToRemove.forEach(box => {
-      if (box.wireframe) {
-          nonBloomScene.remove(box.wireframe);
-          box.wireframe.geometry.dispose();
-          box.wireframe.material.dispose();
-      }
-      if (box.solid) {
-          nonBloomScene.remove(box.solid);
-          box.solid.geometry.dispose();
-          box.solid.material.dispose();
-      }
-      
-      // Remove from the snapshot as well
-      const boxIndex = snapshot.boxes.findIndex(b => b.id === box.id);
-      if (boxIndex !== -1) {
-          snapshot.boxes.splice(boxIndex, 1);
-      }
-      delete snapshot.containment[box.id];
+  cubesToRemove.forEach((box) => {
+    if (box.wireframe) {
+      nonBloomScene.remove(box.wireframe);
+      box.wireframe.geometry.dispose();
+      box.wireframe.material.dispose();
+    }
+    if (box.solid) {
+      nonBloomScene.remove(box.solid);
+      box.solid.geometry.dispose();
+      box.solid.material.dispose();
+    }
+
+    // Remove from the snapshot as well
+    const boxIndex = snapshot.boxes.findIndex((b) => b.id === box.id);
+    if (boxIndex !== -1) {
+      snapshot.boxes.splice(boxIndex, 1);
+    }
+    delete snapshot.containment[box.id];
   });
 
   console.log(`Removed ${cubesToRemove.length} empty cubes`);
 
   render();
-
 }
 
-
 // ---------------- CREATING ----------------------------------------
-
 
 // Helper function to check if two objects are approximately equal
 function approxEqual(obj1, obj2, epsilon = 0.001) {
   if (typeof obj1 !== typeof obj2) return false;
-  if (typeof obj1 !== 'object') return Math.abs(obj1 - obj2) < epsilon;
+  if (typeof obj1 !== "object") return Math.abs(obj1 - obj2) < epsilon;
   for (let key in obj1) {
     if (!approxEqual(obj1[key], obj2[key], epsilon)) return false;
   }
@@ -448,7 +435,7 @@ function normalizePosition(position, canvasWidth, canvasHeight) {
   return {
     x: position.x / canvasWidth,
     y: position.y / canvasHeight,
-    z: position.z
+    z: position.z,
   };
 }
 
@@ -457,96 +444,97 @@ function denormalizePosition(normalizedPosition, canvasWidth, canvasHeight) {
   return {
     x: normalizedPosition.x * canvasWidth,
     y: normalizedPosition.y * canvasHeight,
-    z: normalizedPosition.z
+    z: normalizedPosition.z,
   };
 }
 
-export function efficientGraphUpdate(snapshot, container) {
-  const canvasWidth = container.clientWidth;
-  const canvasHeight = container.clientHeight;
-
-  if (!scene) {
-    // Initial setup
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(75, canvasWidth / canvasHeight, 0.1, 1000);
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(canvasWidth, canvasHeight);
-    container.appendChild(renderer.domElement);
-    controls = new OrbitControls(camera, renderer.domElement);
-    camera.position.z = 5;
+export function initializeReactiveGraph() {
+  if (!scene || !camera || !renderer || !controls) {
+    console.error(
+      "Three.js setup is not complete. Make sure to call setupScene() first."
+    );
+    return;
   }
 
+  // Set up the reaction to update the graph when the MobX store changes
+  const disposeReaction = reaction(
+    () => graphStore.snapshot,
+    (snapshot) => efficientGraphUpdate(snapshot),
+    { fireImmediately: true }
+  );
+
+  // Return a cleanup function
+  return () => {
+    disposeReaction();
+    // Add any other cleanup logic here if needed
+  };
+}
+
+export function efficientGraphUpdate(snapshot) {
   const existingObjects = new Map();
-  scene.traverse(object => {
+  scene.traverse((object) => {
     if (object.userData.id) {
       existingObjects.set(object.userData.id, object);
     }
   });
 
   // Update or create boxes
-  snapshot.boxes.forEach(box => {
-    let wireframeCube = existingObjects.get(box.id + '_wireframe');
-    let solidCube = existingObjects.get(box.id + '_solid');
-
-    const normalizedPosition = normalizePosition(box.position, canvasWidth, canvasHeight);
-
-    if (!wireframeCube || !solidCube) {
-      const denormalizedPosition = denormalizePosition(normalizedPosition, canvasWidth, canvasHeight);
-      const newCube = createWireframeCube(
+  snapshot.boxes.forEach((box) => {
+    let cube = existingObjects.get(box.id);
+    if (!cube) {
+      cube = createWireframeCube(
         box.size || 1,
-        denormalizedPosition.x,
-        denormalizedPosition.y,
-        denormalizedPosition.z,
+        box.position.x,
+        box.position.y,
+        box.position.z,
         box.color || 0xffffff,
         box.id
       );
-      wireframeCube = newCube.wireframeCube;
-      solidCube = newCube.solidCube;
-      scene.add(wireframeCube);
-      scene.add(solidCube);
+      // scene.add(cube.wireframeCube);
+      // scene.add(cube.solidCube);
     } else {
       // Update existing cube properties if changed
-      const currentNormalizedPosition = normalizePosition(wireframeCube.position, canvasWidth, canvasHeight);
-      if (!approxEqual(currentNormalizedPosition, normalizedPosition)) {
-        const denormalizedPosition = denormalizePosition(normalizedPosition, canvasWidth, canvasHeight);
-        wireframeCube.position.set(denormalizedPosition.x, denormalizedPosition.y, denormalizedPosition.z);
-        solidCube.position.set(denormalizedPosition.x, denormalizedPosition.y, denormalizedPosition.z);
+      if (!approxEqual(cube.wireframeCube.position, box.position)) {
+        cube.wireframeCube.position.set(
+          box.position.x,
+          box.position.y,
+          box.position.z
+        );
+        cube.solidCube.position.set(
+          box.position.x,
+          box.position.y,
+          box.position.z
+        );
       }
-      if (!approxEqual(wireframeCube.scale, box.scale)) {
-        wireframeCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
-        solidCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
+      if (!approxEqual(cube.wireframeCube.scale, box.scale)) {
+        cube.wireframeCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
+        cube.solidCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
       }
-      if (wireframeCube.material.color.getHex() !== box.color) {
-        wireframeCube.material.color.setHex(box.color);
-        solidCube.material.color.setHex(box.color);
+      if (cube.wireframeCube.material.color.getHex() !== box.color) {
+        cube.wireframeCube.material.color.setHex(box.color);
+        cube.solidCube.material.color.setHex(box.color);
       }
     }
-    existingObjects.delete(box.id + '_wireframe');
-    existingObjects.delete(box.id + '_solid');
+    existingObjects.delete(box.id);
   });
 
   // Update or create spheres
-  snapshot.objects.forEach(obj => {
+  snapshot.objects.forEach((obj) => {
     if (obj.type === "IcosahedronGeometry" || obj.type === "SphereGeometry") {
       let sphere = existingObjects.get(obj.id);
-      const normalizedPosition = normalizePosition(obj.position, canvasWidth, canvasHeight);
-
       if (!sphere) {
-        const denormalizedPosition = denormalizePosition(normalizedPosition, canvasWidth, canvasHeight);
         sphere = createSphere(
-          denormalizedPosition.x,
-          denormalizedPosition.y,
-          denormalizedPosition.z,
+          obj.position.x,
+          obj.position.y,
+          obj.position.z,
           obj.scale.x * 20,
           obj.id
         );
-        scene.add(sphere);
+        // scene.add(sphere);
       } else {
         // Update existing sphere properties if changed
-        const currentNormalizedPosition = normalizePosition(sphere.position, canvasWidth, canvasHeight);
-        if (!approxEqual(currentNormalizedPosition, normalizedPosition)) {
-          const denormalizedPosition = denormalizePosition(normalizedPosition, canvasWidth, canvasHeight);
-          sphere.position.set(denormalizedPosition.x, denormalizedPosition.y, denormalizedPosition.z);
+        if (!approxEqual(sphere.position, obj.position)) {
+          sphere.position.set(obj.position.x, obj.position.y, obj.position.z);
         }
         if (!approxEqual(sphere.scale, obj.scale)) {
           sphere.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
@@ -560,14 +548,14 @@ export function efficientGraphUpdate(snapshot, container) {
   });
 
   // Remove objects that no longer exist in the snapshot
-  existingObjects.forEach(object => {
+  existingObjects.forEach((object) => {
     scene.remove(object);
     if (object.material) object.material.dispose();
     if (object.geometry) object.geometry.dispose();
   });
 
-  // Update containment relationships
-  // This part depends on how you want to visually represent containment
+  // Update containment relationships (if needed)
+  // ... (implement containment logic here)
 
   render();
 }

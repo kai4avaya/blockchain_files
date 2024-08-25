@@ -1,5 +1,5 @@
 import { makeObservable, observable, action, runInAction, autorun } from "mobx";
-import { saveData, getData } from '../local/db.js';
+import { saveData, getData } from '../local/dbgeneral';
 // import { updateGraph, isRendererReady } from '../../ui/graph/graph.js'; // Import isRendererReady
 import { updateGraph, isRendererReady } from '../../ui/graph_v2/create.js'; // Import isRendererReady
 
@@ -109,7 +109,8 @@ export class FileStore {
 
   @action.bound
   async saveFiles() {
-    await saveData('files', this.files);
+    console.log("tryna save them files from filestore this should not happen", this.files)
+    // await saveData('files', this.files);
   }
 
   @action.bound

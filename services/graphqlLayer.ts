@@ -1,5 +1,5 @@
 import { buildSchema, GraphQLArgs, graphql } from 'graphql';
-import { getData as fetchFromDB, saveData as saveToDB } from '../local/db'; // Assuming these are the actual data interaction functions
+import { getData as fetchFromDB, saveData as saveToDB } from '../memory/local/dbgeneral'; // Assuming these are the actual data interaction functions
 
 
 
@@ -70,6 +70,25 @@ const args: GraphQLArgs = {
   operationName: query,
   source: { query, variables } as Source as string | Source
 };
+
+export type SceneData = {
+  // Define the properties of SceneData here
+  // Example:
+  id: string;
+  content: string;
+};
+
+export async function sendGraphDataToServer(sceneData: SceneData) {
+  try {
+    // Mock server response for testing
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate server delay
+    console.log("Data sent to server:", sceneData);
+    return true;
+  } catch (error) {
+    console.error("Failed to send data to server", error);
+    return false;
+  }
+}
 
 // Example usage of GraphQL execution (currently commented out)
 // const saveMutation = `

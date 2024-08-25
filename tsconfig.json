@@ -12,6 +12,6 @@
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": true
   },
- "include": ["**/*.ts", "**/*.d.ts"],
+ "include": ["**/*.ts", "**/*.d.ts", "ui/graph_v2/snapshot.js"],
   "exclude": ["node_modules"]
 }
