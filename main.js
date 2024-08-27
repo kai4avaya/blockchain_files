@@ -6,18 +6,18 @@ import fileStore from './memory/stores/fileStore';
 import userActionStore from './memory/stores/userActionStore';
 // import graphStore from './memory/stores/graphStore';
 import { showPopup } from './ui/popup.js';
-import { initializeDB } from './memory/local/db.js'; // Initialize the database and create stores if they don't exist
+import { initializeDB } from './memory/local/dbgeneral'
 // import {getObjectUnderPointer} from './ui/graph/dragging_shapes'
 import {getObjectUnderPointer} from './ui/graph_v2/move'
-const tempLoginName = "k.ai"
-localStorage.setItem("login_block", "k.ai");
+const TEMPLOGINNAME = "k.ai"
+localStorage.setItem("login_block", TEMPLOGINNAME);
 
 // Initialize Quill editor
 editor();
 // let camera;
 // let scene;
 async function main() {
-    await initializeDB(); // Initialize the database and create stores if they don't exist
+    await initializeDB(["directories", "files", "graph"]); // Initialize the database and create stores if they don't exist
     // const { camera, raycaster,scene, nonBloomScene, mouse, controls } = share3dDat();
 
     // Initialize Three.js scene and camera

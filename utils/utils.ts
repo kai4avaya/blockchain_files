@@ -2,16 +2,21 @@ import { observable } from "mobx";
 import * as THREE from "three";
 
 // Helper function to recursively convert observables to plain objects
-function convertObservablesToPlainObjects(data: any): any {
+function convertObservablesToPlainObjects(data: any, visitedObjects: Set<any> = new Set()): any {
   if (Array.isArray(data)) {
-    return data.map(item => convertObservablesToPlainObjects(item));
+    return data.map(item => convertObservablesToPlainObjects(item, visitedObjects));
   } else if (data && typeof data === 'object') {
+    if (visitedObjects.has(data)) {
+      return '[Circular Reference]'; // Handle circular references
+    }
+    visitedObjects.add(data);
+
     if (data.toJS) {
       return data.toJS(); // Handle MobX observable maps and arrays
     } else {
       const plainObject: any = {};
       for (const key in data) {
-        plainObject[key] = convertObservablesToPlainObjects(data[key]);
+        plainObject[key] = convertObservablesToPlainObjects(data[key], visitedObjects);
       }
       return plainObject;
     }

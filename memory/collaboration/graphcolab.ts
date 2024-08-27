@@ -1,7 +1,7 @@
 import { Loro, LoroMap } from 'loro-crdt';
 import { saveData, getData } from '../local/dbgeneral';
 import { fetchGraphDataFromServer, sendGraphDataToServer } from '../../services/graphqlLayer';
-import { createSceneSnapshot } from '../../ui/graph_v2/snapshot';
+// import { createSceneSnapshot } from '../../ui/graph_v2/snapshot';
 import graphStore from '../stores/graphStore';
 import * as THREE from "three";
 import {deserialize, serialize} from "../../utils/utils";

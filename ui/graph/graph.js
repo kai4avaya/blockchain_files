@@ -180,6 +180,7 @@ const raycaster = new THREE.Raycaster();
 
 const mouse = new THREE.Vector2();
 
+
 window.addEventListener("pointerdown", onPointerDown);
 window.addEventListener("pointermove", onPointerMove);
 window.addEventListener("pointerup", onPointerUp);
