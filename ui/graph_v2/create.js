@@ -430,23 +430,6 @@ function approxEqual(obj1, obj2, epsilon = 0.001) {
   return true;
 }
 
-// // Helper function to normalize positions based on canvas size
-// function normalizePosition(position, canvasWidth, canvasHeight) {
-//   return {
-//     x: position.x / canvasWidth,
-//     y: position.y / canvasHeight,
-//     z: position.z,
-//   };
-// }
-
-// // Helper function to denormalize positions
-// function denormalizePosition(normalizedPosition, canvasWidth, canvasHeight) {
-//   return {
-//     x: normalizedPosition.x * canvasWidth,
-//     y: normalizedPosition.y * canvasHeight,
-//     z: normalizedPosition.z,
-//   };
-// }
 
 export function initializeReactiveGraph() {
   if (!scene || !camera || !renderer || !controls) {

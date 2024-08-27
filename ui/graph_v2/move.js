@@ -6,11 +6,13 @@ import {
   removeEmptyCubes
 } from "./create.js";
 import {
-    createSceneSnapshot,
+  createSceneSnapshot,
   getObjectById,
 } from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
 import * as THREE from "three";
+import {debounce} from "../../utils/utils";
+
 let isDragging = false;
 let selectedSphere = null;
 let CUBEINTERSECTED;
@@ -261,10 +263,7 @@ function normalizeSize(fileSize) {
   );
 }
 
-function updateMousePosition(event) {
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-}
+
 export function checkIntersections(raycaster, scenes) {
   let allIntersects = [];
 
@@ -297,12 +296,14 @@ function handleFileDragOver(event) {
 }
   
 async function handleFileDrop_sphere(event) {
+  // if (!isDragging && !isFileDragging) return;  // may need endpoint for isDragging
+
   isFileDragging = false;
   resetCubeHighlight();
   const { camera, scene, nonBloomScene} = share3dDat();
 
   const dt = event.dataTransfer;
-  const fileList = dt.files;
+  const fileList = dt?.files;
 
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -313,12 +314,12 @@ async function handleFileDrop_sphere(event) {
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
     const size = normalizeSize(file.size);
-    let dropPosition;
+    // let dropPosition;
     const uuids = await handleFileDrop(event);
 
     if (allIntersects.length > 0) {
       const intersect = allIntersects[0];
-      dropPosition = intersect.point;
+      const dropPosition = intersect.point;
 
       if (
         intersect.object.geometry.type === "EdgesGeometry" ||
@@ -334,6 +335,7 @@ async function handleFileDrop_sphere(event) {
           uuids[i]
         );
       } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
+        // const size = getSize(intersect)
         const actualSphereSize = size * 0.05;
         const scaledCubeSize = actualSphereSize * 4;
         createWireframeCube(
@@ -372,13 +374,11 @@ async function handleFileDrop_sphere(event) {
       plane.normal.copy(planeNormal);
       
       raycaster.ray.intersectPlane(plane, intersectPoint);
-      dropPosition = intersectPoint;
-      raycaster.ray.intersectPlane(plane, dropPosition);
 
       createSphere(
-        dropPosition.x,
-        dropPosition.y,
-        dropPosition.z,
+        intersectPoint.x,
+        intersectPoint.y,
+        intersectPoint.z,
         size,
         uuids[i]
       );
@@ -391,6 +391,83 @@ async function handleFileDrop_sphere(event) {
     CUBEINTERSECTED = null;
   }
 }
+
+function getSize(intersect, scale=1){
+  const boundingBox = new THREE.Box3().setFromObject(intersect.object);
+  const size = new THREE.Vector3();
+  boundingBox.getSize(size);
+
+  return Math.max(size.x, size.y, size.z) * scale
+}
+
+async function handleDrop_sphere(event) {
+  if (!isDragging) return;  // may need endpoint for isDragging
+
+  resetCubeHighlight();
+  const { camera, scene, nonBloomScene} = share3dDat();
+
+
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+
+  // for (let i = 0; i < fileList.length; i++) {
+  //   const file = fileList[i];
+  //   const size = normalizeSize(file.size);
+  //   let dropPosition;
+  //   const uuids = await handleFileDrop(event);
+
+  console.log("i just dropped yo handleDrop_sphere")
+
+    if (allIntersects.length > 0) {
+      const intersect = allIntersects[0];
+      const dropPosition = intersect.point;
+
+      if (
+        intersect.object.geometry.type === "EdgesGeometry" ||
+        intersect.object.geometry.type === "BoxGeometry"
+      ) {
+        intersect.object.material.color.set(0xff0000);
+
+      } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
+        const size = getSize(intersect)
+        const actualSphereSize = size * 0.05;
+        const scaledCubeSize = actualSphereSize * 4;
+        createWireframeCube(
+          scaledCubeSize,
+          dropPosition.x,
+          dropPosition.y,
+          dropPosition.z,
+          0xff0000
+        );
+     
+      } else {
+       
+      }
+    } else {
+      // const planeDistance = -10;
+      // const plane = new THREE.Plane(
+      //   new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
+      //   planeDistance
+      // );
+
+      // dropPosition = new THREE.Vector3();
+      // raycaster.ray.intersectPlane(plane, dropPosition);
+      planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+      plane.normal.copy(planeNormal);
+      raycaster.ray.intersectPlane(plane, intersectPoint);
+     
+    }
+  }
+
+  // Reset cube highlighting after drop
+  if (CUBEINTERSECTED) {
+    resetCubeColor(CUBEINTERSECTED);
+    CUBEINTERSECTED = null;
+  }
+// }
   
   
   function resetCubeHighlight() {
@@ -495,15 +572,17 @@ function getObjectType(object) {
   }
 
 
-function onPointerUp(event) {
+async function onPointerUp(event) {
   const { controls,scene, nonBloomScene } = share3dDat();
 
   if (isDragging) {
+    await handleDrop_sphere(event)
     isDragging = false;
     controls.enabled = true; // Re-enable OrbitControls after dragging
     selectedSphere = null;
     selectedObject = null;
     currentSnapshot = null;
+
     if (CUBEINTERSECTED) {
       resetCubeColor(CUBEINTERSECTED);
       CUBEINTERSECTED = null;
@@ -514,36 +593,59 @@ function onPointerUp(event) {
 }
 
 
-function onPointerMove(event) {
-  const now = performance.now();
-  if (now - lastTime < 16) {
-    return;
-  }
-  lastTime = now;
+// function onPointerMove(event) {
+//   const now = performance.now();
+//   if (now - lastTime < 16) {
+//     return;
+//   }
+//   lastTime = now;
 
-  if (isDragging && selectedSphere) {
+//   if (isDragging && selectedSphere) {
+//     moveSphere(event);
+//   } else if (isDragging && selectedObject) {
+//     const { camera} = share3dDat();
+//     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+//     // raycaster.setFromCamera(mouse, camera);
+//     // const plane = new THREE.Plane(
+//     //   new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
+//     //   0
+//     // );
+
+//     raycaster.setFromCamera(mouse, camera);
+//       plane.setFromNormalAndCoplanarPoint(
+//         new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
+//         new THREE.Vector3()
+//       );
+//     // const intersectPoint = new THREE.Vector3();
+//     raycaster.ray.intersectPlane(plane, intersectPoint);
+//     dragCube(selectedObject, intersectPoint);
+//   }
+//   // Remove the else block that was calling handleDragOver
+// }
+
+
+const onPointerMove = debounce((event) => {
+  if (!isDragging) return;
+
+  const { camera } = share3dDat();
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  if (selectedSphere) {
     moveSphere(event);
-  } else if (isDragging && selectedObject) {
-    const { camera} = share3dDat();
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    // raycaster.setFromCamera(mouse, camera);
-    // const plane = new THREE.Plane(
-    //   new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-    //   0
-    // );
-
-    raycaster.setFromCamera(mouse, camera);
-      plane.setFromNormalAndCoplanarPoint(
-        new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-        new THREE.Vector3()
-      );
-    // const intersectPoint = new THREE.Vector3();
+  } else if (selectedObject) {
+    plane.setFromNormalAndCoplanarPoint(
+      new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
+      new THREE.Vector3()
+    );
     raycaster.ray.intersectPlane(plane, intersectPoint);
     dragCube(selectedObject, intersectPoint);
   }
-  // Remove the else block that was calling handleDragOver
-}
+
+  requestAnimationFrame(render);
+}, 16);  // Debounce to roughly 60fps
 
   
 window.addEventListener("pointerdown", onPointerDown);

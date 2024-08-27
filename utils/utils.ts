@@ -1,6 +1,18 @@
 import { observable } from "mobx";
 import * as THREE from "three";
 
+export function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
 // Helper function to recursively convert observables to plain objects
 function convertObservablesToPlainObjects(data: any, visitedObjects: Set<any> = new Set()): any {
   if (Array.isArray(data)) {
