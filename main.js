@@ -6,19 +6,56 @@ import fileStore from './memory/stores/fileStore';
 import userActionStore from './memory/stores/userActionStore';
 // import graphStore from './memory/stores/graphStore';
 import { showPopup } from './ui/popup.js';
-import { initializeDB } from './memory/local/dbgeneral'
 // import {getObjectUnderPointer} from './ui/graph/dragging_shapes'
 import {getObjectUnderPointer} from './ui/graph_v2/move'
+import { openDB, getData, saveData, initializeDB } from './memory/local/dbgeneral';
+
 const TEMPLOGINNAME = "k.ai"
 localStorage.setItem("login_block", TEMPLOGINNAME);
 
 // Initialize Quill editor
 editor();
-// let camera;
-// let scene;
+
+async function initializeDatabaseAndStores() {
+  try {
+    // Initialize the database and create stores if they don't exist
+    await initializeDB(["directories", "files", "graph"]);
+    console.log("Database and stores initialized successfully");
+  } catch (error) {
+    console.error("Error initializing database and stores:", error);
+    // Handle the error appropriately (e.g., show a user-friendly message)
+  }
+}
+
+async function loadInitialState() {
+  try {
+    // Open the database connection
+    const db = await openDB();
+    
+    // Load data from various stores
+    const directories = await getData("directories");
+    const files = await getData("files");
+    const graphData = await getData("graph");
+    
+    // Process and use the loaded data
+    console.log("Directories:", directories);
+    console.log("Files:", files);
+    console.log("Graph data:", graphData);
+    
+    // Update your application state with the loaded data
+    // For example:
+    // fileStore.setDirectories(directories);
+    // fileStore.setFiles(files);
+    // graphStore.setGraphData(graphData);
+  } catch (error) {
+    console.error("Error loading initial state:", error);
+    // Handle the error appropriately
+  }
+}
+
 async function main() {
-    await initializeDB(["directories", "files", "graph"]); // Initialize the database and create stores if they don't exist
-    // const { camera, raycaster,scene, nonBloomScene, mouse, controls } = share3dDat();
+  await initializeDatabaseAndStores();
+  await loadInitialState();
 
     // Initialize Three.js scene and camera
     // scene = new THREE.Scene();

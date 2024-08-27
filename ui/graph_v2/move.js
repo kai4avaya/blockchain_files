@@ -35,9 +35,9 @@ setupDragAndDrop();
 function getCubeUnderPointer(event) {
     const { camera, scene, nonBloomScene, controls } = share3dDat();
     // Update mouse position
-    // mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    // mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    updateMousePosition(event)
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  
     // Cast a ray from the camera to the mouse position
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(nonBloomScene.children, true);
@@ -190,9 +190,9 @@ export function resizeCubeToFitSpheres(
 export function getObjectUnderPointer(event) {
   const { camera,  scene, nonBloomScene } = share3dDat();
 
-  updateMousePosition(event)
-  // mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  // mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  // Update mouse position
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
   // Cast a ray from the camera to the mouse position
   raycaster.setFromCamera(mouse, camera);
@@ -213,9 +213,9 @@ export function getObjectUnderPointer(event) {
 export function moveSphere(event, sphere, intersectPointIn = null) {
   const {  camera } = share3dDat();
 
-  // mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  // mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  updateMousePosition(event)
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
   raycaster.setFromCamera(mouse, camera);
 
   const targetSphere = sphere || selectedSphere;
@@ -265,7 +265,6 @@ function updateMousePosition(event) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 }
-
 export function checkIntersections(raycaster, scenes) {
   let allIntersects = [];
 
@@ -281,9 +280,8 @@ export function checkIntersections(raycaster, scenes) {
 function handleFileDragOver(event) {
   const { camera, scene, nonBloomScene } = share3dDat();
 
-  // mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  // mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  updateMousePosition(event)
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
 
   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
@@ -306,9 +304,8 @@ async function handleFileDrop_sphere(event) {
   const dt = event.dataTransfer;
   const fileList = dt.files;
 
-  // mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  // mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  updateMousePosition(event)
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
 
   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
@@ -460,9 +457,9 @@ function getObjectType(object) {
   export function onPointerDown(event) {
     const { mouse, raycaster, scene, nonBloomScene, camera, controls } = share3dDat();
     
-    // mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    // mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    updateMousePosition(event)
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
     raycaster.setFromCamera(mouse, camera);
     const intersectsBloom = raycaster.intersectObjects(scene.children, true);
     const intersectsNonBloom = raycaster.intersectObjects(nonBloomScene.children, true);
@@ -528,9 +525,8 @@ function onPointerMove(event) {
     moveSphere(event);
   } else if (isDragging && selectedObject) {
     const { camera} = share3dDat();
-    // mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    // mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    updateMousePosition(event)
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     // raycaster.setFromCamera(mouse, camera);
     // const plane = new THREE.Plane(
     //   new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),

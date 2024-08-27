@@ -10,21 +10,19 @@ export async function openDB(dbName: string = 'fileGraphDB', version: number = 1
 
     request.onupgradeneeded = function (event: IDBVersionChangeEvent) {
       const db = (event.target as IDBRequest).result as IDBDatabase;
-      if (!db.objectStoreNames.contains('graph')) {
-        db.createObjectStore('graph', { keyPath: 'id', autoIncrement: true });
-      }
+      const stores = ["directories", "files", "graph"];
+      
+      stores.forEach(storeName => {
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
+          console.log(`Object store '${storeName}' created.`);
+        }
+      });
     };
 
     request.onsuccess = function (event: Event) {
       if (event.target) {
         dbInstance = (event.target as IDBRequest).result as IDBDatabase;
-        
-        // Add event listener for when the database is closed unexpectedly
-        dbInstance.onclose = () => {
-          console.log("Database was unexpectedly closed. Setting dbInstance to null.");
-          dbInstance = null;
-        };
-        
         resolve(dbInstance);
       } else {
         reject(new Error('Error opening IndexedDB: event target is null'));
@@ -32,16 +30,67 @@ export async function openDB(dbName: string = 'fileGraphDB', version: number = 1
     };
 
     request.onerror = function (event: Event) {
-      if (event.target) {
-        reject(new Error(`Error opening IndexedDB: ${(event.target as IDBRequest).error?.message || 'unknown error'}`));
-      } else {
-        reject(new Error('Error opening IndexedDB: unknown error'));
-      }
+      reject(new Error(`Error opening IndexedDB: ${(event.target as IDBRequest).error?.message || 'unknown error'}`));
     };
   });
 }
+
+export async function initializeDB(storeNames: string[]): Promise<void> {
+  try {
+    let db = await openDB();
+    
+    // Check if all required stores exist
+    const missingStores = storeNames.filter(store => !db.objectStoreNames.contains(store));
+    
+    if (missingStores.length > 0) {
+      // Close the current connection
+      db.close();
+      
+      // Increment the version number
+      const newVersion = db.version + 1;
+      
+      // Open a new connection with the incremented version
+      db = await openDB('fileGraphDB', newVersion);
+    }
+
+    console.log("Database initialized successfully");
+  } catch (error) {
+    console.error("Error initializing database:", error);
+    throw error;
+  }
+}
+
+export async function getData(storeName: string, dbName: string = 'fileGraphDB'): Promise<any[]> {
+  try {
+    const db = await openDB(dbName);
+
+    if (!db.objectStoreNames.contains(storeName)) {
+      throw new Error(`Object store ${storeName} does not exist in database ${dbName}`);
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const request = store.getAll();
+
+      request.onsuccess = function (event: Event) {
+        resolve((event.target as IDBRequest).result);
+      };
+
+      request.onerror = function (event: Event) {
+        reject(new Error(`Error fetching data from ${storeName}: ${(event.target as IDBRequest).error?.message || 'unknown error'}`));
+      };
+    });
+  } catch (error) {
+    console.error(`Error in getData for store ${storeName}:`, error);
+    throw error;
+  }
+}
+
 export async function saveData(storeName: string, data: any, dbName: string = 'fileGraphDB'): Promise<void> {
   const db = await openDB(dbName);
+
+  console.log("i am data being saved in dbgneral.ts", data)
 
   // Check if the store exists, recreate the database with a new version if it doesn't
   if (!db.objectStoreNames.contains(storeName)) {
@@ -97,60 +146,4 @@ export async function saveData(storeName: string, data: any, dbName: string = 'f
       }
     });
   }
-}
-
-export async function getData(storeName: string, dbName: string = 'fileGraphDB'): Promise<any[]> {
-  let db: IDBDatabase;
-  try {
-    db = await openDB(dbName);
-  } catch (error) {
-    console.error("Failed to open database:", error);
-    throw error;
-  }
-
-  if (!db.objectStoreNames.contains(storeName)) {
-    throw new Error(`Object store ${storeName} does not exist in database ${dbName}`);
-  }
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readonly');
-    const store = tx.objectStore(storeName);
-    const request = store.getAll();
-
-    request.onsuccess = function (event: Event) {
-      resolve((event.target as IDBRequest).result);
-    };
-
-    request.onerror = function (event: Event) {
-      reject(new Error(`Error fetching data from ${storeName}: ${(event.target as IDBRequest).error?.message || 'unknown error'}`));
-    };
-
-    tx.oncomplete = function () {
-      // Optionally close the database connection here if you don't need it open continuously
-      // db.close();
-    };
-  });
-}
-
-
-export async function initializeDB(dbNames: string[]): Promise<void> {
-  const db = await openDB();
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(dbNames, 'readwrite');
-
-    tx.oncomplete = function () {
-      resolve();
-    };
-
-    tx.onerror = function (event) {
-      reject(new Error(`Error initializing IndexedDB: ${event}`));
-    };
-
-    for (const dbName of dbNames) {
-      if (!tx.db.objectStoreNames.contains(dbName)) {
-        tx.db.createObjectStore(dbName, { keyPath: 'id', autoIncrement: true });
-      }
-    }
-  });
 }
