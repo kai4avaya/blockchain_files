@@ -8,8 +8,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
 import { generateUniqueId } from "../../utils/utils";
 import { createSceneSnapshot } from "./snapshot.js";
-import graphStore from '../../memory/stores/graphStore';
-import loroCRDTManager from '../../memory/collaboration/graphcolab';
+// import graphStore from '../../memory/stores/graphStore';
+// import loroCRDTManager from '../../memory/collaboration/graphcolab';
 
 const BLOOM_SCENE = 1;
 const bloomLayer = new THREE.Layers();
@@ -54,9 +54,8 @@ controls.maxPolarAngle = Math.PI * 0.5;
 controls.minDistance = 1;
 controls.maxDistance = 100;
 let needsRender = false;
-controls.addEventListener("change", () => {
-  needsRender = true;
-});
+let renderCount = 0;
+
 const renderScene = new RenderPass(scene, camera);
 const nonBloomScene = new THREE.Scene();
 const bloomPass = new UnrealBloomPass(
@@ -153,15 +152,13 @@ setupScene()
 let cubes = [];
 
 
+controls.addEventListener("change", () => {
+  markNeedsRender();
+});
+
+
 export async function initializeGraph() {
   setupScene();
-  graphStore.setScenes(scene, nonBloomScene);
-
-  const initialSceneData = await loroCRDTManager.initialize();
-  if (initialSceneData) {
-    await graphStore.applyUpdatedData(initialSceneData);
-    efficientGraphUpdate(initialSceneData)
-  }
 }
 
 
@@ -215,7 +212,8 @@ window.onresize = function () {
   bloomComposer.setSize(width, height);
   finalComposer.setSize(width, height);
 
-  render();
+  // render();
+  markNeedsRender();
 };
 
 function setupScene() {
@@ -240,7 +238,8 @@ function setupScene() {
     if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
   }
 
-  render();
+  // render();
+  markNeedsRender();
 }
 
 let first = 1;
@@ -272,7 +271,8 @@ export function createSphere(x, y, z, size, id = "") {
 
   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
 
-  render();
+  // render();
+  markNeedsRender();
 }
 
 function disposeMaterial(obj) {
@@ -308,7 +308,7 @@ export function render() {
 
   // Clean up
   nonBloomRT.dispose(); // Dispose of the non-bloom render target
-  graphStore.setScenes(scene, nonBloomScene);
+  // graphStore.setScenes(scene, nonBloomScene);
 }
 
 function darkenNonBloomed(obj) {
@@ -327,14 +327,25 @@ function restoreMaterial(obj) {
   }
 }
 
+export function markNeedsRender() {
+  needsRender = true;
+  renderCount = 2; // Render for the next 2 frames
+}
+
+
+
 function animate() {
   requestAnimationFrame(animate);
-
-  if (needsRender) {
+  if (needsRender || renderCount > 0) {
     render();
-    needsRender = false;
+    if (renderCount > 0) {
+      renderCount--;
+    } else {
+      needsRender = false;
+    }
   }
 }
+
 
 animate();
 
@@ -415,7 +426,8 @@ export function removeEmptyCubes(scene, nonBloomScene) {
 
   console.log(`Removed ${cubesToRemove.length} empty cubes`);
 
-  render();
+  // render();
+  markNeedsRender();
 }
 
 // ---------------- CREATING ----------------------------------------
@@ -431,27 +443,27 @@ function approxEqual(obj1, obj2, epsilon = 0.001) {
 }
 
 
-export function initializeReactiveGraph() {
-  if (!scene || !camera || !renderer || !controls) {
-    console.error(
-      "Three.js setup is not complete. Make sure to call setupScene() first."
-    );
-    return;
-  }
+// export function initializeReactiveGraph() {
+//   if (!scene || !camera || !renderer || !controls) {
+//     console.error(
+//       "Three.js setup is not complete. Make sure to call setupScene() first."
+//     );
+//     return;
+//   }
 
-  // Set up the reaction to update the graph when the MobX store changes
-  const disposeReaction = reaction(
-    () => graphStore.snapshot,
-    (snapshot) => efficientGraphUpdate(snapshot),
-    { fireImmediately: true }
-  );
+//   // Set up the reaction to update the graph when the MobX store changes
+//   const disposeReaction = reaction(
+//     () => graphStore.snapshot,
+//     (snapshot) => efficientGraphUpdate(snapshot),
+//     { fireImmediately: true }
+//   );
 
-  // Return a cleanup function
-  return () => {
-    disposeReaction();
-    // Add any other cleanup logic here if needed
-  };
-}
+//   // Return a cleanup function
+//   return () => {
+//     disposeReaction();
+//     // Add any other cleanup logic here if needed
+//   };
+// }
 
 export function efficientGraphUpdate(snapshot) {
   const existingObjects = new Map();
@@ -540,5 +552,6 @@ export function efficientGraphUpdate(snapshot) {
   // Update containment relationships (if needed)
   // ... (implement containment logic here)
 
-  render();
+  // render();
+  markNeedsRender();
 }

@@ -7,6 +7,7 @@ import * as THREE from "three";
 import {deserialize, serialize} from "../../utils/utils";
 
 
+
 interface Snapshot {
   objects: {
       id: string;

@@ -3,7 +3,8 @@ import {
   share3dDat,
   createWireframeCube,
   render,
-  removeEmptyCubes
+  removeEmptyCubes,
+  markNeedsRender
 } from "./create.js";
 import {
   createSceneSnapshot,
@@ -16,7 +17,6 @@ import {debounce} from "../../utils/utils";
 let isDragging = false;
 let selectedSphere = null;
 let CUBEINTERSECTED;
-let lastTime = 0;
 const cubeGroups = new Map(); // Map of cube UUIDs to arrays of spheres inside them
 let selectedObject = null;
 let currentSnapshot = null;
@@ -96,7 +96,8 @@ export function dragCube(cubes_and_containtedSpheres, intersectPoint) {
             sphere.object.position.add(movementDelta);
       });
   
-    render();
+    // render();
+    markNeedsRender()
   }
 
 export function removeSphereFromCube(sphere, cube) {
@@ -127,7 +128,9 @@ function highlightCube(cube) {
       opacity: 0.8,
     });
     cube.material.needsUpdate = true;
-    render();
+    // render();
+    markNeedsRender()
+
   }
   
 
@@ -213,7 +216,7 @@ export function getObjectUnderPointer(event) {
 }
 
 export function moveSphere(event, sphere, intersectPointIn = null) {
-  const {  camera } = share3dDat();
+  const { camera } = share3dDat();
 
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -229,12 +232,6 @@ export function moveSphere(event, sphere, intersectPointIn = null) {
   // Store the original distance from the camera
   const originalDistance = camera.position.distanceTo(targetSphere.position);
 
-  // Create a plane at the sphere's current position
-  const planeNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(
-    camera.quaternion
-  );
-  // const planeConstant = -targetSphere.position.dot(planeNormal);
-  // const plane = new THREE.Plane(planeNormal, planeConstant);
   planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
   plane.setFromNormalAndCoplanarPoint(planeNormal, targetSphere.position);
 
@@ -250,9 +247,10 @@ export function moveSphere(event, sphere, intersectPointIn = null) {
   // Adjust the scale to maintain apparent size
   const scaleFactor = newDistance / originalDistance;
   targetSphere.scale.multiplyScalar(scaleFactor);
-  // handleFileDragOver(event)
-  
-  render();
+  handleFileDragOver(event)
+  // render();
+  markNeedsRender()
+
 }
 
 function normalizeSize(fileSize) {
@@ -477,7 +475,9 @@ async function handleDrop_sphere(event) {
         CUBEINTERSECTED.material.needsUpdate = true;
       }
       CUBEINTERSECTED = null;
-      render();
+      // render();
+    markNeedsRender()
+
     }
   }
 
@@ -568,7 +568,9 @@ function getObjectType(object) {
       }
     }
 
-    render();
+    // render();
+    markNeedsRender()
+
   }
 
 
