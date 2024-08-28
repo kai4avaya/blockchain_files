@@ -637,6 +637,7 @@ export function saveObjectChanges(objectData) {
       id: objectData.id,
       position: objectData.position,
       scale: objectData.scale,
+      size: objectData.size,
       lastEditedBy: loginName,
       // Add any other properties that might have changed
     });
@@ -645,9 +646,12 @@ export function saveObjectChanges(objectData) {
     if (objectData.containedSpheres) {
       objectData.containedSpheres.forEach(sphere => {
         sceneState.updateObject({
-          id: sphere.id,
-          position: sphere.position.toArray(),
-          // Add any other sphere-specific properties that might have changed
+          type: objectData.type,
+          id: objectData.id,
+          position: objectData.position,
+          scale: objectData.scale,
+          size: objectData.size,
+          lastEditedBy: loginName,
         });
       });
     }
@@ -668,13 +672,19 @@ async function onPointerUp(event) {
         type: 'sphere',
         id: selectedSphere.userData.id,
         position: selectedSphere.position,
-        scale: selectedSphere.scale
+        scale: selectedSphere.scale,
+        size: selectedSphere.size,
+        color: selectedObject.material.color
+
       });
     } else if (selectedObject) {
       saveObjectChanges({
         type: 'cube',
         id: selectedObject.wireframeCube.userData.id,
         position: selectedObject.wireframeCube.position,
+        scale: selectedSphere.scale,
+        size: selectedSphere.size,
+        color: selectedObject.material.color,
         containedSpheres: selectedObject.containedSpheres.map(sphere => ({
           id: sphere.object.userData.id,
           position: sphere.object.position
@@ -694,37 +704,6 @@ async function onPointerUp(event) {
     removeEmptyCubes(scene, nonBloomScene);
   }
 }
-
-// function onPointerMove(event) {
-//   const now = performance.now();
-//   if (now - lastTime < 16) {
-//     return;
-//   }
-//   lastTime = now;
-
-//   if (isDragging && selectedSphere) {
-//     moveSphere(event);
-//   } else if (isDragging && selectedObject) {
-//     const { camera} = share3dDat();
-//     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-//     // raycaster.setFromCamera(mouse, camera);
-//     // const plane = new THREE.Plane(
-//     //   new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-//     //   0
-//     // );
-
-//     raycaster.setFromCamera(mouse, camera);
-//       plane.setFromNormalAndCoplanarPoint(
-//         new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-//         new THREE.Vector3()
-//       );
-//     // const intersectPoint = new THREE.Vector3();
-//     raycaster.ray.intersectPlane(plane, intersectPoint);
-//     dragCube(selectedObject, intersectPoint);
-//   }
-//   // Remove the else block that was calling handleDragOver
-// }
 
 
 const onPointerMove = debounce((event) => {
