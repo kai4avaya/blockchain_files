@@ -719,8 +719,8 @@ export function reconstructScene(snapshot) {
           objectState.color,
           objectState.id
         );
-        wireframeCube.rotation.fromArray(objectState.rotation);
-        solidCube.rotation.fromArray(objectState.rotation);
+        // wireframeCube.rotation.fromArray(objectState.rotation);
+        // solidCube.rotation.fromArray(objectState.rotation);
       } else if (objectState.type === "sphere") {
         const { sphere } = createSphere(
           objectState.position[0],
@@ -730,7 +730,7 @@ export function reconstructScene(snapshot) {
           objectState.id,
           objectState.color
         );
-        sphere.rotation.fromArray(objectState.rotation);
+        // sphere.rotation.fromArray(objectState.rotation);
       } else {
         console.warn(`Unknown object type: ${objectState.type}`);
       }
