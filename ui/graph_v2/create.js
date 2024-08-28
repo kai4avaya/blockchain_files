@@ -8,12 +8,14 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
 import { generateUniqueId } from "../../utils/utils";
 import { createSceneSnapshot } from "./snapshot.js";
-// import graphStore from '../../memory/stores/graphStore';
-// import loroCRDTManager from '../../memory/collaboration/graphcolab';
+import { sceneState } from "../../memory/collaboration/scene_colab";
 
 const BLOOM_SCENE = 1;
 const bloomLayer = new THREE.Layers();
 bloomLayer.set(BLOOM_SCENE);
+
+export const scene = new THREE.Scene();
+export const nonBloomScene = new THREE.Scene();
 
 const params = {
   threshold: 0,
@@ -40,7 +42,7 @@ renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ReinhardToneMapping;
 document.body.appendChild(renderer.domElement);
-const scene = new THREE.Scene();
+// const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
   40,
   window.innerWidth / window.innerHeight,
@@ -57,7 +59,7 @@ let needsRender = false;
 let renderCount = 0;
 
 const renderScene = new RenderPass(scene, camera);
-const nonBloomScene = new THREE.Scene();
+// const nonBloomScene = new THREE.Scene();
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
   1.5,
@@ -148,19 +150,49 @@ bloomTexturePass.uniforms["bloomTexture"].value =
 nonBloomTexturePass.uniforms["nonBloomTexture"].value = nonBloomRT.texture;
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-setupScene()
+setupScene();
 let cubes = [];
-
 
 controls.addEventListener("change", () => {
   markNeedsRender();
 });
 
-
 export async function initializeGraph() {
   setupScene();
 }
 
+// export function createWireframeCube(size, x, y, z, color, id = 0) {
+//   const geometry = new THREE.BoxGeometry(size, size, size);
+//   const edges = new THREE.EdgesGeometry(geometry);
+//   const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+//   const wireframeCube = new THREE.LineSegments(edges, material);
+//   wireframeCube.position.set(x, y, z);
+
+//   const solidCubeMaterial = new THREE.MeshBasicMaterial({
+//     color: color,
+//     transparent: true,
+//     opacity: 0,
+//   });
+//   const solidCube = new THREE.Mesh(geometry, solidCubeMaterial);
+//   solidCube.position.set(x, y, z);
+
+//   // Ensure `userData` is assigned
+//   const userData = {
+//     id: generateUniqueId(),
+//   };
+//   wireframeCube.userData = userData;
+//   solidCube.userData = userData;
+
+//   const cube = {
+//     wireframeCube: wireframeCube,
+//     solidCube: solidCube,
+//   };
+
+//   nonBloomScene.add(wireframeCube);
+//   nonBloomScene.add(solidCube);
+
+//   return cube;
+// }
 
 export function createWireframeCube(size, x, y, z, color, id = 0) {
   const geometry = new THREE.BoxGeometry(size, size, size);
@@ -177,22 +209,37 @@ export function createWireframeCube(size, x, y, z, color, id = 0) {
   const solidCube = new THREE.Mesh(geometry, solidCubeMaterial);
   solidCube.position.set(x, y, z);
 
-  // Ensure `userData` is assigned
   const userData = {
-    id: generateUniqueId(),
+    id: id || generateUniqueId(),
   };
   wireframeCube.userData = userData;
   solidCube.userData = userData;
 
-  const cube = {
-    wireframeCube: wireframeCube,
-    solidCube: solidCube,
-  };
-
   nonBloomScene.add(wireframeCube);
   nonBloomScene.add(solidCube);
 
-  return cube;
+  return {
+    wireframeCube,
+    solidCube,
+    state: {
+      id: userData.id,
+      type: "cube",
+      position: wireframeCube.position.toArray(),
+      rotation: wireframeCube.rotation.toArray(),
+      scale: wireframeCube.scale.toArray(),
+      color: color,
+      size: size,
+      geometry: {
+        type: "BoxGeometry",
+        parameters: { width: size, height: size, depth: size },
+      },
+      material: {
+        type: "LineBasicMaterial",
+        color: color,
+        wireframe: true,
+      },
+    },
+  };
 }
 
 export function resetSphereScales(spheres, defaultScale = 1) {
@@ -216,7 +263,7 @@ window.onresize = function () {
   markNeedsRender();
 };
 
-function setupScene() {
+function setupSceneBloom() {
   scene.traverse(disposeMaterial);
   scene.children.length = 0;
 
@@ -242,37 +289,92 @@ function setupScene() {
   markNeedsRender();
 }
 
+function setupScene() {
+  scene.traverse(disposeMaterial);
+  scene.children.length = 0;
+  nonBloomScene.traverse(disposeMaterial);
+  nonBloomScene.children.length = 0;
+
+  // render();
+  markNeedsRender();
+}
+
 let first = 1;
 
-export function createSphere(x, y, z, size, id = "") {
-  if (first) {
-    scene.traverse(disposeMaterial);
-    scene.children.length = 0;
-  }
+// export function createSphere(x, y, z, size, id = "") {
+//   if (first) {
+//     scene.traverse(disposeMaterial);
+//     scene.children.length = 0;
+//   }
 
-  first = 0;
+//   first = 0;
 
+//   const geometry = new THREE.IcosahedronGeometry(1, 15);
+
+//   const color = new THREE.Color();
+//   color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
+
+//   const material = new THREE.MeshBasicMaterial({ color: color });
+//   const sphere = new THREE.Mesh(geometry, material);
+//   sphere.position.set(x, y, z);
+
+//   sphere.scale.setScalar(size * 0.05);
+
+//   sphere.userData = {
+//     id: id, // Unique ID
+//   };
+
+//   scene.add(sphere);
+
+//   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
+
+//   // render();
+//   markNeedsRender();
+// }
+
+export function createSphere(x, y, z, size, id = "", colorIn = "") {
   const geometry = new THREE.IcosahedronGeometry(1, 15);
-
-  const color = new THREE.Color();
-  color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
-
-  const material = new THREE.MeshBasicMaterial({ color: color });
+  // const color = new THREE.Color();
+  let color = new THREE.Color()
+  if (colorIn)  color.setHSL(colorIn);
+  else {
+    color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
+  }
+  let material = new THREE.MeshBasicMaterial({ color: color });
   const sphere = new THREE.Mesh(geometry, material);
   sphere.position.set(x, y, z);
-
   sphere.scale.setScalar(size * 0.05);
 
-  sphere.userData = {
-    id: id, // Unique ID
+  const userData = {
+    id: id || generateUniqueId(),
   };
+  sphere.userData = userData;
 
   scene.add(sphere);
 
   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
 
-  // render();
   markNeedsRender();
+
+  return {
+    sphere,
+    state: {
+      id: userData.id,
+      type: "sphere",
+      position: sphere.position.toArray(),
+      rotation: sphere.rotation.toArray(),
+      scale: sphere.scale.toArray(),
+      color: sphere.material.color.getHex(),
+      geometry: {
+        type: "IcosahedronGeometry",
+        parameters: { radius: 1, detail: 15 },
+      },
+      material: {
+        type: "MeshBasicMaterial",
+        color: sphere.material.color.getHex(),
+      },
+    },
+  };
 }
 
 function disposeMaterial(obj) {
@@ -332,8 +434,6 @@ export function markNeedsRender() {
   renderCount = 2; // Render for the next 2 frames
 }
 
-
-
 function animate() {
   requestAnimationFrame(animate);
   if (needsRender || renderCount > 0) {
@@ -345,7 +445,6 @@ function animate() {
     }
   }
 }
-
 
 animate();
 
@@ -442,7 +541,6 @@ function approxEqual(obj1, obj2, epsilon = 0.001) {
   return true;
 }
 
-
 // export function initializeReactiveGraph() {
 //   if (!scene || !camera || !renderer || !controls) {
 //     console.error(
@@ -465,93 +563,188 @@ function approxEqual(obj1, obj2, epsilon = 0.001) {
 //   };
 // }
 
+// export function efficientGraphUpdate(snapshot) {
+//   const existingObjects = new Map();
+//   scene.traverse((object) => {
+//     if (object.userData.id) {
+//       existingObjects.set(object.userData.id, object);
+//     }
+//   });
+
+//   // Update or create boxes
+//   snapshot.boxes.forEach((box) => {
+//     let cube = existingObjects.get(box.id);
+//     if (!cube) {
+//       cube = createWireframeCube(
+//         box.size || 1,
+//         box.position.x,
+//         box.position.y,
+//         box.position.z,
+//         box.color || 0xffffff,
+//         box.id
+//       );
+//       // scene.add(cube.wireframeCube);
+//       // scene.add(cube.solidCube);
+//     } else {
+//       // Update existing cube properties if changed
+//       if (!approxEqual(cube.wireframeCube.position, box.position)) {
+//         cube.wireframeCube.position.set(
+//           box.position.x,
+//           box.position.y,
+//           box.position.z
+//         );
+//         cube.solidCube.position.set(
+//           box.position.x,
+//           box.position.y,
+//           box.position.z
+//         );
+//       }
+//       if (!approxEqual(cube.wireframeCube.scale, box.scale)) {
+//         cube.wireframeCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
+//         cube.solidCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
+//       }
+//       if (cube.wireframeCube.material.color.getHex() !== box.color) {
+//         cube.wireframeCube.material.color.setHex(box.color);
+//         cube.solidCube.material.color.setHex(box.color);
+//       }
+//     }
+//     existingObjects.delete(box.id);
+//   });
+
+//   // Update or create spheres
+//   snapshot.objects.forEach((obj) => {
+//     if (obj.type === "IcosahedronGeometry" || obj.type === "SphereGeometry") {
+//       let sphere = existingObjects.get(obj.id);
+//       if (!sphere) {
+//         sphere = createSphere(
+//           obj.position.x,
+//           obj.position.y,
+//           obj.position.z,
+//           obj.scale.x * 20,
+//           obj.id
+//         );
+//         // scene.add(sphere);
+//       } else {
+//         // Update existing sphere properties if changed
+//         if (!approxEqual(sphere.position, obj.position)) {
+//           sphere.position.set(obj.position.x, obj.position.y, obj.position.z);
+//         }
+//         if (!approxEqual(sphere.scale, obj.scale)) {
+//           sphere.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+//         }
+//         if (sphere.material.color.getHex() !== obj.color) {
+//           sphere.material.color.setHex(obj.color);
+//         }
+//       }
+//       existingObjects.delete(obj.id);
+//     }
+//   });
+
+//   // Remove objects that no longer exist in the snapshot
+//   existingObjects.forEach((object) => {
+//     scene.remove(object);
+//     if (object.material) object.material.dispose();
+//     if (object.geometry) object.geometry.dispose();
+//   });
+
+//   // Update containment relationships (if needed)
+//   // ... (implement containment logic here)
+
+//   // render();
+//   markNeedsRender();
+// }
+
 export function efficientGraphUpdate(snapshot) {
+  // This function can now be simplified to use SceneState
+  snapshot?.boxes?.forEach((box) => {
+    sceneState.updateObject(box);
+  });
+
+  snapshot?.objects?.forEach((obj) => {
+    if (obj.type === "IcosahedronGeometry" || obj.type === "SphereGeometry") {
+      sceneState.updateObject(obj);
+    }
+  });
+
+  markNeedsRender();
+}
+export function reconstructScene(snapshot) {
+  const prevSnapshot = createSceneSnapshot([scene, nonBloomScene]);
+  console.log("snapshot in create...", snapshot);
+  console.log("prev snapshot in create...", prevSnapshot);
+
   const existingObjects = new Map();
   scene.traverse((object) => {
     if (object.userData.id) {
       existingObjects.set(object.userData.id, object);
     }
   });
+  nonBloomScene.traverse((object) => {
+    if (object.userData.id) {
+      existingObjects.set(object.userData.id, object);
+    }
+  });
 
-  // Update or create boxes
-  snapshot.boxes.forEach((box) => {
-    let cube = existingObjects.get(box.id);
-    if (!cube) {
-      cube = createWireframeCube(
-        box.size || 1,
-        box.position.x,
-        box.position.y,
-        box.position.z,
-        box.color || 0xffffff,
-        box.id
+  snapshot?.forEach((objectState) => {
+    const existingObject = existingObjects.get(objectState.id);
+    if (existingObject) {
+      // Update existing object
+      existingObject.position.set(
+        objectState.position[0],
+        objectState.position[1],
+        objectState.position[2]
       );
-      // scene.add(cube.wireframeCube);
-      // scene.add(cube.solidCube);
+      existingObject.rotation.set(
+        objectState.rotation[0],
+        objectState.rotation[1],
+        objectState.rotation[2]
+      );
+      existingObject.scale.set(
+        objectState.scale[0],
+        objectState.scale[1],
+        objectState.scale[2]
+      );
+      if (existingObject.material) {
+        existingObject.material.color.setHex(objectState.color);
+      }
+      existingObjects.delete(objectState.id);
     } else {
-      // Update existing cube properties if changed
-      if (!approxEqual(cube.wireframeCube.position, box.position)) {
-        cube.wireframeCube.position.set(
-          box.position.x,
-          box.position.y,
-          box.position.z
+      // Create new object
+      if (objectState.type === "cube") {
+        const { wireframeCube, solidCube } = createWireframeCube(
+          objectState.size,
+          objectState.position[0],
+          objectState.position[1],
+          objectState.position[2],
+          objectState.color,
+          objectState.id
         );
-        cube.solidCube.position.set(
-          box.position.x,
-          box.position.y,
-          box.position.z
+        wireframeCube.rotation.fromArray(objectState.rotation);
+        solidCube.rotation.fromArray(objectState.rotation);
+      } else if (objectState.type === "sphere") {
+        const { sphere } = createSphere(
+          objectState.position[0],
+          objectState.position[1],
+          objectState.position[2],
+          objectState.scale[0] * 20, // Assuming scale[0] represents the size
+          objectState.id,
+          objectState.color
         );
-      }
-      if (!approxEqual(cube.wireframeCube.scale, box.scale)) {
-        cube.wireframeCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
-        cube.solidCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
-      }
-      if (cube.wireframeCube.material.color.getHex() !== box.color) {
-        cube.wireframeCube.material.color.setHex(box.color);
-        cube.solidCube.material.color.setHex(box.color);
-      }
-    }
-    existingObjects.delete(box.id);
-  });
-
-  // Update or create spheres
-  snapshot.objects.forEach((obj) => {
-    if (obj.type === "IcosahedronGeometry" || obj.type === "SphereGeometry") {
-      let sphere = existingObjects.get(obj.id);
-      if (!sphere) {
-        sphere = createSphere(
-          obj.position.x,
-          obj.position.y,
-          obj.position.z,
-          obj.scale.x * 20,
-          obj.id
-        );
-        // scene.add(sphere);
+        sphere.rotation.fromArray(objectState.rotation);
       } else {
-        // Update existing sphere properties if changed
-        if (!approxEqual(sphere.position, obj.position)) {
-          sphere.position.set(obj.position.x, obj.position.y, obj.position.z);
-        }
-        if (!approxEqual(sphere.scale, obj.scale)) {
-          sphere.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
-        }
-        if (sphere.material.color.getHex() !== obj.color) {
-          sphere.material.color.setHex(obj.color);
-        }
+        console.warn(`Unknown object type: ${objectState.type}`);
       }
-      existingObjects.delete(obj.id);
     }
   });
 
-  // Remove objects that no longer exist in the snapshot
-  existingObjects.forEach((object) => {
-    scene.remove(object);
-    if (object.material) object.material.dispose();
-    if (object.geometry) object.geometry.dispose();
+  // Remove objects that are no longer in the snapshot
+  existingObjects?.forEach((object) => {
+    if (object.parent === scene) {
+      scene.remove(object);
+    } else if (object.parent === nonBloomScene) {
+      nonBloomScene.remove(object);
+    }
   });
 
-  // Update containment relationships (if needed)
-  // ... (implement containment logic here)
-
-  // render();
   markNeedsRender();
 }

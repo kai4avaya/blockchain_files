@@ -10,6 +10,9 @@ import { showPopup } from './ui/popup.js';
 import {getObjectUnderPointer} from './ui/graph_v2/move'
 // import { openDB, getData, saveData, initializeDB } from './memory/local/dbgeneral';
 import { initializeFileSystem, getFileSystem } from './memory/collaboration/file_colab';
+import { sceneState } from './memory/collaboration/scene_colab';
+import { scene, nonBloomScene, initializeGraph } from './ui/graph_v2/create';
+
 
 const userId = "k.ai"
 localStorage.setItem("login_block", userId);
@@ -26,6 +29,10 @@ async function main() {
     console.log("FileSystem is ready");
     // Perform operations that require the file system
   });
+
+  // Initialize the graph and SceneState
+  await initializeGraph();
+  await sceneState.initialize(scene, nonBloomScene);
 
 }
 

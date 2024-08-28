@@ -46,31 +46,19 @@ class FileSystem {
     }
   
     private async initializeDB() {
-      console.log('Starting initializeDB');
       try {
         await indexDBOverlay.initializeDB(['files', 'directories']);
-        console.log('indexDBOverlay initialized');
   
         const files = await indexDBOverlay.getData('files');
-        console.log('Files fetched:', files);
         
         const directories = await indexDBOverlay.getData('directories');
-        console.log('Directories fetched:', directories);
         
-  
-        console.log('Files fetched:', files);
-        console.log('Directories fetched:', directories);
-  
         this.snapshot = {
           files: files || [],
           directories: directories || [],
           version: 0  // Start with version 0 for a new system
         };
-  
-        console.log('Snapshot created:', this.snapshot);
-  
         this.isReady = true;
-        console.log('FileSystem is now ready');
         this.notifyReadyCallbacks();
       } catch (error) {
         console.error('Error in initializeDB:', error);
@@ -81,7 +69,6 @@ class FileSystem {
     }
   
     private notifyReadyCallbacks() {
-      console.log(`Notifying ${this.readyCallbacks.length} ready callbacks`);
       this.readyCallbacks.forEach(callback => callback());
       this.readyCallbacks = [];
     }
@@ -102,13 +89,11 @@ class FileSystem {
 
   getMetadata<T extends FileMetadata | DirectoryMetadata>(id: string, type: 'file' | 'directory'): T | undefined {
     const items = type === 'file' ? this.snapshot.files : this.snapshot.directories;
-    console.log("i am items in getMetaData!", items)
     return items.find(item => item.id === id) as T | undefined;
   }
 
 
   private async applyUpdate(update: Partial<FileSystemSnapshot>) {
-    console.log('applyUpdate update, isReady', update, this.isReady);
     if (!this.isReady) {
       await new Promise<void>(resolve => this.onReady(resolve));
     }
@@ -153,7 +138,6 @@ class FileSystem {
     this.updateMetadata(item);
     const key = type === 'file' ? 'files' : 'directories';
     const updatedItems = [...this.snapshot[key], item];
-    console.log("file colab in addOrUpdate: " + updatedItems)
     await this.applyUpdate({ [key]: updatedItems });
   }
 
