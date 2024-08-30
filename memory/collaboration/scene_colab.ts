@@ -2,7 +2,7 @@ import { reconstructScene } from "../../ui/graph_v2/create";
 import indexDBOverlay from '../local/file_worker';
 
 interface ObjectState {
-  id: string;
+  uuid: string; // original id of object
   type: 'sphere' | 'cube' | 'other';
   position: number[];
   rotation: number[];
@@ -14,7 +14,7 @@ interface ObjectState {
   color: number;
   size?: number;
   userData: {
-    id: string;
+    id: string; // links back to file id
   };
 }
 
@@ -36,10 +36,6 @@ class SceneState {
     return SceneState.instance;
   }
 
-  setUserId(userId: string) {
-    this.userId = userId;
-  }
-
   async initialize(): Promise<void> {
     try {
       const storedState = await indexDBOverlay.getData(this.STORAGE_KEY);
@@ -54,7 +50,7 @@ class SceneState {
   }
 
   private loadState(storedState: ObjectState[]): void {
-    storedState.forEach(state => this.objects.set(state.id, state));
+    storedState.forEach(state => this.objects.set(state.uuid, state));
     this.reconstructScene();
   }
 
@@ -62,10 +58,10 @@ class SceneState {
     reconstructScene(Array.from(this.objects.values()));
   }
 
-  updateObject(objectState: Partial<ObjectState> & { id: string }): void {
-    const existingState = this.objects.get(objectState.id);
+  updateObject(objectState: Partial<ObjectState> & { uuid: string }): void {
+    const existingState = this.objects.get(objectState.uuid);
 
-    console.log("id in scene colab", objectState)
+    console.log("uuid in scene colab", objectState)
     console.log("existingState  scene colab", existingState)
 
     if (existingState) {
@@ -89,15 +85,15 @@ class SceneState {
       versionNonce: this.generateVersionNonce(),
       lastEditedBy: this.userId
     };
-    this.objects.set(newState.id, newState);
+    this.objects.set(newState.uuid, newState);
     this.scheduleSave();
     this.reconstructScene();
   }
 
   mergeUpdate(incomingState: ObjectState): void {
-    const existingState = this.objects.get(incomingState.id);
+    const existingState = this.objects.get(incomingState.uuid);
     if (!existingState || this.isNewerState(incomingState, existingState)) {
-      this.objects.set(incomingState.id, incomingState);
+      this.objects.set(incomingState.uuid, incomingState);
       this.scheduleSave();
       this.reconstructScene();
       this.broadcastUpdate(incomingState);
@@ -109,8 +105,8 @@ class SceneState {
            (incoming.version === existing.version && incoming.versionNonce < existing.versionNonce);
   }
 
-  deleteObject(id: string): void {
-    const state = this.objects.get(id);
+  deleteObject(uuid: string): void {
+    const state = this.objects.get(uuid);
     if (state) {
       const updatedState = {
         ...state,

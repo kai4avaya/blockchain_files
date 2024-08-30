@@ -262,44 +262,11 @@ function setupScene() {
   nonBloomScene.traverse(disposeMaterial);
   nonBloomScene.children.length = 0;
 
-  // render();
   markNeedsRender();
 }
 
-let first = 1;
 
-// export function createSphere(x, y, z, size, id = "") {
-//   if (first) {
-//     scene.traverse(disposeMaterial);
-//     scene.children.length = 0;
-//   }
-
-//   first = 0;
-
-//   const geometry = new THREE.IcosahedronGeometry(1, 15);
-
-//   const color = new THREE.Color();
-//   color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
-
-//   const material = new THREE.MeshBasicMaterial({ color: color });
-//   const sphere = new THREE.Mesh(geometry, material);
-//   sphere.position.set(x, y, z);
-
-//   sphere.scale.setScalar(size * 0.05);
-
-//   sphere.userData = {
-//     id: id, // Unique ID
-//   };
-
-//   scene.add(sphere);
-
-//   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
-
-//   // render();
-//   markNeedsRender();
-// }
-
-export function createSphere(x, y, z, size, id = "", colorIn = "") {
+export function createSphere(x, y, z, size, userId = "", colorIn = "") {
   const geometry = new THREE.IcosahedronGeometry(1, 15);
   // const color = new THREE.Color();
   let color = new THREE.Color()
@@ -313,7 +280,7 @@ export function createSphere(x, y, z, size, id = "", colorIn = "") {
   sphere.scale.setScalar(size * 0.05);
 
   const userData = {
-    id: id || generateUniqueId(),
+    id: userId || generateUniqueId(),
   };
   sphere.userData = userData;
 
@@ -328,7 +295,8 @@ export function createSphere(x, y, z, size, id = "", colorIn = "") {
   return {
     sphere,
     state: {
-      id: userData.id,
+      uuid: sphere.uuid, // this is threejs original id
+      userData: userData, //this is file id of the sphere related to its file
       type: "sphere",
       position: sphere.position.toArray(),
       rotation: sphere.rotation.toArray(),
@@ -499,6 +467,137 @@ export function removeEmptyCubes(scene, nonBloomScene) {
 }
 
 // ---------------- CREATING ----------------------------------------
+// export function reconstructScene(snapshot) {
+//   console.log("Reconstructing scene with snapshot:", snapshot);
+
+//   const existingObjects = new Map();
+//   let sceneObjectCount = 0;
+//   let nonBloomSceneObjectCount = 0;
+
+//   // Collect existing objects
+//   scene.traverse((object) => {
+//     console.log("Found existing  scene object:", object);
+
+//     if (object.userData.id) {
+//       existingObjects.set(object.userData.id, { object, inScene: true });
+//       sceneObjectCount++;
+//     }
+//   });
+//   nonBloomScene.traverse((object) => {
+//     console.log("Found existing nonBloomScene object:", object);
+
+//     if (object.userData.id) {
+//       existingObjects.set(object.userData.id, { object, inScene: false });
+//       nonBloomSceneObjectCount++;
+//     }
+//   });
+
+//   console.log(`Existing objects before reconstruction: ${existingObjects.size}`);
+//   console.log(`Scene object count: ${sceneObjectCount}`);
+//   console.log(`Non-bloom scene object count: ${nonBloomSceneObjectCount}`);
+
+//   // Update or create objects from snapshot
+//   snapshot.forEach((objectState) => {
+//     console.log(`Processing object: ${objectState.uuid}, Type: ${objectState.type}`);
+//     const existingEntry = existingObjects.get(objectState.uuid);
+
+//     if (existingEntry) {
+//       // Object exists, update its properties
+//       updateObjectProperties(existingEntry.object, objectState);
+//       existingObjects.delete(objectState.uuid); // Remove from map to track which objects are no longer in the snapshot
+//     } else {
+//       // Object doesn't exist, create it
+//       if (objectState.type === "cube") {
+//         const { wireframeCube, solidCube } = createWireframeCube(
+//           objectState.size,
+//           objectState.position[0],
+//           objectState.position[1],
+//           objectState.position[2],
+//           objectState.color,
+//           objectState.userData.id
+//         );
+//         console.log(`Created cube: ${objectState.id}`);
+//       } else if (objectState.type === "sphere") {
+//         const { sphere } = createSphere(
+//           objectState.position[0],
+//           objectState.position[1],
+//           objectState.position[2],
+//           objectState.scale[0] * 20,
+//           objectState.userData.id,
+//           objectState.color
+//         );
+//         console.log(`Created sphere: ${objectState.uuid}`);
+//       } else {
+//         console.warn(`Unknown object type: ${objectState.type}`);
+//       }
+//     }
+//   });
+
+//   // Remove objects that are no longer in the snapshot
+//   existingObjects.forEach((entry, id) => {
+//     console.log(`Removing object no longer in snapshot: ${id}`);
+//     if (entry.inScene) {
+//       scene.remove(entry.object);
+//     } else {
+//       nonBloomScene.remove(entry.object);
+//     }
+//     if (entry.object.material) entry.object.material.dispose();
+//     if (entry.object.geometry) entry.object.geometry.dispose();
+//   });
+
+//   sceneObjectCount = 0;
+//   nonBloomSceneObjectCount = 0;
+//   scene.traverse((object) => {
+//     if (object.userData.id) sceneObjectCount++;
+//   });
+//   nonBloomScene.traverse((object) => {
+//     if (object.userData.id) nonBloomSceneObjectCount++;
+//   });
+
+//   console.log("Scene reconstruction complete.");
+//   console.log(`Final scene object count: ${sceneObjectCount}`);
+//   console.log(`Final non-bloom scene object count: ${nonBloomSceneObjectCount}`);
+
+//   markNeedsRender();
+//   requestAnimationFrame(() => {
+//     render();
+//     console.log("Render complete.");
+//   });
+// }
+
+// function updateObjectProperties(object, objectState) {
+//   // Update position
+//   object.position.set(objectState.position[0], objectState.position[1], objectState.position[2]);
+
+//   // Update scale
+//   if (objectState.scale) {
+//     object.scale.set(objectState.scale[0], objectState.scale[1], objectState.scale[2]);
+//   }
+
+//   // Update color
+//   if (object.material && objectState.color !== undefined) {
+//     object.material.color.setHex(objectState.color);
+//   }
+
+//   // Update size for cubes
+//   if (objectState.type === "cube" && objectState.size !== undefined) {
+//     // Assuming size affects scale for cubes
+//     const newSize = objectState.size;
+//     object.scale.set(newSize, newSize, newSize);
+    
+//     // If this is a wireframe cube, update its corresponding solid cube
+//     if (object.userData.isSolidCube) {
+//       const wireframeCube = scene.getObjectByProperty('userData.id', object.userData.id);
+//       if (wireframeCube) {
+//         wireframeCube.scale.set(newSize, newSize, newSize);
+//       }
+//     }
+//   }
+
+//   console.log(`Updated properties for object: ${objectState.id}`);
+// }
+
+
 export function reconstructScene(snapshot) {
   console.log("Reconstructing scene with snapshot:", snapshot);
 
@@ -508,17 +607,18 @@ export function reconstructScene(snapshot) {
 
   // Collect existing objects
   scene.traverse((object) => {
-    console.log("Found existing  scene object:", object);
-    if (object.userData.id) {
-      existingObjects.set(object.userData.id, { object, inScene: true });
+    console.log("Found existing scene object:", object);
+
+    if (object.uuid) {
+      existingObjects.set(object.uuid, { object, inScene: true });
       sceneObjectCount++;
     }
   });
   nonBloomScene.traverse((object) => {
     console.log("Found existing nonBloomScene object:", object);
 
-    if (object.userData.id) {
-      existingObjects.set(object.userData.id, { object, inScene: false });
+    if (object.uuid) {
+      existingObjects.set(object.uuid, { object, inScene: false });
       nonBloomSceneObjectCount++;
     }
   });
@@ -529,13 +629,13 @@ export function reconstructScene(snapshot) {
 
   // Update or create objects from snapshot
   snapshot.forEach((objectState) => {
-    console.log(`Processing object: ${objectState.id}, Type: ${objectState.type}`);
-    const existingEntry = existingObjects.get(objectState.id);
+    console.log(`Processing object: ${objectState.uuid}, Type: ${objectState.type}`);
+    const existingEntry = existingObjects.get(objectState.uuid);
 
     if (existingEntry) {
       // Object exists, update its properties
       updateObjectProperties(existingEntry.object, objectState);
-      existingObjects.delete(objectState.id); // Remove from map to track which objects are no longer in the snapshot
+      existingObjects.delete(objectState.uuid); // Remove from map to track which objects are no longer in the snapshot
     } else {
       // Object doesn't exist, create it
       if (objectState.type === "cube") {
@@ -545,19 +645,22 @@ export function reconstructScene(snapshot) {
           objectState.position[1],
           objectState.position[2],
           objectState.color,
-          objectState.id
+          objectState.uuid
         );
-        console.log(`Created cube: ${objectState.id}`);
+        wireframeCube.uuid = objectState.uuid;
+        solidCube.uuid = objectState.uuid + "_solid";
+        console.log(`Created cube: ${objectState.uuid}`);
       } else if (objectState.type === "sphere") {
         const { sphere } = createSphere(
           objectState.position[0],
           objectState.position[1],
           objectState.position[2],
           objectState.scale[0] * 20,
-          objectState.id,
+          objectState.uuid,
           objectState.color
         );
-        console.log(`Created sphere: ${objectState.id}`);
+        sphere.uuid = objectState.uuid;
+        console.log(`Created sphere: ${objectState.uuid}`);
       } else {
         console.warn(`Unknown object type: ${objectState.type}`);
       }
@@ -565,8 +668,8 @@ export function reconstructScene(snapshot) {
   });
 
   // Remove objects that are no longer in the snapshot
-  existingObjects.forEach((entry, id) => {
-    console.log(`Removing object no longer in snapshot: ${id}`);
+  existingObjects.forEach((entry, uuid) => {
+    console.log(`Removing object no longer in snapshot: ${uuid}`);
     if (entry.inScene) {
       scene.remove(entry.object);
     } else {
@@ -579,10 +682,10 @@ export function reconstructScene(snapshot) {
   sceneObjectCount = 0;
   nonBloomSceneObjectCount = 0;
   scene.traverse((object) => {
-    if (object.userData.id) sceneObjectCount++;
+    if (object.uuid) sceneObjectCount++;
   });
   nonBloomScene.traverse((object) => {
-    if (object.userData.id) nonBloomSceneObjectCount++;
+    if (object.uuid) nonBloomSceneObjectCount++;
   });
 
   console.log("Scene reconstruction complete.");
@@ -618,101 +721,12 @@ function updateObjectProperties(object, objectState) {
     
     // If this is a wireframe cube, update its corresponding solid cube
     if (object.userData.isSolidCube) {
-      const wireframeCube = scene.getObjectByProperty('userData.id', object.userData.id);
+      const wireframeCube = scene.getObjectByProperty('uuid', object.uuid);
       if (wireframeCube) {
         wireframeCube.scale.set(newSize, newSize, newSize);
       }
     }
   }
 
-  console.log(`Updated properties for object: ${objectState.id}`);
+  console.log(`Updated properties for object: ${object.uuid}`);
 }
-// export function reconstructScene(snapshot) {
-//   console.log("Reconstructing scene with snapshot:", snapshot);
-
-//   const existingObjects = new Map();
-//   let sceneObjectCount = 0;
-//   let nonBloomSceneObjectCount = 0;
-
-//   // Collect existing objects
-//   scene.traverse((object) => {
-//     console.log("object that existed prior scene ", object)
-
-//     if (object.userData.id) {
-
-//       existingObjects.set(object.userData.id, { object, inScene: true });
-//       sceneObjectCount++;
-//     }
-//   });
-//   nonBloomScene.traverse((object) => {
-//     console.log("object that existed prior nonBloomScene ", object)
-
-//     if (object.userData.id) {
-//       existingObjects.set(object.userData.id, { object, inScene: false });
-//       nonBloomSceneObjectCount++;
-//     }
-//   });
-
-//   console.log(`Existing objects before reconstruction: ${existingObjects.size}`);
-//   console.log(`Scene object count: ${sceneObjectCount}`);
-//   console.log(`Non-bloom scene object count: ${nonBloomSceneObjectCount}`);
-
-//   // Remove all existing objects
-//   existingObjects.forEach((entry, id) => {
-//     console.log(`Removing existing object: ${id}`);
-//     if (entry.inScene) {
-//       scene.remove(entry.object);
-//     } else {
-//       nonBloomScene.remove(entry.object);
-//     }
-//     if (entry.object.material) entry.object.material.dispose();
-//     if (entry.object.geometry) entry.object.geometry.dispose();
-//   });
-
-//   // Recreate objects from snapshot
-//   snapshot.forEach((objectState) => {
-//     console.log(`Creating/Recreating object: ${objectState.id}, Type: ${objectState.type}`);
-//     if (objectState.type === "cube") {
-//       const { wireframeCube, solidCube } = createWireframeCube(
-//         objectState.size,
-//         objectState.position[0],
-//         objectState.position[1],
-//         objectState.position[2],
-//         objectState.color,
-//         objectState.id
-//       );
-//       console.log(`Created cube: ${objectState.id}`);
-//     } else if (objectState.type === "sphere") {
-//       const { sphere } = createSphere(
-//         objectState.position[0],
-//         objectState.position[1],
-//         objectState.position[2],
-//         objectState.scale[0] * 20,
-//         objectState.id,
-//         objectState.color
-//       );
-//       console.log(`Created sphere: ${objectState.id}`);
-//     } else {
-//       console.warn(`Unknown object type: ${objectState.type}`);
-//     }
-//   });
-
-//   sceneObjectCount = 0;
-//   nonBloomSceneObjectCount = 0;
-//   scene.traverse((object) => {
-//     if (object.userData.id) sceneObjectCount++;
-//   });
-//   nonBloomScene.traverse((object) => {
-//     if (object.userData.id) nonBloomSceneObjectCount++;
-//   });
-
-//   console.log("Scene reconstruction complete.");
-//   console.log(`Final scene object count: ${sceneObjectCount}`);
-//   console.log(`Final non-bloom scene object count: ${nonBloomSceneObjectCount}`);
-
-//   markNeedsRender();
-//   requestAnimationFrame(() => {
-//     render();
-//     console.log("Render complete.");
-//   });
-// }

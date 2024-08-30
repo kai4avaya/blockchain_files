@@ -315,7 +315,7 @@ async function handleFileDrop_sphere(event) {
     const file = fileList[i];
     const size = normalizeSize(file.size);
     // let dropPosition;
-    const uuids = await handleFileDrop(event);
+    const fileIds = await handleFileDrop(event);
 
     if (allIntersects.length > 0) {
       const intersect = allIntersects[0];
@@ -332,7 +332,7 @@ async function handleFileDrop_sphere(event) {
           dropPosition.y,
           dropPosition.z,
           size,
-          uuids[i]
+          fileIds[i]
         ))
       } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
         // const size = getSize(intersect)
@@ -350,7 +350,7 @@ async function handleFileDrop_sphere(event) {
           dropPosition.y,
           dropPosition.z,
           size,
-          uuids[i]
+          fileIds[i]
         ))
       } else {
         createdShapes.push(createSphere(
@@ -358,7 +358,7 @@ async function handleFileDrop_sphere(event) {
           dropPosition.y,
           dropPosition.z,
           size,
-          uuids[i]
+          fileIds[i]
         ))
       }
     } else {
@@ -380,7 +380,7 @@ async function handleFileDrop_sphere(event) {
         intersectPoint.y,
         intersectPoint.z,
         size,
-        uuids[i]
+        fileIds[i]
       ))
     }
   }
@@ -390,7 +390,8 @@ async function handleFileDrop_sphere(event) {
     if (shape?.state?.type === "sphere") {  // Assuming this is how we identify spheres
       saveObjectChanges({
         type: 'sphere',
-        id: shape?.state?.id,
+        uuid: shape?.state?.uuid,
+        userData: shape?.userData,
         position: shape?.state?.position,
         scale: shape?.state?.scale,
         size: shape?.state?.size,
@@ -399,7 +400,8 @@ async function handleFileDrop_sphere(event) {
     } else if (shape.wireframeCube && shape.solidCube) {  // Assuming this is how we identify cubes
       saveObjectChanges({
         type: 'cube',
-        id: shape.wireframeCube.userData.id,
+        uuid: shape?.state?.uuid,
+        userData: shape.wireframeCube.userData,
         position: shape.wireframeCube.position,
         scale: shape.wireframeCube.scale,
         size: shape?.state?.size,
@@ -596,28 +598,14 @@ export function saveObjectChanges(objectData) {
   console.log("saveObjectChanges", objectData);
   if (!objectData) return;
 
-  // if (objectData.type === 'sphere') {
-  //   sceneState.updateObject({
-
-  //     id: objectData.id,
-  //     position: objectData.position,
-  //     scale: objectData.scale,
-  //     // Add any other properties that might have changed
-  //   });
-  // } else if (objectData.type === 'cube') {
-  //   sceneState.updateObject({
-  //     id: objectData.id,
-  //     position: objectData.position.toArray(),
-  //     // Add any other cube-specific properties that might have changed
-  //   });
     sceneState.updateObject({
       type: objectData.type,
-      id: objectData.id,
+      uuid: objectData.uuid,
+      userData: objectData.userData,
       position: objectData.position,
       scale: objectData.scale,
       size: objectData.size,
       lastEditedBy: loginName,
-      // Add any other properties that might have changed
     });
 
     // Update positions of contained spheres if any
@@ -625,7 +613,8 @@ export function saveObjectChanges(objectData) {
       objectData.containedSpheres.forEach(sphere => {
         sceneState.updateObject({
           type: objectData.type,
-          id: objectData.id,
+          uuid: objectData.uuid,
+          userData: objectData.userData,
           position: objectData.position,
           scale: objectData.scale,
           size: objectData.size,
@@ -650,8 +639,8 @@ async function onPointerUp(event) {
   
       saveObjectChanges({
           type: 'sphere',
-          id: selectedSphere.id,
-          userData: {id: selectedSphere.userData.id},
+          uuid: selectedSphere.uiid,
+          userData: selectedSphere.userData,
           position: selectedSphere.position, // Make sure position is defined
           scale: selectedSphere.scale,       // Make sure scale is defined
           size: selectedSphere.geometry.parameters.radius, // Accessing size from geometry parameters
@@ -662,15 +651,15 @@ async function onPointerUp(event) {
       console.log("i am selectedObject", selectedObject);
       saveObjectChanges({
         type: 'cube',
-        id: selectedObject.id,
+        // id: selectedObject.id,
         userData: {id: selectedObject.userData.id || "no ID"},
-        id: selectedObject.wireframeCube.userData.id,
+        uuid: selectedObject.wireframeCube.userData.uuid,
         position: selectedObject.wireframeCube.position,
         scale: selectedObject.scale,
         size: selectedObject.size,
         color: selectedObject.material.color,
         containedSpheres: selectedObject.containedSpheres.map(sphere => ({
-          id: sphere.object.userData.id,
+          uuid: sphere.object.userData.uuid,
           position: sphere.object.position
         }))
       });
