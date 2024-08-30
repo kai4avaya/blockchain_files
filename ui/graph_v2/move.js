@@ -293,6 +293,7 @@ function handleFileDragOver(event) {
 }
   
 async function handleFileDrop_sphere(event) {
+  console.log("handleFileDrop_sphere", event)
   // if (!isDragging && !isFileDragging) return;  // may need endpoint for isDragging
 
   isFileDragging = false;
@@ -420,40 +421,30 @@ function getSize(intersect, scale=1){
   boundingBox.getSize(size);
 
   return Math.max(size.x, size.y, size.z) * scale
-}
-
-async function handleDrop_sphere(event) {
+}async function handleDrop_sphere(event) {
   if (!isDragging) return;  // may need endpoint for isDragging
 
   resetCubeHighlight();
   const { camera, scene, nonBloomScene} = share3dDat();
-
 
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
 
   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+  if (allIntersects.length > 0) {
+    const intersect = allIntersects[0];
+    const dropPosition = intersect.point;
 
-  // for (let i = 0; i < fileList.length; i++) {
-  //   const file = fileList[i];
-  //   const size = normalizeSize(file.size);
-  //   let dropPosition;
-  //   const uuids = await handleFileDrop(event);
-
-
-    if (allIntersects.length > 0) {
-      const intersect = allIntersects[0];
-      const dropPosition = intersect.point;
-
-      if (
-        intersect.object.geometry.type === "EdgesGeometry" ||
-        intersect.object.geometry.type === "BoxGeometry"
-      ) {
-        intersect.object.material.color.set(0xff0000);
-
-      } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
-        const size = getSize(intersect)
+    if (
+      intersect.object.geometry.type === "EdgesGeometry" ||
+      intersect.object.geometry.type === "BoxGeometry"
+    ) {
+      intersect.object.material.color.set(0xff0000);
+    } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
+      // Only create a cube if we're dropping onto another sphere
+      if (selectedSphere && selectedSphere !== intersect.object) {
+        const size = getSize(intersect);
         const actualSphereSize = size * 0.05;
         const scaledCubeSize = actualSphereSize * 4;
         createWireframeCube(
@@ -463,24 +454,12 @@ async function handleDrop_sphere(event) {
           dropPosition.z,
           0xff0000
         );
-     
-      } else {
-       
       }
-    } else {
-      // const planeDistance = -10;
-      // const plane = new THREE.Plane(
-      //   new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-      //   planeDistance
-      // );
-
-      // dropPosition = new THREE.Vector3();
-      // raycaster.ray.intersectPlane(plane, dropPosition);
-      planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
-      plane.normal.copy(planeNormal);
-      raycaster.ray.intersectPlane(plane, intersectPoint);
-     
     }
+  } else {
+    planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+    plane.normal.copy(planeNormal);
+    raycaster.ray.intersectPlane(plane, intersectPoint);
   }
 
   // Reset cube highlighting after drop
@@ -488,8 +467,7 @@ async function handleDrop_sphere(event) {
     resetCubeColor(CUBEINTERSECTED);
     CUBEINTERSECTED = null;
   }
-// }
-  
+}
   
   function resetCubeHighlight() {
     if (CUBEINTERSECTED) {
@@ -668,22 +646,28 @@ async function onPointerUp(event) {
     controls.enabled = true; // Re-enable OrbitControls after dragging
 
     if (selectedSphere) {
+      console.log("I am selectedSphere", selectedSphere);
+  
       saveObjectChanges({
-        type: 'sphere',
-        id: selectedSphere.userData.id,
-        position: selectedSphere.position,
-        scale: selectedSphere.scale,
-        size: selectedSphere.size,
-        color: selectedObject.material.color
-
+          type: 'sphere',
+          id: selectedSphere.id,
+          userData: {id: selectedSphere.userData.id},
+          position: selectedSphere.position, // Make sure position is defined
+          scale: selectedSphere.scale,       // Make sure scale is defined
+          size: selectedSphere.geometry.parameters.radius, // Accessing size from geometry parameters
+          color: selectedSphere.material.color.getHex()    // Correctly accessing color
       });
-    } else if (selectedObject) {
+  }
+   else if (selectedObject) {
+      console.log("i am selectedObject", selectedObject);
       saveObjectChanges({
         type: 'cube',
+        id: selectedObject.id,
+        userData: {id: selectedObject.userData.id || "no ID"},
         id: selectedObject.wireframeCube.userData.id,
         position: selectedObject.wireframeCube.position,
-        scale: selectedSphere.scale,
-        size: selectedSphere.size,
+        scale: selectedObject.scale,
+        size: selectedObject.size,
         color: selectedObject.material.color,
         containedSpheres: selectedObject.containedSpheres.map(sphere => ({
           id: sphere.object.userData.id,

@@ -161,39 +161,6 @@ export async function initializeGraph() {
   setupScene();
 }
 
-// export function createWireframeCube(size, x, y, z, color, id = 0) {
-//   const geometry = new THREE.BoxGeometry(size, size, size);
-//   const edges = new THREE.EdgesGeometry(geometry);
-//   const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
-//   const wireframeCube = new THREE.LineSegments(edges, material);
-//   wireframeCube.position.set(x, y, z);
-
-//   const solidCubeMaterial = new THREE.MeshBasicMaterial({
-//     color: color,
-//     transparent: true,
-//     opacity: 0,
-//   });
-//   const solidCube = new THREE.Mesh(geometry, solidCubeMaterial);
-//   solidCube.position.set(x, y, z);
-
-//   // Ensure `userData` is assigned
-//   const userData = {
-//     id: generateUniqueId(),
-//   };
-//   wireframeCube.userData = userData;
-//   solidCube.userData = userData;
-
-//   const cube = {
-//     wireframeCube: wireframeCube,
-//     solidCube: solidCube,
-//   };
-
-//   nonBloomScene.add(wireframeCube);
-//   nonBloomScene.add(solidCube);
-
-//   return cube;
-// }
-
 export function createWireframeCube(size, x, y, z, color, id = 0) {
   const geometry = new THREE.BoxGeometry(size, size, size);
   const edges = new THREE.EdgesGeometry(geometry);
@@ -532,129 +499,6 @@ export function removeEmptyCubes(scene, nonBloomScene) {
 }
 
 // ---------------- CREATING ----------------------------------------
-
-// Helper function to check if two objects are approximately equal
-function approxEqual(obj1, obj2, epsilon = 0.001) {
-  if (typeof obj1 !== typeof obj2) return false;
-  if (typeof obj1 !== "object") return Math.abs(obj1 - obj2) < epsilon;
-  for (let key in obj1) {
-    if (!approxEqual(obj1[key], obj2[key], epsilon)) return false;
-  }
-  return true;
-}
-
-// export function initializeReactiveGraph() {
-//   if (!scene || !camera || !renderer || !controls) {
-//     console.error(
-//       "Three.js setup is not complete. Make sure to call setupScene() first."
-//     );
-//     return;
-//   }
-
-//   // Set up the reaction to update the graph when the MobX store changes
-//   const disposeReaction = reaction(
-//     () => graphStore.snapshot,
-//     (snapshot) => efficientGraphUpdate(snapshot),
-//     { fireImmediately: true }
-//   );
-
-//   // Return a cleanup function
-//   return () => {
-//     disposeReaction();
-//     // Add any other cleanup logic here if needed
-//   };
-// }
-
-// export function efficientGraphUpdate(snapshot) {
-//   const existingObjects = new Map();
-//   scene.traverse((object) => {
-//     if (object.userData.id) {
-//       existingObjects.set(object.userData.id, object);
-//     }
-//   });
-
-//   // Update or create boxes
-//   snapshot.boxes.forEach((box) => {
-//     let cube = existingObjects.get(box.id);
-//     if (!cube) {
-//       cube = createWireframeCube(
-//         box.size || 1,
-//         box.position.x,
-//         box.position.y,
-//         box.position.z,
-//         box.color || 0xffffff,
-//         box.id
-//       );
-//       // scene.add(cube.wireframeCube);
-//       // scene.add(cube.solidCube);
-//     } else {
-//       // Update existing cube properties if changed
-//       if (!approxEqual(cube.wireframeCube.position, box.position)) {
-//         cube.wireframeCube.position.set(
-//           box.position.x,
-//           box.position.y,
-//           box.position.z
-//         );
-//         cube.solidCube.position.set(
-//           box.position.x,
-//           box.position.y,
-//           box.position.z
-//         );
-//       }
-//       if (!approxEqual(cube.wireframeCube.scale, box.scale)) {
-//         cube.wireframeCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
-//         cube.solidCube.scale.set(box.scale.x, box.scale.y, box.scale.z);
-//       }
-//       if (cube.wireframeCube.material.color.getHex() !== box.color) {
-//         cube.wireframeCube.material.color.setHex(box.color);
-//         cube.solidCube.material.color.setHex(box.color);
-//       }
-//     }
-//     existingObjects.delete(box.id);
-//   });
-
-//   // Update or create spheres
-//   snapshot.objects.forEach((obj) => {
-//     if (obj.type === "IcosahedronGeometry" || obj.type === "SphereGeometry") {
-//       let sphere = existingObjects.get(obj.id);
-//       if (!sphere) {
-//         sphere = createSphere(
-//           obj.position.x,
-//           obj.position.y,
-//           obj.position.z,
-//           obj.scale.x * 20,
-//           obj.id
-//         );
-//         // scene.add(sphere);
-//       } else {
-//         // Update existing sphere properties if changed
-//         if (!approxEqual(sphere.position, obj.position)) {
-//           sphere.position.set(obj.position.x, obj.position.y, obj.position.z);
-//         }
-//         if (!approxEqual(sphere.scale, obj.scale)) {
-//           sphere.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
-//         }
-//         if (sphere.material.color.getHex() !== obj.color) {
-//           sphere.material.color.setHex(obj.color);
-//         }
-//       }
-//       existingObjects.delete(obj.id);
-//     }
-//   });
-
-//   // Remove objects that no longer exist in the snapshot
-//   existingObjects.forEach((object) => {
-//     scene.remove(object);
-//     if (object.material) object.material.dispose();
-//     if (object.geometry) object.geometry.dispose();
-//   });
-
-//   // Update containment relationships (if needed)
-//   // ... (implement containment logic here)
-
-//   // render();
-//   markNeedsRender();
-// }
 export function reconstructScene(snapshot) {
   console.log("Reconstructing scene with snapshot:", snapshot);
 
@@ -664,12 +508,15 @@ export function reconstructScene(snapshot) {
 
   // Collect existing objects
   scene.traverse((object) => {
+    console.log("Found existing  scene object:", object);
     if (object.userData.id) {
       existingObjects.set(object.userData.id, { object, inScene: true });
       sceneObjectCount++;
     }
   });
   nonBloomScene.traverse((object) => {
+    console.log("Found existing nonBloomScene object:", object);
+
     if (object.userData.id) {
       existingObjects.set(object.userData.id, { object, inScene: false });
       nonBloomSceneObjectCount++;
@@ -680,9 +527,46 @@ export function reconstructScene(snapshot) {
   console.log(`Scene object count: ${sceneObjectCount}`);
   console.log(`Non-bloom scene object count: ${nonBloomSceneObjectCount}`);
 
-  // Remove all existing objects
+  // Update or create objects from snapshot
+  snapshot.forEach((objectState) => {
+    console.log(`Processing object: ${objectState.id}, Type: ${objectState.type}`);
+    const existingEntry = existingObjects.get(objectState.id);
+
+    if (existingEntry) {
+      // Object exists, update its properties
+      updateObjectProperties(existingEntry.object, objectState);
+      existingObjects.delete(objectState.id); // Remove from map to track which objects are no longer in the snapshot
+    } else {
+      // Object doesn't exist, create it
+      if (objectState.type === "cube") {
+        const { wireframeCube, solidCube } = createWireframeCube(
+          objectState.size,
+          objectState.position[0],
+          objectState.position[1],
+          objectState.position[2],
+          objectState.color,
+          objectState.id
+        );
+        console.log(`Created cube: ${objectState.id}`);
+      } else if (objectState.type === "sphere") {
+        const { sphere } = createSphere(
+          objectState.position[0],
+          objectState.position[1],
+          objectState.position[2],
+          objectState.scale[0] * 20,
+          objectState.id,
+          objectState.color
+        );
+        console.log(`Created sphere: ${objectState.id}`);
+      } else {
+        console.warn(`Unknown object type: ${objectState.type}`);
+      }
+    }
+  });
+
+  // Remove objects that are no longer in the snapshot
   existingObjects.forEach((entry, id) => {
-    console.log(`Removing existing object: ${id}`);
+    console.log(`Removing object no longer in snapshot: ${id}`);
     if (entry.inScene) {
       scene.remove(entry.object);
     } else {
@@ -690,34 +574,6 @@ export function reconstructScene(snapshot) {
     }
     if (entry.object.material) entry.object.material.dispose();
     if (entry.object.geometry) entry.object.geometry.dispose();
-  });
-
-  // Recreate objects from snapshot
-  snapshot.forEach((objectState) => {
-    console.log(`Creating/Recreating object: ${objectState.id}, Type: ${objectState.type}`);
-    if (objectState.type === "cube") {
-      const { wireframeCube, solidCube } = createWireframeCube(
-        objectState.size,
-        objectState.position[0],
-        objectState.position[1],
-        objectState.position[2],
-        objectState.color,
-        objectState.id
-      );
-      console.log(`Created cube: ${objectState.id}`);
-    } else if (objectState.type === "sphere") {
-      const { sphere } = createSphere(
-        objectState.position[0],
-        objectState.position[1],
-        objectState.position[2],
-        objectState.scale[0] * 20,
-        objectState.id,
-        objectState.color
-      );
-      console.log(`Created sphere: ${objectState.id}`);
-    } else {
-      console.warn(`Unknown object type: ${objectState.type}`);
-    }
   });
 
   sceneObjectCount = 0;
@@ -739,3 +595,124 @@ export function reconstructScene(snapshot) {
     console.log("Render complete.");
   });
 }
+
+function updateObjectProperties(object, objectState) {
+  // Update position
+  object.position.set(objectState.position[0], objectState.position[1], objectState.position[2]);
+
+  // Update scale
+  if (objectState.scale) {
+    object.scale.set(objectState.scale[0], objectState.scale[1], objectState.scale[2]);
+  }
+
+  // Update color
+  if (object.material && objectState.color !== undefined) {
+    object.material.color.setHex(objectState.color);
+  }
+
+  // Update size for cubes
+  if (objectState.type === "cube" && objectState.size !== undefined) {
+    // Assuming size affects scale for cubes
+    const newSize = objectState.size;
+    object.scale.set(newSize, newSize, newSize);
+    
+    // If this is a wireframe cube, update its corresponding solid cube
+    if (object.userData.isSolidCube) {
+      const wireframeCube = scene.getObjectByProperty('userData.id', object.userData.id);
+      if (wireframeCube) {
+        wireframeCube.scale.set(newSize, newSize, newSize);
+      }
+    }
+  }
+
+  console.log(`Updated properties for object: ${objectState.id}`);
+}
+// export function reconstructScene(snapshot) {
+//   console.log("Reconstructing scene with snapshot:", snapshot);
+
+//   const existingObjects = new Map();
+//   let sceneObjectCount = 0;
+//   let nonBloomSceneObjectCount = 0;
+
+//   // Collect existing objects
+//   scene.traverse((object) => {
+//     console.log("object that existed prior scene ", object)
+
+//     if (object.userData.id) {
+
+//       existingObjects.set(object.userData.id, { object, inScene: true });
+//       sceneObjectCount++;
+//     }
+//   });
+//   nonBloomScene.traverse((object) => {
+//     console.log("object that existed prior nonBloomScene ", object)
+
+//     if (object.userData.id) {
+//       existingObjects.set(object.userData.id, { object, inScene: false });
+//       nonBloomSceneObjectCount++;
+//     }
+//   });
+
+//   console.log(`Existing objects before reconstruction: ${existingObjects.size}`);
+//   console.log(`Scene object count: ${sceneObjectCount}`);
+//   console.log(`Non-bloom scene object count: ${nonBloomSceneObjectCount}`);
+
+//   // Remove all existing objects
+//   existingObjects.forEach((entry, id) => {
+//     console.log(`Removing existing object: ${id}`);
+//     if (entry.inScene) {
+//       scene.remove(entry.object);
+//     } else {
+//       nonBloomScene.remove(entry.object);
+//     }
+//     if (entry.object.material) entry.object.material.dispose();
+//     if (entry.object.geometry) entry.object.geometry.dispose();
+//   });
+
+//   // Recreate objects from snapshot
+//   snapshot.forEach((objectState) => {
+//     console.log(`Creating/Recreating object: ${objectState.id}, Type: ${objectState.type}`);
+//     if (objectState.type === "cube") {
+//       const { wireframeCube, solidCube } = createWireframeCube(
+//         objectState.size,
+//         objectState.position[0],
+//         objectState.position[1],
+//         objectState.position[2],
+//         objectState.color,
+//         objectState.id
+//       );
+//       console.log(`Created cube: ${objectState.id}`);
+//     } else if (objectState.type === "sphere") {
+//       const { sphere } = createSphere(
+//         objectState.position[0],
+//         objectState.position[1],
+//         objectState.position[2],
+//         objectState.scale[0] * 20,
+//         objectState.id,
+//         objectState.color
+//       );
+//       console.log(`Created sphere: ${objectState.id}`);
+//     } else {
+//       console.warn(`Unknown object type: ${objectState.type}`);
+//     }
+//   });
+
+//   sceneObjectCount = 0;
+//   nonBloomSceneObjectCount = 0;
+//   scene.traverse((object) => {
+//     if (object.userData.id) sceneObjectCount++;
+//   });
+//   nonBloomScene.traverse((object) => {
+//     if (object.userData.id) nonBloomSceneObjectCount++;
+//   });
+
+//   console.log("Scene reconstruction complete.");
+//   console.log(`Final scene object count: ${sceneObjectCount}`);
+//   console.log(`Final non-bloom scene object count: ${nonBloomSceneObjectCount}`);
+
+//   markNeedsRender();
+//   requestAnimationFrame(() => {
+//     render();
+//     console.log("Render complete.");
+//   });
+// }

@@ -13,6 +13,9 @@ interface ObjectState {
   isDeleted: boolean;
   color: number;
   size?: number;
+  userData: {
+    id: string;
+  };
 }
 
 class SceneState {
