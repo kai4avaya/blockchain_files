@@ -26,7 +26,6 @@ async function main() {
   const fileSystem = getFileSystem();
 
   fileSystem.onReady(() => {
-    console.log("FileSystem is ready");
     // Perform operations that require the file system
   });
 
@@ -53,7 +52,6 @@ window.addEventListener('click', async event => {
 
     const selectedObject = getObjectUnderPointer(event);
     if (selectedObject) {
-      console.log("Object under click:", selectedObject);
       const nodeId = selectedObject.userData.id;
       const fileSystem = getFileSystem();
       const fileMetadata = fileSystem.getMetadata(nodeId);
@@ -93,14 +91,12 @@ window.addEventListener('click', async event => {
 
     const selectedObject = getObjectUnderPointer(event);
     if (selectedObject) {
-        console.log("Object under click:", selectedObject); // Log the selected object
         // Perform operations on the selected object
         // const nodeId = selectedObject.userData.id;
         // await fileStore.selectFile(nodeId); // Fetch and update selected file in MobX store
         // console.log("nodeId LETS SHOW POPUP!", nodeId)
         const nodeId = selectedObject.userData.id;
       const fileSystem = getFileSystem();
-      console.log(" nodeId , getSnapshot() ",nodeId, fileSystem.getSnapshot())
       const fileMetadata = fileSystem.getMetadata(nodeId, "file");
         showPopup(fileMetadata, event.clientX, event.clientY); // Display the selected file's metadata
     } else {

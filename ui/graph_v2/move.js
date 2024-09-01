@@ -423,7 +423,8 @@ function getSize(intersect, scale=1){
   boundingBox.getSize(size);
 
   return Math.max(size.x, size.y, size.z) * scale
-}async function handleDrop_sphere(event) {
+}
+async function handleDrop_sphere(event) {
   if (!isDragging) return;  // may need endpoint for isDragging
 
   resetCubeHighlight();
@@ -626,6 +627,59 @@ export function saveObjectChanges(objectData) {
 
 
 
+// async function onPointerUp(event) {
+//   const { controls, scene, nonBloomScene } = share3dDat();
+
+//   if (isDragging) {
+//     await handleDrop_sphere(event);
+//     isDragging = false;
+//     controls.enabled = true; // Re-enable OrbitControls after dragging
+
+//     if (selectedSphere) {
+//       console.log("I am selectedSphere", selectedSphere);
+  
+//       saveObjectChanges({
+//           type: 'sphere',
+//           uuid: selectedSphere.uuid,
+//           userData: selectedSphere.userData,
+//           position: selectedSphere.position, // Make sure position is defined
+//           scale: selectedSphere.scale,       // Make sure scale is defined
+//           size: selectedSphere.geometry.parameters.radius, // Accessing size from geometry parameters
+//           color: selectedSphere.material.color.getHex()    // Correctly accessing color
+//       });
+//   }
+//    else if (selectedObject) {
+//       console.log("i am selectedObject", selectedObject);
+//       saveObjectChanges({
+//         type: 'cube',
+//         // id: selectedObject.id,
+//         userData: {id: selectedObject.userData.id || "no ID"},
+//         uuid: selectedObject.wireframeCube.userData.uuid,
+//         position: selectedObject.wireframeCube.position,
+//         scale: selectedObject.scale,
+//         size: selectedObject.size,
+//         color: selectedObject.material.color,
+//         containedSpheres: selectedObject.containedSpheres.map(sphere => ({
+//           uuid: sphere.object.userData.uuid,
+//           position: sphere.object.position
+//         }))
+//       });
+//     }
+
+//     selectedSphere = null;
+//     selectedObject = null;
+//     currentSnapshot = null;
+
+//     if (CUBEINTERSECTED) {
+//       resetCubeColor(CUBEINTERSECTED);
+//       CUBEINTERSECTED = null;
+//     }
+
+//     removeEmptyCubes(scene, nonBloomScene);
+//   }
+// }
+
+
 async function onPointerUp(event) {
   const { controls, scene, nonBloomScene } = share3dDat();
 
@@ -635,33 +689,30 @@ async function onPointerUp(event) {
     controls.enabled = true; // Re-enable OrbitControls after dragging
 
     if (selectedSphere) {
-      console.log("I am selectedSphere", selectedSphere);
-  
+      console.log("Saving sphere data", selectedSphere);
       saveObjectChanges({
-          type: 'sphere',
-          uuid: selectedSphere.uiid,
-          userData: selectedSphere.userData,
-          position: selectedSphere.position, // Make sure position is defined
-          scale: selectedSphere.scale,       // Make sure scale is defined
-          size: selectedSphere.geometry.parameters.radius, // Accessing size from geometry parameters
-          color: selectedSphere.material.color.getHex()    // Correctly accessing color
+        type: 'sphere',
+        uuid: selectedSphere.uuid,
+        userData: selectedSphere.userData,
+        position: selectedSphere.position.toArray(), // Convert Vector3 to array
+        scale: selectedSphere.scale.toArray(),       // Convert Vector3 to array
+        size: selectedSphere.geometry.parameters.radius,
+        color: selectedSphere.material.color.getHex()
       });
-  }
-   else if (selectedObject) {
-      console.log("i am selectedObject", selectedObject);
+    } else if (selectedObject && selectedObject.wireframeCube) {
+      console.log("Saving cube data", selectedObject);
       saveObjectChanges({
         type: 'cube',
-        // id: selectedObject.id,
-        userData: {id: selectedObject.userData.id || "no ID"},
-        uuid: selectedObject.wireframeCube.userData.uuid,
-        position: selectedObject.wireframeCube.position,
-        scale: selectedObject.scale,
-        size: selectedObject.size,
-        color: selectedObject.material.color,
-        containedSpheres: selectedObject.containedSpheres.map(sphere => ({
-          uuid: sphere.object.userData.uuid,
-          position: sphere.object.position
-        }))
+        userData: {id: selectedObject.wireframeCube.userData.id || "no ID"},
+        uuid: selectedObject.wireframeCube.uuid,
+        position: selectedObject.wireframeCube.position.toArray(), // Convert Vector3 to array
+        scale: selectedObject.wireframeCube.scale.toArray(),       // Convert Vector3 to array
+        size: selectedObject.wireframeCube.geometry.parameters.width, // Assuming uniform scale
+        color: selectedObject.wireframeCube.material.color.getHex(),
+        containedSpheres: selectedObject.containedSpheres ? selectedObject.containedSpheres.map(sphere => ({
+          uuid: sphere.object.uuid,
+          position: sphere.object.position.toArray() // Convert Vector3 to array
+        })) : []
       });
     }
 
@@ -677,7 +728,6 @@ async function onPointerUp(event) {
     removeEmptyCubes(scene, nonBloomScene);
   }
 }
-
 
 const onPointerMove = debounce((event) => {
   if (!isDragging) return;

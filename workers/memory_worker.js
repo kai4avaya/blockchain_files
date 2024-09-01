@@ -107,13 +107,10 @@ self.onmessage = async function(event) {
         result = await initializeDB(data.storeNames);
         break;
       case 'getData':
-        console.log("just recieved that yummy data im the getdata memory_worker", data);
         result = await getData(data.storeName, data.dbName);
 
-        console.log("im dat sweet getData result in the worker ", result);
         break;
       case 'saveData':
-        console.log("just recieved that yummy data im the savedata memory_worker", data);
         result = await saveData(data.storeName, data.data, data.dbName);
         break;
       default:

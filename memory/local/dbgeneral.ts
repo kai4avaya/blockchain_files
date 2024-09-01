@@ -15,7 +15,6 @@ export async function openDB(dbName: string = 'fileGraphDB', version: number = 1
       stores.forEach(storeName => {
         if (!db.objectStoreNames.contains(storeName)) {
           db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
-          console.log(`Object store '${storeName}' created.`);
         }
       });
     };
@@ -53,7 +52,6 @@ export async function initializeDB(storeNames: string[]): Promise<void> {
       db = await openDB('fileGraphDB', newVersion);
     }
 
-    console.log("Database initialized successfully");
   } catch (error) {
     console.error("Error initializing database:", error);
     throw error;
@@ -89,8 +87,6 @@ export async function getData(storeName: string, dbName: string = 'fileGraphDB')
 
 export async function saveData(storeName: string, data: any, dbName: string = 'fileGraphDB'): Promise<void> {
   const db = await openDB(dbName);
-
-  console.log("i am data being saved in dbgneral.ts", data)
 
   // Check if the store exists, recreate the database with a new version if it doesn't
   if (!db.objectStoreNames.contains(storeName)) {

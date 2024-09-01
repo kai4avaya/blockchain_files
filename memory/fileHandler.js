@@ -63,7 +63,6 @@ async function processQueue() {
 function processFile(fileEntry, mousePosition, id) {
     return new Promise((resolve, reject) => {
         fileEntry.file(file => {
-            console.log(`Processing file: ${file.name}`);
             const fileSystem = getFileSystem();
             const fileMetadata = {
                 id,

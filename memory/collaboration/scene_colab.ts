@@ -42,7 +42,6 @@ class SceneState {
       if (storedState && storedState.length > 0) {
         this.loadState(storedState);
       } else {
-        console.log("No stored state found. Initializing empty state.");
       }
     } catch (error) {
       console.error('Error initializing SceneState:', error);
@@ -60,9 +59,6 @@ class SceneState {
 
   updateObject(objectState: Partial<ObjectState> & { uuid: string }): void {
     const existingState = this.objects.get(objectState.uuid);
-
-    console.log("uuid in scene colab", objectState)
-    console.log("existingState  scene colab", existingState)
 
     if (existingState) {
       const updatedState = { 
