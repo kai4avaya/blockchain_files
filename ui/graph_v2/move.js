@@ -294,7 +294,6 @@ function handleFileDragOver(event) {
   
 async function handleFileDrop_sphere(event) {
   console.log("handleFileDrop_sphere", event)
-  // if (!isDragging && !isFileDragging) return;  // may need endpoint for isDragging
 
   isFileDragging = false;
   resetCubeHighlight();
@@ -321,6 +320,8 @@ async function handleFileDrop_sphere(event) {
       const intersect = allIntersects[0];
       const dropPosition = intersect.point;
 
+      console.log("intersect.object.geometry.type", intersect.object.geometry.type)
+
       if (
         intersect.object.geometry.type === "EdgesGeometry" ||
         intersect.object.geometry.type === "BoxGeometry"
@@ -335,7 +336,8 @@ async function handleFileDrop_sphere(event) {
           fileIds[i]
         ))
       } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
-        // const size = getSize(intersect)
+
+        console.log("---intersected sphere drop file")
         const actualSphereSize = size * 0.05;
         const scaledCubeSize = actualSphereSize * 4;
         createdShapes.push(createWireframeCube(
@@ -362,14 +364,7 @@ async function handleFileDrop_sphere(event) {
         ))
       }
     } else {
-      // const planeDistance = -10;
-      // const plane = new THREE.Plane(
-      //   new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-      //   planeDistance
-      // );
 
-      // dropPosition = new THREE.Vector3();
-      // raycaster.ray.intersectPlane(plane, dropPosition);
       planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
       plane.normal.copy(planeNormal);
       
@@ -390,22 +385,39 @@ async function handleFileDrop_sphere(event) {
     if (shape?.state?.type === "sphere") {  // Assuming this is how we identify spheres
       saveObjectChanges({
         type: 'sphere',
-        uuid: shape?.state?.uuid,
-        userData: shape?.userData,
-        position: shape?.state?.position,
-        scale: shape?.state?.scale,
-        size: shape?.state?.size,
-        color: shape?.material?.color
+        uuid: shape.sphere.uuid,
+        userData: shape.sphere.userData,
+        // position: shape?.state?.position,
+        position: shape.sphere.position.toArray(),
+        rotation: shape.sphere.rotation.toArray(),
+        scale: shape.sphere.scale.toArray(),
+        color: shape.sphere.material.color.getHex(),
+        size:  shape.sphere.size,
+        size: shape.sphere.geometry.parameters.radius,
+
+        
+        // scale: shape?.state?.scale,
+        // size: shape?.state?.size,
+        // color: shape?.state?.color
       });
-    } else if (shape.wireframeCube && shape.solidCube) {  // Assuming this is how we identify cubes
-      saveObjectChanges({
+    } else if (shape.wireframeCube && shape.solidCube) {  
+      saveObjectChanges({  // Save wireframe cube
         type: 'cube',
-        uuid: shape?.state?.uuid,
-        userData: shape.wireframeCube.userData,
+        uuid: shape?.state?.uuid_wire,
+        userData: shape.state.userDataWire,
         position: shape.wireframeCube.position,
         scale: shape.wireframeCube.scale,
         size: shape?.state?.size,
-        color: shape?.material?.color
+        color: shape?.state?.color
+      });
+      saveObjectChanges({  // Save solid cube
+        type: 'cube',
+        uuid: shape?.state?.uuid_cube,
+        userData: shape.state.userDataCube,
+        position: shape.solidCube.position,
+        scale: shape.solidCube.scale,
+        size: shape?.state?.size,
+        color: shape?.state?.color
       });
     }
   });

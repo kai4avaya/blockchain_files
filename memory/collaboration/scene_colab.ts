@@ -116,6 +116,7 @@ class SceneState {
   }
 
   getSerializableState(): ObjectState[] {
+    console.log("Array.from(this.objects.values()", Array.from(this.objects.values()))
     return Array.from(this.objects.values());
   }
 

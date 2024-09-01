@@ -161,7 +161,8 @@ export async function initializeGraph() {
   setupScene();
 }
 
-export function createWireframeCube(size, x, y, z, color, id = 0) {
+export function createWireframeCube(size, x, y, z, color, id = '') {
+  if(!color) color = randomColorGenerator();
   const geometry = new THREE.BoxGeometry(size, size, size);
   const edges = new THREE.EdgesGeometry(geometry);
   const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
@@ -180,16 +181,24 @@ export function createWireframeCube(size, x, y, z, color, id = 0) {
     id: id || generateUniqueId(),
   };
   wireframeCube.userData = userData;
+
+  // userData.id = userData.id + "_solid"
   solidCube.userData = userData;
+  solidCube.userData.id = userData.id + "_solid";
 
   nonBloomScene.add(wireframeCube);
   nonBloomScene.add(solidCube);
+
+  console.log("BIG BAD CUBE IS CREATED")
 
   return {
     wireframeCube,
     solidCube,
     state: {
-      id: userData.id,
+      uuid_wire : wireframeCube.uuid,
+      uuid_solid : solidCube.uuid,
+      userDataWire : wireframeCube.userData,
+      userDataSolid : solidCube.userData,
       type: "cube",
       position: wireframeCube.position.toArray(),
       rotation: wireframeCube.rotation.toArray(),
@@ -230,31 +239,37 @@ window.onresize = function () {
   markNeedsRender();
 };
 
-function setupSceneBloom() {
-  scene.traverse(disposeMaterial);
-  scene.children.length = 0;
-
-  const geometry = new THREE.IcosahedronGeometry(1, 15);
-
-  for (let i = 0; i < 50; i++) {
-    const color = new THREE.Color();
-    color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
-
-    const material = new THREE.MeshBasicMaterial({ color: color });
-    const sphere = new THREE.Mesh(geometry, material);
-    sphere.position.x = Math.random() * 10 - 5;
-    sphere.position.y = Math.random() * 10 - 5;
-    sphere.position.z = Math.random() * 10 - 5;
-    sphere.position.normalize().multiplyScalar(Math.random() * 4.0 + 2.0);
-    sphere.scale.setScalar(Math.random() * Math.random() + 0.5);
-    scene.add(sphere);
-
-    if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
-  }
-
-  // render();
-  markNeedsRender();
+function randomColorGenerator(){
+  const color = new THREE.Color();
+  color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
+  return color;
 }
+
+// function setupSceneBloom() {
+//   scene.traverse(disposeMaterial);
+//   scene.children.length = 0;
+
+//   const geometry = new THREE.IcosahedronGeometry(1, 15);
+
+//   for (let i = 0; i < 50; i++) {
+//     const color = new THREE.Color();
+//     color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
+
+//     const material = new THREE.MeshBasicMaterial({ color: color });
+//     const sphere = new THREE.Mesh(geometry, material);
+//     sphere.position.x = Math.random() * 10 - 5;
+//     sphere.position.y = Math.random() * 10 - 5;
+//     sphere.position.z = Math.random() * 10 - 5;
+//     sphere.position.normalize().multiplyScalar(Math.random() * 4.0 + 2.0);
+//     sphere.scale.setScalar(Math.random() * Math.random() + 0.5);
+//     scene.add(sphere);
+
+//     if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
+//   }
+
+//   // render();
+//   markNeedsRender();
+// }
 
 function setupScene() {
   scene.traverse(disposeMaterial);
@@ -283,7 +298,7 @@ export function createSphere(x, y, z, size, userId = "", colorIn = "") {
     id: userId || generateUniqueId(),
   };
   sphere.userData = userData;
-
+  sphere.size = size;
   scene.add(sphere);
 
   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);

@@ -4,7 +4,6 @@ class IndexDBWorkerOverlay {
   
     constructor() {
       this.worker = new Worker('../../workers/memory_worker');
-      console.log("this.worker", this.worker);
       this.worker.onmessage = this.handleWorkerMessage.bind(this);
     }
   
@@ -39,12 +38,10 @@ class IndexDBWorkerOverlay {
   
     async getData(storeName: string, dbName: string = 'fileGraphDB'): Promise<any[]> {
       const dataRetreived = await this.sendToWorker('getData', { storeName, dbName });
-      console.log("i have retrieved the data storeName, data",storeName, dataRetreived);
       return dataRetreived;
     }
   
     async saveData(storeName: string, data: any, dbName: string = 'fileGraphDB'): Promise<void> {
-      console.log("sending data to worker see ya storeName, data!",storeName, data)
       await this.sendToWorker('saveData', { storeName, data, dbName });
     }
   }
