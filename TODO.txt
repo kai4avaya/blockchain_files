@@ -7,3 +7,5 @@ simpkufy all object saving as one code
      - and adidng objects sphere , wirecurbe, solidcube
        - then iterate through keys and save the values of each shape
          - does not matter what it is...
+
+add shape to each object

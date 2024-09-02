@@ -88,3 +88,7 @@ export function generateUniqueId(length = 3): string {
   generatedIds.add(uniqueId);
   return uniqueId;
 }
+
+export function generateVersionNonce(): number {
+  return Math.floor(Math.random() * 1000000);
+}

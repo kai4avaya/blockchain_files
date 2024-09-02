@@ -3,7 +3,8 @@ import indexDBOverlay from '../local/file_worker';
 
 interface ObjectState {
   uuid: string; // original id of object
-  type: 'sphere' | 'cube' | 'other';
+  type: string;
+  shape: string;
   position: number[];
   rotation: number[];
   scale: number[];
@@ -56,29 +57,60 @@ class SceneState {
   private reconstructScene(): void {
     reconstructScene(Array.from(this.objects.values()));
   }
-
   updateObject(objectState: Partial<ObjectState> & { uuid: string }): void {
     const existingState = this.objects.get(objectState.uuid);
 
     if (existingState) {
-      const updatedState = { 
-        ...existingState, 
-        ...objectState, 
-        version: existingState.version + 1,
-        versionNonce: this.generateVersionNonce(),
-        lastEditedBy: this.userId 
-      };
-      this.mergeUpdate(updatedState);
+      if (this.hasChanged(existingState, objectState)) {
+        const updatedState = { 
+          ...existingState, 
+          ...objectState, 
+          version: existingState.version + 1,
+          versionNonce: this.generateVersionNonce(),
+          lastEditedBy: this.userId 
+        };
+        this.mergeUpdate(updatedState);
+      }
     } else {
       this.createObject(objectState as ObjectState);
+    }
+  }
+
+  private hasChanged(existing: ObjectState, incoming: Partial<ObjectState>): boolean {
+    return Object.keys(incoming).some(key => {
+      if (key === 'position' || key === 'rotation' || key === 'scale') {
+        return !this.arraysEqual(existing[key], incoming[key]);
+      }
+      return existing[key] !== incoming[key];
+    });
+  }
+
+  private arraysEqual(a: any[], b: any[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  mergeUpdate(incomingState: ObjectState): void {
+    const existingState = this.objects.get(incomingState.uuid);
+    if (!existingState || this.isNewerState(incomingState, existingState)) {
+      this.objects.set(incomingState.uuid, {
+        ...existingState,
+        ...incomingState,
+      });
+      this.scheduleSave();
+      this.reconstructScene();
+      this.broadcastUpdate(incomingState);
     }
   }
 
   private createObject(state: ObjectState): void {
     const newState = {
       ...state,
-      version: 1,
-      versionNonce: this.generateVersionNonce(),
+      // version: 1,
+      // versionNonce: this.generateVersionNonce(),
       lastEditedBy: this.userId
     };
     this.objects.set(newState.uuid, newState);
@@ -86,15 +118,15 @@ class SceneState {
     this.reconstructScene();
   }
 
-  mergeUpdate(incomingState: ObjectState): void {
-    const existingState = this.objects.get(incomingState.uuid);
-    if (!existingState || this.isNewerState(incomingState, existingState)) {
-      this.objects.set(incomingState.uuid, incomingState);
-      this.scheduleSave();
-      this.reconstructScene();
-      this.broadcastUpdate(incomingState);
-    }
-  }
+  // mergeUpdate(incomingState: ObjectState): void {
+  //   const existingState = this.objects.get(incomingState.uuid);
+  //   if (!existingState || this.isNewerState(incomingState, existingState)) {
+  //     this.objects.set(incomingState.uuid, incomingState);
+  //     this.scheduleSave();
+  //     this.reconstructScene();
+  //     this.broadcastUpdate(incomingState);
+  //   }
+  // }
 
   private isNewerState(incoming: ObjectState, existing: ObjectState): boolean {
     return incoming.version > existing.version ||
