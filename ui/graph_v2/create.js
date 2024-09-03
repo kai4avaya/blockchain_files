@@ -162,8 +162,8 @@ export async function initializeGraph() {
   setupScene();
 }
 
-export function createWireframeCube(size, x, y, z, color, id = '') {
-  if(!color) color = randomColorGenerator();
+export function createWireframeCube(size, x, y, z, color, id = "") {
+  if (!color) color = randomColorGenerator();
   const geometry = new THREE.BoxGeometry(size, size, size);
   const edges = new THREE.EdgesGeometry(geometry);
   const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
@@ -182,22 +182,22 @@ export function createWireframeCube(size, x, y, z, color, id = '') {
     id: id || generateUniqueId(),
   };
   wireframeCube.userData = userData;
-  wireframeCube.lastEditedBy=loginName;
-  wireframeCube.shape="wireframeCube";
-  wireframeCube.size = wireframeCube.geometry.parameters.width,
-  wireframeCube.version = 1,
-  wireframeCube.versionNonce = generateVersionNonce(),
-  solidCube.shape="solidCube";
-  solidCube.size = solidCube.geometry.parameters.width,
-  solidCube.userData = userData;
+  wireframeCube.lastEditedBy = loginName;
+  wireframeCube.shape = "wireframeCube";
+  (wireframeCube.size = wireframeCube.geometry.parameters.width),
+    (wireframeCube.version = 1),
+    (wireframeCube.versionNonce = generateVersionNonce()),
+    (solidCube.shape = "solidCube");
+  (solidCube.size = solidCube.geometry.parameters.width),
+    (solidCube.userData = userData);
   solidCube.userData.id = userData.id + "_solid";
-  solidCube.version = 1,
-  solidCube.versionNonce = generateVersionNonce(),
-  solidCube.lastEditedBy=loginName;
+  (solidCube.version = 1),
+    (solidCube.versionNonce = generateVersionNonce()),
+    (solidCube.lastEditedBy = loginName);
   nonBloomScene.add(wireframeCube);
   nonBloomScene.add(solidCube);
 
-  console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube)
+  console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube);
 
   return {
     wireframeCube,
@@ -226,7 +226,7 @@ window.onresize = function () {
   markNeedsRender();
 };
 
-function randomColorGenerator(){
+function randomColorGenerator() {
   const color = new THREE.Color();
   color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
   return color;
@@ -267,12 +267,11 @@ function setupScene() {
   markNeedsRender();
 }
 
-
 export function createSphere(x, y, z, size, userId = "", colorIn = "") {
   const geometry = new THREE.IcosahedronGeometry(1, 15);
   // const color = new THREE.Color();
-  let color = new THREE.Color()
-  if (colorIn)  color.setHSL(colorIn);
+  let color = new THREE.Color();
+  if (colorIn) color.setHSL(colorIn);
   else {
     color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
   }
@@ -280,7 +279,7 @@ export function createSphere(x, y, z, size, userId = "", colorIn = "") {
   const sphere = new THREE.Mesh(geometry, material);
   sphere.position.set(x, y, z);
   sphere.scale.setScalar(size * 0.05);
-  sphere.shape="sphere";
+  sphere.shape = "sphere";
 
   const userData = {
     id: userId || generateUniqueId(),
@@ -288,19 +287,17 @@ export function createSphere(x, y, z, size, userId = "", colorIn = "") {
   sphere.userData = userData;
   sphere.size = size;
   scene.add(sphere);
-  sphere.lastEditedBy=loginName;
-  sphere.version = 1,
-  sphere.versionNonce = generateVersionNonce()
+  sphere.lastEditedBy = loginName;
+  (sphere.version = 1), (sphere.versionNonce = generateVersionNonce());
 
   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
 
   markNeedsRender();
 
-  console.log("JUST CREATED THIS SPHERE", sphere)
+  console.log("JUST CREATED THIS SPHERE", sphere);
 
   return {
     sphere,
-  
   };
 }
 
@@ -450,24 +447,20 @@ export function removeEmptyCubes(scene, nonBloomScene) {
     delete snapshot.containment[box.id];
   });
 
-  console.log(`Removed ${cubesToRemove.length} empty cubes`);
-
   // render();
   markNeedsRender();
 }
 export function reconstructScene(snapshot) {
+  console.log("----------------------------------------------------------------------------");
   console.log("Reconstructing scene with snapshot:", snapshot);
-
   const existingObjects = new Map();
 
+  // Collect existing objects
   function traverseScene(object, isMainScene) {
     if (object.uuid) {
-      console.log(`Found existing ${isMainScene ? 'scene' : 'nonBloomScene'} object:`, object);
       existingObjects.set(object.uuid, { object, inScene: isMainScene });
     }
   }
-
-  // Collect existing objects
   scene.traverse((object) => traverseScene(object, true));
   nonBloomScene.traverse((object) => traverseScene(object, false));
 
@@ -477,35 +470,46 @@ export function reconstructScene(snapshot) {
   snapshot.forEach((objectState) => {
     console.log(`Processing object: ${objectState.uuid}, Type: ${objectState.type}, Shape: ${objectState.shape}`);
     const existingEntry = existingObjects.get(objectState.uuid);
-
-    if (existingEntry) {
-      updateObjectProperties(existingEntry.object, objectState);
+    
+    if (objectState.isDeleted) {
+      if (existingEntry) {
+        console.log(`Removing deleted object: ${objectState.uuid}`);
+        removeObject(existingEntry);
+      }
       existingObjects.delete(objectState.uuid);
     } else {
-      createObject(objectState);
+      if (existingEntry) {
+        updateObjectProperties(existingEntry.object, objectState);
+      } else {
+        createObject(objectState);
+      }
     }
   });
 
-  // Remove objects that are no longer in the snapshot
-  existingObjects.forEach((entry, uuid) => {
-    console.log(`Removing object no longer in snapshot: ${uuid}`);
-    if (entry.inScene) {
-      scene.remove(entry.object);
-    } else {
-      nonBloomScene.remove(entry.object);
-    }
-    if (entry.object.material) entry.object.material.dispose();
-    if (entry.object.geometry) entry.object.geometry.dispose();
-  });
-
-  console.log("Scene reconstruction complete.");
+  console.log("----------------------------------------------------------------------------");
   markNeedsRender();
+}
+
+function removeObject(entry) {
+  if (!entry.object.shape) return;
+  
+  if (entry.inScene) {
+    scene.remove(entry.object);
+  } else {
+    nonBloomScene.remove(entry.object);
+  }
+  
+  if (entry.object.material) entry.object.material.dispose();
+  if (entry.object.geometry) entry.object.geometry.dispose();
 }
 
 function createObject(objectState) {
   if (objectState.shape === "sphere") {
     createSphereWrapper(objectState);
-  } else if (objectState.shape === "wireframeCube" || objectState.shape === "solidCube") {
+  } else if (
+    objectState.shape === "wireframeCube" ||
+    objectState.shape === "solidCube"
+  ) {
     createCubeWrapper(objectState);
   } else {
     console.warn(`Unknown object type: ${objectState.shape}`);
@@ -517,27 +521,36 @@ function updateObjectProperties(object, objectState) {
   applyUpdates(object, objectState);
 
   // Check if this is a cube and update its twin
-  if (objectState.shape === "wireframeCube" || objectState.shape === "solidCube") {
-    const twinId = object.userData.id.endsWith("_solid") 
-      ? object.userData.id.slice(0, -6)  // Remove "_solid" suffix
-      : object.userData.id + "_solid";   // Add "_solid" suffix
+  if (
+    objectState.shape === "wireframeCube" ||
+    objectState.shape === "solidCube"
+  ) {
+    const twinId = object.userData.id.endsWith("_solid")
+      ? object.userData.id.slice(0, -6) // Remove "_solid" suffix
+      : object.userData.id + "_solid"; // Add "_solid" suffix
 
     const twinObject = findObjectById(twinId);
     if (twinObject) {
       applyUpdates(twinObject, objectState);
     }
   }
-
-  console.log(`Updated properties for object: ${object.uuid}`);
 }
 
 function applyUpdates(object, objectState) {
   // Update position
-  object.position.set(objectState.position[0], objectState.position[1], objectState.position[2]);
+  object.position.set(
+    objectState.position[0],
+    objectState.position[1],
+    objectState.position[2]
+  );
 
   // Update scale
   if (objectState.scale) {
-    object.scale.set(objectState.scale[0], objectState.scale[1], objectState.scale[2]);
+    object.scale.set(
+      objectState.scale[0],
+      objectState.scale[1],
+      objectState.scale[2]
+    );
   }
 
   // Update color
@@ -546,7 +559,10 @@ function applyUpdates(object, objectState) {
   }
 
   // Update size for cubes
-  if ((object.shape === "wireframeCube" || object.shape === "solidCube") && objectState.size !== undefined) {
+  if (
+    (object.shape === "wireframeCube" || object.shape === "solidCube") &&
+    objectState.size !== undefined
+  ) {
     const newSize = objectState.size;
     object.scale.set(newSize, newSize, newSize);
   }
@@ -569,9 +585,6 @@ function findObjectById(id) {
   return foundObject;
 }
 
-
-
-
 function createCubeWrapper(objectState) {
   const { wireframeCube, solidCube } = createWireframeCube(
     objectState.size,
@@ -583,7 +596,6 @@ function createCubeWrapper(objectState) {
   );
   wireframeCube.uuid = objectState.uuid;
   solidCube.uuid = objectState.uuid + "_solid";
-  console.log(`Created cube wrapper: ${objectState.uuid}`);
 }
 
 function createSphereWrapper(objectState) {
@@ -596,5 +608,4 @@ function createSphereWrapper(objectState) {
     objectState.color
   );
   sphere.uuid = objectState.uuid;
-  console.log(`Created sphere wrapper: ${objectState.uuid}`);
 }

@@ -93,13 +93,30 @@ class SceneState {
     return true;
   }
 
+ 
   mergeUpdate(incomingState: ObjectState): void {
     const existingState = this.objects.get(incomingState.uuid);
     if (!existingState || this.isNewerState(incomingState, existingState)) {
-      this.objects.set(incomingState.uuid, {
-        ...existingState,
-        ...incomingState,
-      });
+      if (incomingState.isDeleted) {
+        // If the incoming state is marked as deleted, update only if it's newer
+        this.objects.set(incomingState.uuid, {
+          ...existingState,
+          ...incomingState,
+          isDeleted: true
+        });
+      } else if (existingState && existingState.isDeleted) {
+        // If the existing state was deleted but the incoming state is not,
+        // only update if the incoming state is newer
+        if (this.isNewerState(incomingState, existingState)) {
+          this.objects.set(incomingState.uuid, incomingState);
+        }
+      } else {
+        // Normal update for non-deleted objects
+        this.objects.set(incomingState.uuid, {
+          ...existingState,
+          ...incomingState,
+        });
+      }
       this.scheduleSave();
       this.reconstructScene();
       this.broadcastUpdate(incomingState);
@@ -118,15 +135,7 @@ class SceneState {
     this.reconstructScene();
   }
 
-  // mergeUpdate(incomingState: ObjectState): void {
-  //   const existingState = this.objects.get(incomingState.uuid);
-  //   if (!existingState || this.isNewerState(incomingState, existingState)) {
-  //     this.objects.set(incomingState.uuid, incomingState);
-  //     this.scheduleSave();
-  //     this.reconstructScene();
-  //     this.broadcastUpdate(incomingState);
-  //   }
-  // }
+
 
   private isNewerState(incoming: ObjectState, existing: ObjectState): boolean {
     return incoming.version > existing.version ||

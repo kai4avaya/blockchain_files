@@ -69,11 +69,7 @@ function getCubeUnderPointer(event) {
 }
 
 export function dragCube(cubes_and_containtedSpheres, intersectPoint) {
-  console.log(
-    "dragCube called, cubes_and_containtedSpheres, intersectPoint",
-    cubes_and_containtedSpheres,
-    intersectPoint
-  );
+
   if (
     !cubes_and_containtedSpheres ||
     !cubes_and_containtedSpheres.wireframeCube
@@ -289,7 +285,6 @@ function handleFileDragOver(event) {
 }
 
 async function handleFileDrop_sphere(event) {
-  console.log("handleFileDrop_sphere", event);
 
   isFileDragging = false;
   resetCubeHighlight();
@@ -337,7 +332,7 @@ async function handleFileDrop_sphere(event) {
           )
         );
       } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
-        console.log("---intersected sphere drop file");
+        // console.log("---intersected sphere drop file");
         const actualSphereSize = size * 0.05;
         const scaledCubeSize = actualSphereSize * 4;
         createdShapes.push(
@@ -388,7 +383,7 @@ async function handleFileDrop_sphere(event) {
   }
 
   createdShapes.forEach((shape) => {
-    console.log("Saving shape:", shape);
+    // console.log("Saving shape:", shape);
     Object.values(shape).forEach((item) => {
       if (item && typeof item === "object" && "uuid" in item) {
         saveObjectChanges(item);
@@ -559,7 +554,7 @@ export function onPointerDown(event) {
 }
 
 export function saveObjectChanges(objectData) {
-  console.log("saveObjectChanges", objectData);
+  // console.log("saveObjectChanges", objectData);
   if (!objectData) return;
 
   const convertToArray = (value) => {
@@ -601,10 +596,10 @@ async function onPointerUp(event) {
     controls.enabled = true; // Re-enable OrbitControls after dragging
 
     if (selectedSphere) {
-      console.log("Saving sphere data", selectedSphere);
+      // console.log("Saving sphere data", selectedSphere);
       saveObjectChanges(selectedSphere);
     } else if (selectedObject && selectedObject.wireframeCube) {
-      console.log("Saving cube data", selectedObject);
+      // console.log("Saving cube data", selectedObject);
 
       // Save wireframe cube
       saveObjectChanges({

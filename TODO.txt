@@ -1,11 +1,2 @@
-Fix the uuid vs id via files in all items
-need to work on cubes there id
 
-simpkufy all object saving as one code 
-  do not do different iterations for cube and sphere
-   - do this by removing the state return
-     - and adidng objects sphere , wirecurbe, solidcube
-       - then iterate through keys and save the values of each shape
-         - does not matter what it is...
-
-add shape to each object
+think there is an issue when i in save scene update seperately cube and wireframe because this will trigger two different updates?
