@@ -44,6 +44,8 @@ function getCubeUnderPointer(event) {
   if (intersects.length > 0) {
     currentSnapshot = createSceneSnapshot([scene, nonBloomScene]);
 
+    console.log("i am currentSnapshot", currentSnapshot)
+
     for (const intersectedObject of intersects) {
       // Find the intersected object in the snapshot boxes
       const matchingBox = currentSnapshot.boxes.find(
@@ -56,48 +58,76 @@ function getCubeUnderPointer(event) {
         controls.enabled = false; // Disable OrbitControls during dragging
 
         return {
-          wireframeCube: matchingBox.wireframe,
-          solidCube: matchingBox.solid,
+          wireframeCube: matchingBox.wireframe || null,
+          solidCube: matchingBox.solid || null,
           containedSpheres: currentSnapshot.containment[matchingBox.id].map(
-            (id) => getObjectById(currentSnapshot, id)
+              (id) => getObjectById(currentSnapshot, id)
           ),
-        };
+      };
       }
     }
   }
   return null; // Return null if no cube is found
 }
 
-export function dragCube(cubes_and_containtedSpheres, intersectPoint) {
+// export function dragCube(cubes_and_containtedSpheres, intersectPoint) {
+//   if (
+//     !cubes_and_containtedSpheres ||
+//     !cubes_and_containtedSpheres.wireframeCube
+//   )
+//     return;
+//   // const cubeId = cubes_and_containtedSpheres.wireframeCube.id || cubes_and_containtedSpheres.wireframeCube.uuid;
+//   const cubes = [
+//     cubes_and_containtedSpheres.wireframeCube,
+//     cubes_and_containtedSpheres.solidCube,
+//   ].filter(Boolean);
+//   // Calculate the movement delta
+//   const movementDelta = new THREE.Vector3().subVectors(
+//     intersectPoint,
+//     cubes[0].position
+//   );
+//   cubes_and_containtedSpheres.wireframeCube.position.add(movementDelta);
+//   cubes_and_containtedSpheres.solidCube.position.add(movementDelta);
+//   // Move all spheres inside this cube
+//   // const containedSpheres = cubes_and_containtedSpheres.containedSphereS;
+//   cubes_and_containtedSpheres.containedSpheres.forEach((sphere) => {
+//     console.log("containedsphere item", sphere.object)
+//     sphere.object.position.add(movementDelta);
+//     console.log("sphere in cube being draggged", sphere.object.uuid, "POSITION: " , sphere.object.position)
+//   });
+//   // render();
+//   markNeedsRender();
+// }
 
-  if (
-    !cubes_and_containtedSpheres ||
-    !cubes_and_containtedSpheres.wireframeCube
-  )
-    return;
+// let previousIntersectPoint = new THREE.Vector3();
 
-  // const cubeId = cubes_and_containtedSpheres.wireframeCube.id || cubes_and_containtedSpheres.wireframeCube.uuid;
-  const cubes = [
-    cubes_and_containtedSpheres.wireframeCube,
-    cubes_and_containtedSpheres.solidCube,
-  ].filter(Boolean);
+export function dragCube() {
+  if (!selectedObject || !selectedObject.wireframeCube) return;
 
-  // Calculate the movement delta
-  const movementDelta = new THREE.Vector3().subVectors(
-    intersectPoint,
-    cubes[0].position
-  );
+  console.log("+++++++++++++++++++++++++++++++++++++++++++++++++++")
+  // Calculate the movement delta based on the change in intersect point
+  const movementDelta = new THREE.Vector3().subVectors(intersectPoint, previousIntersectPoint);
 
-  cubes_and_containtedSpheres.wireframeCube.position.add(movementDelta);
-  cubes_and_containtedSpheres.solidCube.position.add(movementDelta);
+  console.log("Movement delta: " + movementDelta.toArray());
+  console.log("wireframe POSITION: " + selectedObject.wireframeCube.position.toArray());
+  
+  // Move the cubes
+  selectedObject.wireframeCube.position.add(movementDelta);
+  selectedObject.solidCube.position.add(movementDelta);
 
   // Move all spheres inside this cube
-  const containedSpheres = cubes_and_containtedSpheres.containedSpheres;
-  containedSpheres.forEach((sphere) => {
+  selectedObject.containedSpheres.forEach((sphere) => {
     sphere.object.position.add(movementDelta);
+    // Update the position in the selectedObject
+    sphere.position = sphere.object.position.toArray();
+    console.log("Sphere moved:", sphere.object.uuid);
+    console.log("New position:", sphere.object.position.toArray());
   });
 
-  // render();
+  // Update the previous intersect point for the next drag event
+  previousIntersectPoint.copy(intersectPoint);
+
+  console.log("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
   markNeedsRender();
 }
 
@@ -311,11 +341,6 @@ async function handleFileDrop_sphere(event) {
       const intersect = allIntersects[0];
       const dropPosition = intersect.point;
 
-      console.log(
-        "intersect.object.geometry.type",
-        intersect.object.geometry.type
-      );
-
       if (
         intersect.object.geometry.type === "EdgesGeometry" ||
         intersect.object.geometry.type === "BoxGeometry"
@@ -328,6 +353,7 @@ async function handleFileDrop_sphere(event) {
             dropPosition.y,
             dropPosition.z,
             size,
+            "",
             fileIds[i]
           )
         );
@@ -341,7 +367,6 @@ async function handleFileDrop_sphere(event) {
             dropPosition.x,
             dropPosition.y,
             dropPosition.z,
-            0xff0000
           )
         );
         createdShapes.push(
@@ -350,6 +375,7 @@ async function handleFileDrop_sphere(event) {
             dropPosition.y,
             dropPosition.z,
             size,
+            "",
             fileIds[i]
           )
         );
@@ -360,6 +386,7 @@ async function handleFileDrop_sphere(event) {
             dropPosition.y,
             dropPosition.z,
             size,
+            "",
             fileIds[i]
           )
         );
@@ -376,6 +403,7 @@ async function handleFileDrop_sphere(event) {
           intersectPoint.y,
           intersectPoint.z,
           size,
+          "",
           fileIds[i]
         )
       );
@@ -436,7 +464,6 @@ async function handleDrop_sphere(event) {
           dropPosition.x,
           dropPosition.y,
           dropPosition.z,
-          0xff0000
         );
       }
     }
@@ -514,19 +541,55 @@ function getObjectType(object) {
   }
 }
 
+// export function onPointerDown(event) {
+//   const { mouse, raycaster, scene, nonBloomScene, camera, controls } =
+//     share3dDat();
+
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+//   raycaster.setFromCamera(mouse, camera);
+//   const intersectsBloom = raycaster.intersectObjects(scene.children, true);
+//   const intersectsNonBloom = raycaster.intersectObjects(
+//     nonBloomScene.children,
+//     true
+//   );
+
+//   const intersects = [...intersectsBloom, ...intersectsNonBloom];
+
+//   const sphereIntersect = intersects.find(
+//     (intersect) => getObjectType(intersect.object) === "Sphere"
+//   );
+
+//   if (sphereIntersect) {
+//     isDragging = true;
+//     controls.enabled = false;
+//     selectedSphere = sphereIntersect.object;
+//     selectedObject = selectedSphere;
+//     sphereIntersect.object.layers.toggle(BLOOM_SCENE);
+//   } else {
+//     const selectedCube = getCubeUnderPointer(event);
+//     if (selectedCube) {
+//       isDragging = true;
+//       controls.enabled = false;
+//       selectedObject = selectedCube;
+//     }
+//   }
+
+//   // render();
+//   markNeedsRender();
+// }
+
+
 export function onPointerDown(event) {
-  const { mouse, raycaster, scene, nonBloomScene, camera, controls } =
-    share3dDat();
+  const { mouse, raycaster, scene, nonBloomScene, camera, controls } = share3dDat();
 
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
   const intersectsBloom = raycaster.intersectObjects(scene.children, true);
-  const intersectsNonBloom = raycaster.intersectObjects(
-    nonBloomScene.children,
-    true
-  );
+  const intersectsNonBloom = raycaster.intersectObjects(nonBloomScene.children, true);
 
   const intersects = [...intersectsBloom, ...intersectsNonBloom];
 
@@ -546,13 +609,27 @@ export function onPointerDown(event) {
       isDragging = true;
       controls.enabled = false;
       selectedObject = selectedCube;
+      
+      // Initialize the previousIntersectPoint for cube dragging
+      plane.setFromNormalAndCoplanarPoint(
+        new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
+        selectedObject.wireframeCube.position
+      );
+      raycaster.ray.intersectPlane(plane, previousIntersectPoint);
     }
   }
 
-  // render();
+  if (isDragging) {
+    // Prevent default behavior when dragging starts
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  event.target.setPointerCapture(event.pointerId);
   markNeedsRender();
 }
 
+// Make sure to declare previousIntersectPoint at the top of your file
+let previousIntersectPoint = new THREE.Vector3();
 export function saveObjectChanges(objectData) {
   // console.log("saveObjectChanges", objectData);
   if (!objectData) return;
@@ -584,32 +661,78 @@ export function saveObjectChanges(objectData) {
     lastEditedBy: objectData.loginName || loginName,
   };
 
+  console.log("commonData", commonData)
+
   sceneState.updateObject(commonData);
 }
 
-async function onPointerUp(event) {
-  const { controls, scene, nonBloomScene } = share3dDat();
+// async function onPointerUp(event) {
+//   if (isDragging) {
 
+//   const { controls, scene, nonBloomScene } = share3dDat();
+
+//     await handleDrop_sphere(event);
+//     isDragging = false;
+//     controls.enabled = true; // Re-enable OrbitControls after dragging
+
+//     if (selectedSphere) {
+//       saveObjectChanges(selectedSphere);
+//     } else if (selectedObject && selectedObject.wireframeCube) {
+//       console.log("selected a cube! onPointerUp", selectedObject);
+
+//       // Save wireframe cube
+//       saveObjectChanges(selectedObject.wireframeCube);
+//       saveObjectChanges(selectedObject.solidCube);
+
+//       if (selectedObject.containedSpheres) {
+//         selectedObject.containedSpheres.forEach(sphereData => {
+//           if (sphereData.object) {
+//             // Use the updated position from the object
+//             sphereData.object.position.fromArray(sphereData.position);
+//             saveObjectChanges(sphereData.object);
+//           }
+//         });
+
+//         // Release the pointer capture
+//     event.target.releasePointerCapture(event.pointerId);
+//       }
+//     }
+
+//     selectedSphere = null;
+//     selectedObject = null;
+//     currentSnapshot = null;
+
+//     if (CUBEINTERSECTED) {
+//       resetCubeColor(CUBEINTERSECTED);
+//       CUBEINTERSECTED = null;
+//     }
+
+//     removeEmptyCubes(scene, nonBloomScene);
+//   }
+// }
+
+
+async function onPointerUp(event) {
   if (isDragging) {
-    await handleDrop_sphere(event);
+    const { controls, scene, nonBloomScene } = share3dDat();
+
     isDragging = false;
-    controls.enabled = true; // Re-enable OrbitControls after dragging
+    controls.enabled = true;
 
     if (selectedSphere) {
-      // console.log("Saving sphere data", selectedSphere);
       saveObjectChanges(selectedSphere);
     } else if (selectedObject && selectedObject.wireframeCube) {
-      // console.log("Saving cube data", selectedObject);
-
       // Save wireframe cube
-      saveObjectChanges({
-        ...selectedObject.wireframeCube,
-      });
-
+      saveObjectChanges(selectedObject.wireframeCube);
       // Save solid cube
-      if (selectedObject.solidCube) {
-        saveObjectChanges({
-          ...selectedObject.solidCube,
+      saveObjectChanges(selectedObject.solidCube);
+
+      if (selectedObject.containedSpheres) {
+        selectedObject.containedSpheres.forEach(sphereData => {
+          if (sphereData.object) {
+            sphereData.object.position.fromArray(sphereData.position);
+            saveObjectChanges(sphereData.object);
+          }
         });
       }
     }
@@ -624,9 +747,12 @@ async function onPointerUp(event) {
     }
 
     removeEmptyCubes(scene, nonBloomScene);
+    event.target.releasePointerCapture(event.pointerId);
+
+    // Force a re-render of the scene
+    markNeedsRender();
   }
 }
-
 const onPointerMove = debounce((event) => {
   if (!isDragging) return;
 
@@ -634,6 +760,9 @@ const onPointerMove = debounce((event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
+
+  console.log("++++in onPointerMove", "moving a sphere with moveSphere", selectedSphere);
+  console.log("++++in onPointerMove", "moving a cube NOT SPHERE with selectedObject", selectedObject);
 
   if (selectedSphere) {
     moveSphere(event);
@@ -643,7 +772,7 @@ const onPointerMove = debounce((event) => {
       new THREE.Vector3()
     );
     raycaster.ray.intersectPlane(plane, intersectPoint);
-    dragCube(selectedObject, intersectPoint);
+    dragCube();
   }
 
   requestAnimationFrame(render);

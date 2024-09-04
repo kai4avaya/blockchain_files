@@ -22,13 +22,18 @@ interface ObjectState {
 class SceneState {
   private static instance: SceneState | null = null;
   private objects: Map<string, ObjectState>;
+  private updatedObjects: Set<string>;
+  private savedObjects: Set<string>; // New set to track objects saved in IndexedDB
   private readonly STORAGE_KEY = 'graph';
   private saveTimeout: NodeJS.Timeout | null = null;
   private userId: string = "noUserId";
 
   private constructor() {
     this.objects = new Map();
+    this.updatedObjects = new Set();
+    this.savedObjects = new Set();
   }
+
 
   static getInstance(): SceneState {
     if (!SceneState.instance) {
@@ -42,13 +47,13 @@ class SceneState {
       const storedState = await indexDBOverlay.getData(this.STORAGE_KEY);
       if (storedState && storedState.length > 0) {
         this.loadState(storedState);
-      } else {
+        // Add all loaded objects to savedObjects set
+        storedState.forEach(state => this.savedObjects.add(state.uuid));
       }
     } catch (error) {
       console.error('Error initializing SceneState:', error);
     }
   }
-
   private loadState(storedState: ObjectState[]): void {
     storedState.forEach(state => this.objects.set(state.uuid, state));
     this.reconstructScene();
@@ -57,6 +62,29 @@ class SceneState {
   private reconstructScene(): void {
     reconstructScene(Array.from(this.objects.values()));
   }
+
+  // updateObject(objectState: Partial<ObjectState> & { uuid: string }): void {
+  //   const existingState = this.objects.get(objectState.uuid);
+
+  //   if (existingState) {
+  //     if (this.hasChanged(existingState, objectState)) {
+  //       const updatedState = { 
+  //         ...existingState, 
+  //         ...objectState, 
+  //         version: existingState.version + 1,
+  //         versionNonce: this.generateVersionNonce(),
+  //         lastEditedBy: this.userId 
+  //       };
+  //       this.mergeUpdate(updatedState);
+  //       this.updatedObjects.add(objectState.uuid);
+  //     }
+  //   } else {
+  //     this.createObject(objectState as ObjectState);
+  //     this.updatedObjects.add(objectState.uuid);
+  //   }
+  // }
+
+
   updateObject(objectState: Partial<ObjectState> & { uuid: string }): void {
     const existingState = this.objects.get(objectState.uuid);
 
@@ -70,9 +98,33 @@ class SceneState {
           lastEditedBy: this.userId 
         };
         this.mergeUpdate(updatedState);
+        this.updatedObjects.add(objectState.uuid);
+
+        // If it's a cube, update both wireframe and solid parts
+        if (updatedState.shape === 'wireframeCube' || updatedState.shape === 'solidCube') {
+          const counterpartUuid = updatedState.shape === 'wireframeCube' 
+            ? updatedState.uuid + '-solid' 
+            : updatedState.uuid.replace('-solid', '');
+          
+          const counterpartState = this.objects.get(counterpartUuid);
+          if (counterpartState) {
+            const updatedCounterpartState = {
+              ...counterpartState,
+              position: updatedState.position,
+              rotation: updatedState.rotation,
+              scale: updatedState.scale,
+              version: counterpartState.version + 1,
+              versionNonce: this.generateVersionNonce(),
+              lastEditedBy: this.userId
+            };
+            this.mergeUpdate(updatedCounterpartState);
+            this.updatedObjects.add(counterpartUuid);
+          }
+        }
       }
     } else {
       this.createObject(objectState as ObjectState);
+      this.updatedObjects.add(objectState.uuid);
     }
   }
 
@@ -117,24 +169,24 @@ class SceneState {
           ...incomingState,
         });
       }
+      this.updatedObjects.add(incomingState.uuid);
       this.scheduleSave();
       this.reconstructScene();
       this.broadcastUpdate(incomingState);
     }
   }
-
   private createObject(state: ObjectState): void {
     const newState = {
       ...state,
-      // version: 1,
-      // versionNonce: this.generateVersionNonce(),
       lastEditedBy: this.userId
     };
     this.objects.set(newState.uuid, newState);
+    if (!this.savedObjects.has(newState.uuid)) {
+      this.updatedObjects.add(newState.uuid);
+    }
     this.scheduleSave();
     this.reconstructScene();
   }
-
 
 
   private isNewerState(incoming: ObjectState, existing: ObjectState): boolean {
@@ -153,6 +205,7 @@ class SceneState {
         lastEditedBy: this.userId
       };
       this.mergeUpdate(updatedState);
+      this.updatedObjects.add(uuid);
     }
   }
 
@@ -168,9 +221,22 @@ class SceneState {
     this.saveTimeout = setTimeout(() => this.saveStateToDB(), 1000);
   }
 
+
   private async saveStateToDB() {
     try {
-      await indexDBOverlay.saveData(this.STORAGE_KEY, this.getSerializableState());
+      const updatedStates = Array.from(this.updatedObjects)
+        .map(uuid => this.objects.get(uuid))
+        .filter(state => state !== undefined && (!this.savedObjects.has(state.uuid) || this.hasChanged(this.objects.get(state.uuid)!, state!)));
+      
+      if (updatedStates.length > 0) {
+        await indexDBOverlay.saveData(this.STORAGE_KEY, updatedStates);
+        updatedStates.forEach(state => {
+          if (state) {
+            this.savedObjects.add(state.uuid);
+          }
+        });
+      }
+      this.updatedObjects.clear();
     } catch (error) {
       console.error('Error saving state to IndexedDB:', error);
     }

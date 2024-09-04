@@ -9,7 +9,6 @@ export function createSceneSnapshot(scenes) {
         debugObjects: new THREE.Group()
     };
 
-    // Create a Map to store bounding boxes for quick lookup
     const boundingBoxes = new Map();
 
     scenes.forEach((currentScene, sceneIndex) => {
@@ -25,8 +24,8 @@ export function createSceneSnapshot(scenes) {
                 snapshot.objects.push(objectData);
 
                 // Handle boxes (both wireframe and solid versions)
-                if (object.geometry.type === "BoxGeometry" || object.geometry instanceof THREE.EdgesGeometry) {
-                    const boxId = object.userData.id || object.uuid;
+                if (object.geometry.type === "BoxGeometry" || object instanceof THREE.LineSegments) {
+                    const boxId = object.userData.id ? object.userData.id.replace('_solid', '') : object.uuid.replace('-solid', '');
                     let existingBox = snapshot.boxes.find(box => box.id === boxId);
                     
                     if (!existingBox) {
@@ -44,10 +43,6 @@ export function createSceneSnapshot(scenes) {
                     if (!boundingBoxes.has(boxId)) {
                         const boundingBox = new THREE.Box3().setFromObject(object);
                         boundingBoxes.set(boxId, boundingBox);
-
-                        // Add debug visual for bounding box
-                        const boxHelper = new THREE.Box3Helper(boundingBox, new THREE.Color(0xff0000));
-                        snapshot.debugObjects.add(boxHelper);
                     }
                 }
 
@@ -72,14 +67,14 @@ export function createSceneSnapshot(scenes) {
             }
 
             // Add debug line between box center and sphere center
-            const boxCenter = new THREE.Vector3();
-            boxBoundingBox.getCenter(boxCenter);
-            const sphereCenter = new THREE.Vector3();
-            sphereBoundingBox.getCenter(sphereCenter);
-            const geometry = new THREE.BufferGeometry().setFromPoints([boxCenter, sphereCenter]);
-            const material = new THREE.LineBasicMaterial({ color: 0x0000ff });
-            const line = new THREE.Line(geometry, material);
-            snapshot.debugObjects.add(line);
+            // const boxCenter = new THREE.Vector3();
+            // boxBoundingBox.getCenter(boxCenter);
+            // const sphereCenter = new THREE.Vector3();
+            // sphereBoundingBox.getCenter(sphereCenter);
+            // const geometry = new THREE.BufferGeometry().setFromPoints([boxCenter, sphereCenter]);
+            // const material = new THREE.LineBasicMaterial({ color: 0x0000ff });
+            // const line = new THREE.Line(geometry, material);
+            // snapshot.debugObjects.add(line);
         }
     });
 });

@@ -32,6 +32,7 @@ async function main() {
   // Initialize the graph and SceneState
   await initializeGraph();
   await sceneState.initialize(scene, nonBloomScene);
+  
 
 }
 
