@@ -41,8 +41,27 @@ class IndexDBWorkerOverlay {
       return dataRetreived;
     }
   
-    async saveData(storeName: string, data: any, dbName: string = 'fileGraphDB'): Promise<void> {
-      await this.sendToWorker('saveData', { storeName, data, dbName });
+    // async saveData(storeName: string, data: any, dbName: string = 'fileGraphDB'): Promise<void> {
+    //   await this.sendToWorker('saveData', { storeName, data, dbName });
+    // }
+
+    async saveData(storeName: string, data: any[], dbName: string = 'fileGraphDB'): Promise<void> {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName);
+        request.onerror = (event) => reject(`Error opening database: ${event}`);
+        request.onsuccess = (event) => {
+          const db = (event.target as IDBOpenDBRequest).result;
+          const transaction = db.transaction([storeName], 'readwrite');
+          const objectStore = transaction.objectStore(storeName);
+    
+          data.forEach(item => {
+            objectStore.put(item); // Use 'put' instead of 'add' to update existing records
+          });
+    
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = (event) => reject(`Error saving data: ${event}`);
+        };
+      });
     }
   }
   

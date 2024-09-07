@@ -20,6 +20,7 @@
     "loro-crdt": "^0.16.7",
     "mobx": "^6.13.0",
     "mobx-react-lite": "^4.0.7",
+    "peerjs": "^1.5.4",
     "quill": "^2.0.2",
     "quilljs-markdown": "^1.2.0",
     "socket.io-client": "^4.7.5",

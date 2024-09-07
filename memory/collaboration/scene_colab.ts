@@ -1,6 +1,6 @@
 import { reconstructScene } from "../../ui/graph_v2/create";
 import indexDBOverlay from '../local/file_worker';
-
+import { P2PSync } from '../../network/peer2peer';
 interface ObjectState {
   uuid: string; // original id of object
   type: string;
@@ -27,14 +27,32 @@ class SceneState {
   private readonly STORAGE_KEY = 'graph';
   private saveTimeout: NodeJS.Timeout | null = null;
   private userId: string = "noUserId";
+  private broadcastChannel: BroadcastChannel;
+
 
   private constructor() {
     this.objects = new Map();
     this.updatedObjects = new Set();
     this.savedObjects = new Set();
+    this.broadcastChannel = new BroadcastChannel('sceneStateChannel');
+    this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
+  }
+  
+  private broadcastUpdate(state: ObjectState) {
+    this.broadcastChannel.postMessage(state);
+
+    p2pSync.broadcastUpdate(state);
+  }
+  
+  private handleBroadcastMessage(event: MessageEvent) {
+    const incomingState = event.data as ObjectState;
+    this.mergeUpdate(incomingState);
   }
 
-
+  connectToPeer(peerId: string) {
+    p2pSync.connectToPeer(peerId);
+  }
+  
   static getInstance(): SceneState {
     if (!SceneState.instance) {
       SceneState.instance = new SceneState();
@@ -88,12 +106,15 @@ class SceneState {
   updateObject(objectState: Partial<ObjectState> & { uuid: string }): void {
     const existingState = this.objects.get(objectState.uuid);
 
+    console.log("am in in existingState?", existingState, "objectState", objectState)
+
     if (existingState) {
+      console.log("this.hasChanged(existingState, objectState)", this.hasChanged(existingState, objectState))
       if (this.hasChanged(existingState, objectState)) {
         const updatedState = { 
           ...existingState, 
           ...objectState, 
-          version: existingState.version + 1,
+          // version: existingState.version + 1,
           versionNonce: this.generateVersionNonce(),
           lastEditedBy: this.userId 
         };
@@ -148,6 +169,7 @@ class SceneState {
  
   mergeUpdate(incomingState: ObjectState): void {
     const existingState = this.objects.get(incomingState.uuid);
+    console.log("this.isNewerState", this.isNewerState(incomingState, existingState) )
     if (!existingState || this.isNewerState(incomingState, existingState)) {
       if (incomingState.isDeleted) {
         // If the incoming state is marked as deleted, update only if it's newer
@@ -221,15 +243,42 @@ class SceneState {
     this.saveTimeout = setTimeout(() => this.saveStateToDB(), 1000);
   }
 
-
   private async saveStateToDB() {
+    console.log("this.updatedObjects", this.updatedObjects)
     try {
       const updatedStates = Array.from(this.updatedObjects)
         .map(uuid => this.objects.get(uuid))
-        .filter(state => state !== undefined && (!this.savedObjects.has(state.uuid) || this.hasChanged(this.objects.get(state.uuid)!, state!)));
+        .filter(state => state !== undefined);
       
       if (updatedStates.length > 0) {
-        await indexDBOverlay.saveData(this.STORAGE_KEY, updatedStates);
+        // Fetch existing data from IndexedDB
+        const existingData = await indexDBOverlay.getData(this.STORAGE_KEY);
+        const existingMap = new Map(existingData.map(item => [item.uuid, item]));
+  
+        // Prepare data to be saved
+        const dataToSave = updatedStates.map(state => {
+          if (state) {
+            const existingState = existingMap.get(state.uuid);
+            if (existingState) {
+              // If the state already exists in IndexedDB, update it
+              return {
+                ...existingState,
+                ...state,
+                version: (existingState.version || 0) + 1
+              };
+            } else {
+              // If it's a new state, add it
+              return {
+                ...state,
+                version: 1
+              };
+            }
+          }
+          return state;
+        });
+  
+        await indexDBOverlay.saveData(this.STORAGE_KEY, dataToSave);
+        
         updatedStates.forEach(state => {
           if (state) {
             this.savedObjects.add(state.uuid);
@@ -241,11 +290,31 @@ class SceneState {
       console.error('Error saving state to IndexedDB:', error);
     }
   }
+  // private async saveStateToDB() {
+  //   try {
+  //     const updatedStates = Array.from(this.updatedObjects)
+  //       .map(uuid => this.objects.get(uuid))
+  //       .filter(state => state !== undefined && (!this.savedObjects.has(state.uuid) || this.hasChanged(this.objects.get(state.uuid)!, state!)));
+      
+  //       console.log("updatedStates", updatedStates)
+  //     if (updatedStates.length > 0) {
+  //       await indexDBOverlay.saveData(this.STORAGE_KEY, updatedStates);
+  //       updatedStates.forEach(state => {
+  //         if (state) {
+  //           this.savedObjects.add(state.uuid);
+  //         }
+  //       });
+  //     }
+  //     this.updatedObjects.clear();
+  //   } catch (error) {
+  //     console.error('Error saving state to IndexedDB:', error);
+  //   }
+  // }
 
-  private broadcastUpdate(state: ObjectState) {
-    // Implement your broadcast logic here
-    // For example: socket.emit('objectUpdate', state);
-  }
+  // private broadcastUpdate(state: ObjectState) {
+  //   // Implement your broadcast logic here
+  //   // For example: socket.emit('objectUpdate', state);
+  // }
 
   private generateVersionNonce(): number {
     return Math.floor(Math.random() * 1000000);
@@ -253,3 +322,4 @@ class SceneState {
 }
 
 export const sceneState = SceneState.getInstance();
+const p2pSync = new P2PSync(sceneState);

@@ -654,7 +654,7 @@ export function saveObjectChanges(objectData) {
     position: convertToArray(objectData.position),
     rotation: convertToArray(objectData.rotation),
     scale: convertToArray(objectData.scale),
-    version: objectData.version,
+    version: objectData.version + 1,
     versionNonce: objectData.versionNonce,
     size: objectData.size,
     color: convertColor(objectData.material?.color || objectData.color),

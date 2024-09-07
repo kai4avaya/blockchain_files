@@ -238,6 +238,7 @@ export function createWireframeCube(
   y,
   z,
   scale = null,
+  version=1,
   color = "",
   uuid = "",
   id = ""
@@ -268,7 +269,7 @@ export function createWireframeCube(
   } else {
     wireframeCube.scale.set(size, size, size);
     solidCube.scale.set(size, size, size);
-  }
+  } 
 
   const userData = {
     id: id || generateUniqueId(),
@@ -277,14 +278,14 @@ export function createWireframeCube(
   wireframeCube.lastEditedBy = loginName;
   wireframeCube.shape = "wireframeCube";
   wireframeCube.size = size;
-  wireframeCube.version = 1;
+  wireframeCube.version = version;
   wireframeCube.versionNonce = generateVersionNonce();
 
   solidCube.shape = "solidCube";
   solidCube.size = size;
   solidCube.userData = { ...userData }; // should make copy of it
   solidCube.userData.id = userData.id + "_solid";
-  solidCube.version = 1;
+  solidCube.version = version;
   solidCube.versionNonce = generateVersionNonce();
   solidCube.lastEditedBy = loginName;
 
@@ -389,6 +390,7 @@ export function createSphere(
   y,
   z,
   size,
+  version = 1,
   uuid = "",
   userId = "",
   colorIn = null
@@ -422,6 +424,8 @@ export function createSphere(
   const userData = {
     id: userId || generateUniqueId(),
   };
+  if (version) sphere.version = version;
+
   sphere.userData = userData;
   sphere.size = size;
   scene.add(sphere);
@@ -700,6 +704,10 @@ function applyUpdates(object, objectState) {
     );
   }
 
+  if(objectState.version) {
+    object.version = objectState.version;
+  }
+
   // Update color
   if (object.material && objectState.color !== undefined) {
     object.material.color.setHex(objectState.color);
@@ -753,6 +761,7 @@ function createCubeWrapper(objectState) {
       objectState.position[1],
       objectState.position[2],
       objectState.scale, // This can be undefined/null if not set
+      objectState.version,
       objectState.color,
       objectState.uuid
     );
@@ -765,6 +774,7 @@ function createSphereWrapper(objectState) {
     objectState.position[1],
     objectState.position[2],
     objectState.scale[0] * 20,
+    objectState.version,
     objectState.uuid,
     objectState.color
   );

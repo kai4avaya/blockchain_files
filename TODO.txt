@@ -1,2 +1,1 @@
-
-think there is an issue when i in save scene update seperately cube and wireframe because this will trigger two different updates?
+move is not saving positions in scene_colab
