@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 
-// Comprehensive function to create scene snapshot with bounding boxes, containment, and debug visuals
 export function createSceneSnapshot(scenes) {
     const snapshot = {
         objects: [],
@@ -14,8 +13,9 @@ export function createSceneSnapshot(scenes) {
     scenes.forEach((currentScene, sceneIndex) => {
         currentScene.traverse((object) => {
             if (object.isMesh || object instanceof THREE.LineSegments) {
+                const objectId = getObjectId(object);
                 const objectData = {
-                    id: object.userData.id || object.uuid,
+                    id: objectId,
                     object: object,
                     type: object.geometry.type,
                     scene: sceneIndex
@@ -25,7 +25,7 @@ export function createSceneSnapshot(scenes) {
 
                 // Handle boxes (both wireframe and solid versions)
                 if (object.geometry.type === "BoxGeometry" || object instanceof THREE.LineSegments) {
-                    const boxId = object.userData.id ? object.userData.id.replace('_solid', '') : object.uuid.replace('-solid', '');
+                    const boxId = getBoxId(object);
                     let existingBox = snapshot.boxes.find(box => box.id === boxId);
                     
                     if (!existingBox) {
@@ -54,32 +54,34 @@ export function createSceneSnapshot(scenes) {
         });
     });
 
-   // Compute containment
-   snapshot.boxes.forEach(box => {
-    const boxBoundingBox = boundingBoxes.get(box.id);
-    snapshot.containment[box.id] = [];
+    // Compute containment
+    snapshot.boxes.forEach(box => {
+        const boxBoundingBox = boundingBoxes.get(box.id);
+        snapshot.containment[box.id] = [];
 
-    snapshot.objects.forEach(obj => {
-        if (obj.type === "IcosahedronGeometry" || obj.type === "SphereGeometry") {
-            const sphereBoundingBox = new THREE.Box3().setFromObject(obj.object);
-            if (boxBoundingBox.intersectsBox(sphereBoundingBox)) {  // Changed from containsBox to intersectsBox
-                snapshot.containment[box.id].push(obj.id);
+        snapshot.objects.forEach(obj => {
+            if (obj.type === "IcosahedronGeometry" || obj.type === "SphereGeometry") {
+                const sphereBoundingBox = new THREE.Box3().setFromObject(obj.object);
+                if (boxBoundingBox.intersectsBox(sphereBoundingBox)) {
+                    snapshot.containment[box.id].push(obj.id);
+                }
             }
-
-            // Add debug line between box center and sphere center
-            // const boxCenter = new THREE.Vector3();
-            // boxBoundingBox.getCenter(boxCenter);
-            // const sphereCenter = new THREE.Vector3();
-            // sphereBoundingBox.getCenter(sphereCenter);
-            // const geometry = new THREE.BufferGeometry().setFromPoints([boxCenter, sphereCenter]);
-            // const material = new THREE.LineBasicMaterial({ color: 0x0000ff });
-            // const line = new THREE.Line(geometry, material);
-            // snapshot.debugObjects.add(line);
-        }
+        });
     });
-});
 
-return snapshot;
+    return snapshot;
+}
+
+function getObjectId(object) {
+    if (object.userData && typeof object.userData.id === 'string') {
+        return object.userData.id;
+    }
+    return object.uuid;
+}
+
+function getBoxId(object) {
+    const id = getObjectId(object);
+    return id.endsWith('_solid') ? id.replace('_solid', '') : id.replace('-solid', '');
 }
 
 // Function to retrieve a specific object by ID

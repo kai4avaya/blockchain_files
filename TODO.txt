@@ -1,1 +1,3 @@
 move is not saving positions in scene_colab
+
+i like this color for wireframe cubes it's a whitish color. 11913426

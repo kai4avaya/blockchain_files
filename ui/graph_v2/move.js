@@ -5,11 +5,12 @@ import {
   render,
   removeEmptyCubes,
   markNeedsRender,
+  randomColorGenerator
 } from "./create.js";
 import { createSceneSnapshot, getObjectById } from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
 import * as THREE from "three";
-import { debounce } from "../../utils/utils";
+import { debounce, convertToThreeJSFormat } from "../../utils/utils";
 import { sceneState } from "../../memory/collaboration/scene_colab";
 
 let isDragging = false;
@@ -30,8 +31,49 @@ const loginName = localStorage.getItem("login_block") || "no_login";
 
 setupDragAndDrop();
 
-// returns the actual cubes and the spheres inside them
-function getCubeUnderPointer(event) {
+// // returns the actual cubes and the spheres inside them
+// function getCubeUnderPointer(event, intersects) {
+//   const { camera, scene, nonBloomScene, controls } = share3dDat();
+//   // Update mouse position
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+//   // Cast a ray from the camera to the mouse position
+//   raycaster.setFromCamera(mouse, camera);
+//   // const intersects = raycaster.intersectObjects(nonBloomScene.children, true);
+
+//   if (intersects.length > 0) {
+//     currentSnapshot = createSceneSnapshot([scene, nonBloomScene]);
+
+//     console.log("i am currentSnapshot", currentSnapshot)
+
+//     for (const intersectedObject of intersects) {
+//       // Find the intersected object in the snapshot boxes
+//       const matchingBox = currentSnapshot.boxes.find(
+//         (box) =>
+//           box.id === intersectedObject.object.userData.id ||
+//           box.id === intersectedObject.object.uuid
+//       );
+
+//       if (matchingBox) {
+//         controls.enabled = false; // Disable OrbitControls during dragging
+
+//         return {
+//           wireframeCube: matchingBox.wireframe || null,
+//           solidCube: matchingBox.solid || null,
+//           containedSpheres: currentSnapshot.containment[matchingBox.id].map(
+//               (id) => getObjectById(currentSnapshot, id)
+//           ),
+//       };
+//       }
+//     }
+//   }
+//   return null; // Return null if no cube is found
+// }
+
+
+function getCubeUnderPointer(event, intersects) {
+  console.log("I am getCubeUnderPointer intersects", intersects)
   const { camera, scene, nonBloomScene, controls } = share3dDat();
   // Update mouse position
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -39,37 +81,45 @@ function getCubeUnderPointer(event) {
 
   // Cast a ray from the camera to the mouse position
   raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(nonBloomScene.children, true);
 
   if (intersects.length > 0) {
     currentSnapshot = createSceneSnapshot([scene, nonBloomScene]);
 
-    console.log("i am currentSnapshot", currentSnapshot)
+    console.log("I am currentSnapshot", currentSnapshot);
 
     for (const intersectedObject of intersects) {
-      // Find the intersected object in the snapshot boxes
-      const matchingBox = currentSnapshot.boxes.find(
+      let matchingBox = currentSnapshot.boxes.find(
         (box) =>
-          box.id === intersectedObject.object.userData.id ||
-          box.id === intersectedObject.object.uuid
+          box.wireframe.uuid === intersectedObject.object.uuid ||
+          box.solid.uuid === intersectedObject.object.uuid
       );
+
+      console.log("i am matchingbox", matchingBox);
+      // If we found a solid cube (ending with '-solid'), find its wireframe twin
+      if (matchingBox && matchingBox.id.endsWith('-solid')) {
+        const wireframeId = matchingBox.id.replace('-solid', '');
+        matchingBox = currentSnapshot.boxes.find(box => box.id === wireframeId) || matchingBox;
+      }
 
       if (matchingBox) {
         controls.enabled = false; // Disable OrbitControls during dragging
 
+        // Ensure both wireframe and solid cubes are returned
+        const wireframeCube = matchingBox.wireframe || currentSnapshot.boxes.find(box => box.id === matchingBox.id + '-solid')?.wireframe || null;
+        const solidCube = matchingBox.solid || currentSnapshot.boxes.find(box => box.id === matchingBox.id.replace('-solid', ''))?.solid || null;
+
         return {
-          wireframeCube: matchingBox.wireframe || null,
-          solidCube: matchingBox.solid || null,
-          containedSpheres: currentSnapshot.containment[matchingBox.id].map(
-              (id) => getObjectById(currentSnapshot, id)
-          ),
-      };
+          wireframeCube,
+          solidCube,
+          containedSpheres: currentSnapshot.containment[matchingBox.id]?.map(
+            (id) => getObjectById(currentSnapshot, id)
+          ) || [],
+        };
       }
     }
   }
   return null; // Return null if no cube is found
-}
-
+} 
 // export function dragCube(cubes_and_containtedSpheres, intersectPoint) {
 //   if (
 //     !cubes_and_containtedSpheres ||
@@ -131,15 +181,7 @@ export function dragCube() {
   markNeedsRender();
 }
 
-export function removeSphereFromCube(sphere, cube) {
-  const spheres = cubeGroups.get(cube.uuid);
-  if (spheres) {
-    const index = spheres.indexOf(sphere);
-    if (index !== -1) {
-      spheres.splice(index, 1); // Remove sphere from group
-    }
-  }
-}
+
 
 function highlightCube(cube) {
   if (CUBEINTERSECTED !== cube) {
@@ -314,6 +356,186 @@ function handleFileDragOver(event) {
   }
 }
 
+// async function handleFileDrop_sphere(event) {
+
+//   isFileDragging = false;
+//   resetCubeHighlight();
+//   const { camera, scene, nonBloomScene } = share3dDat();
+
+//   const dt = event.dataTransfer;
+//   const fileList = dt?.files;
+
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+//   raycaster.setFromCamera(mouse, camera);
+
+//   let createdShapes = [];
+
+//   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+
+//   for (let i = 0; i < fileList.length; i++) {
+//     const file = fileList[i];
+//     const size = normalizeSize(file.size);
+//     // let dropPosition;
+//     const fileIds = await handleFileDrop(event);
+
+//     if (allIntersects.length > 0) {
+//       const intersect = allIntersects[0];
+//       const dropPosition = intersect.point;
+
+
+//       if (
+//         intersect.object.geometry.type === "EdgesGeometry" ||
+//         intersect.object.geometry.type === "BoxGeometry"
+//       ) {
+//         intersect.object.material.color.set(0xff0000);
+//         // x, y, z, size, id = ""
+//         createdShapes.push(
+//           createSphere(
+//             dropPosition.x,
+//             dropPosition.y,
+//             dropPosition.z,
+//             size,
+//             "",
+//             fileIds[i]
+//           )
+//         );
+//       } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
+//         // console.log("---intersected sphere drop file");
+//         const actualSphereSize = size * 0.05;
+//         const scaledCubeSize = actualSphereSize * 4;
+//         createdShapes.push(
+//           createWireframeCube(
+//             scaledCubeSize,
+//             dropPosition.x,
+//             dropPosition.y,
+//             dropPosition.z,
+//           )
+//         );
+//         createdShapes.push(
+//           createSphere(
+//             dropPosition.x,
+//             dropPosition.y,
+//             dropPosition.z,
+//             size,
+//             "",
+//             fileIds[i]
+//           )
+//         );
+//       } else {
+//         createdShapes.push(
+//           createSphere(
+//             dropPosition.x,
+//             dropPosition.y,
+//             dropPosition.z,
+//             size,
+//             "",
+//             fileIds[i]
+//           )
+//         );
+//       }
+//     } else {
+//       planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+//       plane.normal.copy(planeNormal);
+
+//       raycaster.ray.intersectPlane(plane, intersectPoint);
+
+//       createdShapes.push(
+//         createSphere(
+//           intersectPoint.x,
+//           intersectPoint.y,
+//           intersectPoint.z,
+//           size,
+//           "",
+//           fileIds[i]
+//         )
+//       );
+//     }
+//   }
+
+//   createdShapes.forEach((shape) => {
+//     // console.log("Saving shape:", shape);
+//     Object.values(shape).forEach((item) => {
+//       if (item && typeof item === "object" && "uuid" in item) {
+//         saveObjectChanges(item);
+//       }
+//     });
+//   });
+
+//   // Reset cube highlighting after drop
+//   if (CUBEINTERSECTED) {
+//     resetCubeColor(CUBEINTERSECTED);
+//     CUBEINTERSECTED = null;
+//   }
+// }
+
+// function getSize(intersect, scale = 1) {
+//   const boundingBox = new THREE.Box3().setFromObject(intersect.object);
+//   const size = new THREE.Vector3();
+//   boundingBox.getSize(size);
+
+//   return Math.max(size.x, size.y, size.z) * scale;
+// }
+// async function handleDrop_sphere(event) {
+//   if (!isDragging) return; // may need endpoint for isDragging
+
+//   resetCubeHighlight();
+//   const { camera, scene, nonBloomScene } = share3dDat();
+
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+//   raycaster.setFromCamera(mouse, camera);
+
+//   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+//   if (allIntersects.length > 0) {
+//     const intersect = allIntersects[0];
+//     const dropPosition = intersect.point;
+
+//     if (
+//       intersect.object.geometry.type === "EdgesGeometry" ||
+//       intersect.object.geometry.type === "BoxGeometry"
+//     ) {
+//       intersect.object.material.color.set(0xff0000);
+//     } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
+//       // Only create a cube if we're dropping onto another sphere
+//       if (selectedSphere && selectedSphere !== intersect.object) {
+//         const size = getSize(intersect);
+//         const actualSphereSize = size * 0.05;
+//         const scaledCubeSize = actualSphereSize * 4;
+//         createWireframeCube(
+//           scaledCubeSize,
+//           dropPosition.x,
+//           dropPosition.y,
+//           dropPosition.z,
+//         );
+//       }
+//     }
+//   } else {
+//     planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+//     plane.normal.copy(planeNormal);
+//     raycaster.ray.intersectPlane(plane, intersectPoint);
+//   }
+
+//   // Reset cube highlighting after drop
+//   if (CUBEINTERSECTED) {
+//     resetCubeColor(CUBEINTERSECTED);
+//     CUBEINTERSECTED = null;
+//   }
+// }
+
+function resetCubeHighlight() {
+  if (CUBEINTERSECTED) {
+    if (CUBEINTERSECTED.originalMaterial) {
+      CUBEINTERSECTED.material = CUBEINTERSECTED.originalMaterial;
+      CUBEINTERSECTED.material.needsUpdate = true;
+    }
+    CUBEINTERSECTED = null;
+    // render();
+    markNeedsRender();
+  }
+}
+
+
 async function handleFileDrop_sphere(event) {
 
   isFileDragging = false;
@@ -330,7 +552,7 @@ async function handleFileDrop_sphere(event) {
   let createdShapes = [];
 
   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
-
+  let dataObject = {};
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
     const size = normalizeSize(file.size);
@@ -341,72 +563,67 @@ async function handleFileDrop_sphere(event) {
       const intersect = allIntersects[0];
       const dropPosition = intersect.point;
 
+      dataObject = convertToThreeJSFormat({
+        position: [dropPosition.x, dropPosition.y, dropPosition.z],// new THREE.Vector3(dropPosition.x, dropPosition.y, dropPosition.z),
+        size: size,
+        userData:{id: fileIds[i]},
+        color: randomColorGenerator(),
+        lastEditedBy: loginName,
+      });
+
       if (
         intersect.object.geometry.type === "EdgesGeometry" ||
         intersect.object.geometry.type === "BoxGeometry"
       ) {
         intersect.object.material.color.set(0xff0000);
+
         // x, y, z, size, id = ""
         createdShapes.push(
           createSphere(
-            dropPosition.x,
-            dropPosition.y,
-            dropPosition.z,
-            size,
-            "",
-            fileIds[i]
+            dataObject
           )
         );
       } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
         // console.log("---intersected sphere drop file");
-        const actualSphereSize = size * 0.05;
-        const scaledCubeSize = actualSphereSize * 4;
+        // const actualSphereSize = size * 0.05;
+        // const scaledCubeSize = actualSphereSize * 4;
         createdShapes.push(
           createWireframeCube(
-            scaledCubeSize,
-            dropPosition.x,
-            dropPosition.y,
-            dropPosition.z,
+            dataObject
           )
         );
         createdShapes.push(
           createSphere(
-            dropPosition.x,
-            dropPosition.y,
-            dropPosition.z,
-            size,
-            "",
-            fileIds[i]
+            dataObject
           )
         );
       } else {
         createdShapes.push(
           createSphere(
-            dropPosition.x,
-            dropPosition.y,
-            dropPosition.z,
-            size,
-            "",
-            fileIds[i]
+            dataObject
           )
         );
       }
     } else {
       planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
-      plane.normal.copy(planeNormal);
+          plane.normal.copy(planeNormal);
+          raycaster.ray.intersectPlane(plane, intersectPoint);
 
-      raycaster.ray.intersectPlane(plane, intersectPoint);
+          dataObject = {
+            position: new THREE.Vector3(intersectPoint.x, intersectPoint.y, intersectPoint.z),
+            size: size,
+            color: randomColorGenerator(),
+            userData:{id: fileIds[i]},
+            lastEditedBy: loginName,
 
-      createdShapes.push(
-        createSphere(
-          intersectPoint.x,
-          intersectPoint.y,
-          intersectPoint.z,
-          size,
-          "",
-          fileIds[i]
-        )
-      );
+          };
+
+          createdShapes.push(
+
+          createSphere( 
+              dataObject
+            )
+          );
     }
   }
 
@@ -459,11 +676,18 @@ async function handleDrop_sphere(event) {
         const size = getSize(intersect);
         const actualSphereSize = size * 0.05;
         const scaledCubeSize = actualSphereSize * 4;
+
+        const dataObject = convertToThreeJSFormat({
+          size: scaledCubeSize,
+          // position: new THREE.Vector3(dropPosition.x, dropPosition.y, dropPosition.z),
+          position: [dropPosition.x, dropPosition.y, dropPosition.z], ////new THREE.Vector3(dropPosition.x, dropPosition.y, dropPosition.z),
+
+          color: randomColorGenerator(),
+          // userData:{id: fileIds[i]},
+        });
+        
         createWireframeCube(
-          scaledCubeSize,
-          dropPosition.x,
-          dropPosition.y,
-          dropPosition.z,
+          dataObject
         );
       }
     }
@@ -480,17 +704,17 @@ async function handleDrop_sphere(event) {
   }
 }
 
-function resetCubeHighlight() {
-  if (CUBEINTERSECTED) {
-    if (CUBEINTERSECTED.originalMaterial) {
-      CUBEINTERSECTED.material = CUBEINTERSECTED.originalMaterial;
-      CUBEINTERSECTED.material.needsUpdate = true;
-    }
-    CUBEINTERSECTED = null;
-    // render();
-    markNeedsRender();
-  }
-}
+// function resetCubeHighlight() {
+//   if (CUBEINTERSECTED) {
+//     if (CUBEINTERSECTED.originalMaterial) {
+//       CUBEINTERSECTED.material = CUBEINTERSECTED.originalMaterial;
+//       CUBEINTERSECTED.material.needsUpdate = true;
+//     }
+//     CUBEINTERSECTED = null;
+//     // render();
+//     markNeedsRender();
+//   }
+// }
 
 function resetCubeColor(cube) {
   if (cube && cube.originalMaterial) {
@@ -591,11 +815,15 @@ export function onPointerDown(event) {
   const intersectsBloom = raycaster.intersectObjects(scene.children, true);
   const intersectsNonBloom = raycaster.intersectObjects(nonBloomScene.children, true);
 
-  const intersects = [...intersectsBloom, ...intersectsNonBloom];
+  // const intersects = [...intersectsBloom, ...intersectsNonBloom];
 
-  const sphereIntersect = intersects.find(
+  // console.log("onpointerdown intersects", intersects)
+  // const sphereIntersect = intersects.find(
+    const sphereIntersect = intersectsBloom.find(
     (intersect) => getObjectType(intersect.object) === "Sphere"
   );
+
+  console.log("I AM SELECTED intersectsNonBloom inside of onpointerdown", intersectsNonBloom, "intersectsBloom", intersectsBloom, "sphereIntersect", sphereIntersect)
 
   if (sphereIntersect) {
     isDragging = true;
@@ -603,8 +831,11 @@ export function onPointerDown(event) {
     selectedSphere = sphereIntersect.object;
     selectedObject = selectedSphere;
     sphereIntersect.object.layers.toggle(BLOOM_SCENE);
-  } else {
-    const selectedCube = getCubeUnderPointer(event);
+  } else if(intersectsNonBloom?.length > 0) {
+
+    console.log("mooooo should have found da cube")
+    const selectedCube = getCubeUnderPointer(event, intersectsNonBloom);
+    console.log("I AM SELECTED CUBE inside of onpointerdown", selectedCube)
     if (selectedCube) {
       isDragging = true;
       controls.enabled = false;
@@ -631,7 +862,7 @@ export function onPointerDown(event) {
 // Make sure to declare previousIntersectPoint at the top of your file
 let previousIntersectPoint = new THREE.Vector3();
 export function saveObjectChanges(objectData) {
-  // console.log("saveObjectChanges", objectData);
+  console.log("saveObjectChanges", objectData);
   if (!objectData) return;
 
   const convertToArray = (value) => {
@@ -720,7 +951,17 @@ async function onPointerUp(event) {
     controls.enabled = true;
 
     if (selectedSphere) {
+       const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
+
+       if (cubesToDelete.length > 0) {
+         // Update the scene state with the cubes to delete
+         cubesToDelete.forEach(cube => {
+           saveObjectChanges(cube.wire);
+           saveObjectChanges(cube.solid);
+         });
+       }
       saveObjectChanges(selectedSphere);
+
     } else if (selectedObject && selectedObject.wireframeCube) {
       // Save wireframe cube
       saveObjectChanges(selectedObject.wireframeCube);
@@ -730,6 +971,7 @@ async function onPointerUp(event) {
       if (selectedObject.containedSpheres) {
         selectedObject.containedSpheres.forEach(sphereData => {
           if (sphereData.object) {
+            console.log("sphereData.position", sphereData.position);
             sphereData.object.position.fromArray(sphereData.position);
             saveObjectChanges(sphereData.object);
           }
@@ -746,13 +988,15 @@ async function onPointerUp(event) {
       CUBEINTERSECTED = null;
     }
 
-    removeEmptyCubes(scene, nonBloomScene);
+    // removeEmptyCubes(scene, nonBloomScene);
     event.target.releasePointerCapture(event.pointerId);
 
     // Force a re-render of the scene
     markNeedsRender();
   }
 }
+
+
 const onPointerMove = debounce((event) => {
   if (!isDragging) return;
 

@@ -6,7 +6,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
-import { generateUniqueId, generateVersionNonce } from "../../utils/utils";
+import { generateUniqueId, generateVersionNonce, makeObjectWritable, convertToThreeJSFormat } from "../../utils/utils";
 import { createSceneSnapshot } from "./snapshot.js";
 // import { sceneState } from "../../memory/collaboration/scene_colab";
 
@@ -162,7 +162,7 @@ export async function initializeGraph() {
   setupScene();
 }
 
-function randomColorGenerator() {
+export function randomColorGenerator() {
   // Generate bright fluorescent colors
   const r = Math.floor(Math.random() * 128 + 128); // 128-255 range for bright colors
   const g = Math.floor(Math.random() * 128 + 128); // 128-255 range for bright colors
@@ -170,143 +170,218 @@ function randomColorGenerator() {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-// export function createWireframeCube(
-//   size,
-//   x,
-//   y,
-//   z,
-//   scale = "",
-//   color = "",
-//   uuid = "",
-//   id = ""
-// ) {
-//   console.log("I AM CUBE SIZE", size);
-//   if (!color) color = randomColorGenerator();
-//   const geometry = new THREE.BoxGeometry(size, size, size);
-//   const edges = new THREE.EdgesGeometry(geometry);
-//   const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
-//   const wireframeCube = new THREE.LineSegments(edges, material);
-//   wireframeCube.position.set(x, y, z);
+// export function convertToThreeJSFormat(data) {
+//   // Start with a shallow copy of all data
+//   const result = { ...data };
 
-//   const solidCubeMaterial = new THREE.MeshBasicMaterial({
-//     color: color,
-//     transparent: true,
-//     opacity: 0,
+//   // Convert position
+//   if (Array.isArray(data.position)) {
+//     result.position = new THREE.Vector3().fromArray(data.position);
+//   }
+
+//   // Convert rotation
+//   if (Array.isArray(data.rotation)) {
+//     if (data.rotation.length === 4) {
+//       // Assuming the rotation is stored as [x, y, z, order]
+//       result.rotation = new THREE.Euler(
+//         data.rotation[0],
+//         data.rotation[1],
+//         data.rotation[2],
+//         data.rotation[3]
+//       );
+//     } else if (data.rotation.length === 3) {
+//       // If only x, y, z are provided, use default order 'XYZ'
+//       result.rotation = new THREE.Euler().fromArray(data.rotation);
+//     } else {
+//       console.warn('Unexpected rotation format:', data.rotation);
+//     }
+//   }
+
+//   // Convert scale
+//   if (Array.isArray(data.scale)) {
+//     result.scale = new THREE.Vector3().fromArray(data.scale);
+//   }
+
+//   // Convert color if it's a number (assuming it's stored as a hex value)
+//   if (typeof data.color === 'number') {
+//     result.color = new THREE.Color(data.color);
+//   }
+
+//   // Remove specific fields
+//   delete result.type;
+//   delete result.shape;
+
+//   // Set default values if not present
+//   // result.color = result.color || randomColorGenerator(); 
+//   result.version = result.version || 1;
+//   result.userData = result.userData || { id: generateUniqueId(3) };
+//   result.versionNonce = generateVersionNonce()
+//   return result;
+// }
+
+
+// export function createWireframeCube(data) {
+//   const convertedData = convertToThreeJSFormat(data);
+//   console.log("I AM CUBE convertedData", convertedData);
+//   const {
+//     position,
+//     scale,
+//     size = 1,
+//     color = randomColorGenerator(),
+//     uuid = THREE.MathUtils.generateUUID(),
+//     // id =  generateUniqueId(),
+//     userData,
+//     version = 1,
+//     lastEditedBy = 'noUserId',
+//   } = convertedData;
+
+//   console.log("I AM CUBE SIZE", size);
+
+//   // Create geometries
+//   const geometry = new THREE.BoxGeometry(1, 1, 1);
+//   const edges = new THREE.EdgesGeometry(geometry);
+
+//   // Create materials
+//   const wireMaterial = new THREE.LineBasicMaterial({ color, linewidth: 2 });
+//   const solidMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 });
+
+//   // Create meshes
+//   const wireframeCube = new THREE.LineSegments(edges, wireMaterial);
+//   const solidCube = new THREE.Mesh(geometry, solidMaterial);
+
+//   // Set position and scale
+//   [wireframeCube, solidCube].forEach(cube => {
+//     if (position) cube.position.copy(position);
+//       cube.scale.setScalar(size);
 //   });
 
-//   const solidCube = new THREE.Mesh(geometry, solidCubeMaterial);
-//   solidCube.position.set(x, y, z);
-
-//   const userData = {
-//     id: id || generateUniqueId(),
+//   // Set common properties
+//   const commonProps = {
+//     size,
+//     version,
+//     lastEditedBy,
+//     versionNonce: generateVersionNonce(),
 //   };
-//   wireframeCube.userData = userData;
-//   wireframeCube.lastEditedBy = loginName;
-//   wireframeCube.shape = "wireframeCube";
-//   (wireframeCube.size = size),
-//     (wireframeCube.version = 1),
-//     (wireframeCube.versionNonce = generateVersionNonce()),
-//     (solidCube.shape = "solidCube");
-//   (solidCube.size = size), (solidCube.userData = { ...userData }); // should make copy of it
-//   solidCube.userData.id = userData.id + "_solid";
-//   (solidCube.version = 1),
-//     (solidCube.versionNonce = generateVersionNonce()),
-//     (solidCube.lastEditedBy = loginName);
 
-//   if (uuid) {
-//     wireframeCube.uuid = uuid;
-//     solidCube.uuid = uuid + "-solid";
-//   } else {
-//     uuid = wireframeCube.uuid;
-//     solidCube.uuid = uuid + "-solid";
-//   }
+//   Object.assign(wireframeCube, {
+//     ...commonProps,
+//     userData: { id },
+//     shape: "wireframeCube",
+//     uuid,
+//   });
+
+//   Object.assign(solidCube, {
+//     ...commonProps,
+//     userData: { id: id + "_solid" },
+//     shape: "solidCube",
+//     uuid: uuid + "-solid",
+//   });
 
 //   nonBloomScene.add(wireframeCube);
 //   nonBloomScene.add(solidCube);
 
 //   console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube);
 
-//   return {
-//     wireframeCube,
-//     solidCube,
-//   };
+//   return { wireframeCube, solidCube };
 // }
 
-export function createWireframeCube(
-  size,
-  x,
-  y,
-  z,
-  scale = null,
-  version=1,
-  color = "",
-  uuid = "",
-  id = ""
-) {
-  console.log("I AM CUBE SIZE", size);
-  if (!color) color = randomColorGenerator();
 
-  // Create a unit cube
-  const geometry = new THREE.BoxGeometry(1, 1, 1);
-  const edges = new THREE.EdgesGeometry(geometry);
-  const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
-  const wireframeCube = new THREE.LineSegments(edges, material);
-  wireframeCube.position.set(x, y, z);
+  
+  // Your createWireframeCube function
+  export function createWireframeCube(convertedData) {
+    console.log("I AM CUBE convertedData", convertedData);
+  
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const edges = new THREE.EdgesGeometry(geometry);
+  
+    const color = convertedData.color;
+    const wireMaterial = new THREE.LineBasicMaterial({ color, linewidth: 2 });
+    const solidMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 });
+  
+    const wireframeCube = new THREE.LineSegments(edges, wireMaterial);
+    const solidCube = new THREE.Mesh(geometry, solidMaterial);
+  
+    // Make entire object writable
+    makeObjectWritable(wireframeCube);
+    makeObjectWritable(solidCube);
+  
+    // Set position and scale
+    [wireframeCube, solidCube].forEach(cube => {
+      if (convertedData.position) cube.position.copy(convertedData.position);
+      cube.scale.setScalar(convertedData.size);
+    });
+  
+    Object.assign(wireframeCube, {
+      ...convertedData,
+      shape: "wireframeCube",
+    });
 
-  const solidCubeMaterial = new THREE.MeshBasicMaterial({
-    color: color,
-    transparent: true,
-    opacity: 0,
-  });
-
-  const solidCube = new THREE.Mesh(geometry, solidCubeMaterial);
-  solidCube.position.set(x, y, z);
-
-  // Apply size and scale
-  if (scale && Array.isArray(scale) && scale.length === 3) {
-    wireframeCube.scale.set(scale[0] * size, scale[1] * size, scale[2] * size);
-    solidCube.scale.set(scale[0] * size, scale[1] * size, scale[2] * size);
-  } else {
-    wireframeCube.scale.set(size, size, size);
-    solidCube.scale.set(size, size, size);
-  } 
-
-  const userData = {
-    id: id || generateUniqueId(),
-  };
-  wireframeCube.userData = userData;
-  wireframeCube.lastEditedBy = loginName;
-  wireframeCube.shape = "wireframeCube";
-  wireframeCube.size = size;
-  wireframeCube.version = version;
-  wireframeCube.versionNonce = generateVersionNonce();
-
-  solidCube.shape = "solidCube";
-  solidCube.size = size;
-  solidCube.userData = { ...userData }; // should make copy of it
-  solidCube.userData.id = userData.id + "_solid";
-  solidCube.version = version;
-  solidCube.versionNonce = generateVersionNonce();
-  solidCube.lastEditedBy = loginName;
-
-  if (uuid) {
-    wireframeCube.uuid = uuid;
-    solidCube.uuid = uuid + "-solid";
-  } else {
-    uuid = wireframeCube.uuid;
-    solidCube.uuid = uuid + "-solid";
+  const uuid = wireframeCube.uuid;
+  
+    Object.assign(solidCube, {
+      ...convertedData,
+      userData: { id: convertedData?.userData?.id + "_solid" },
+      shape: "solidCube",
+      uuid: uuid + "-solid",
+    });
+  
+    nonBloomScene.add(wireframeCube);
+    nonBloomScene.add(solidCube);
+  
+    console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube);
+  
+    return { wireframeCube, solidCube };
   }
 
-  nonBloomScene.add(wireframeCube);
-  nonBloomScene.add(solidCube);
+// export function createWireframeCube(convertedData) {
+//   // const convertedData = convertToThreeJSFormat(data);
+//   console.log("I AM CUBE convertedData", convertedData);
 
-  console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube);
+//   const geometry = new THREE.BoxGeometry(1, 1, 1);
+//   const edges = new THREE.EdgesGeometry(geometry);
 
-  return {
-    wireframeCube,
-    solidCube,
-  };
-}
+//   const color = convertedData.color;
+//   // Create materials
+//   // const wireMaterial = new THREE.LineBasicMaterial({ convertedData.color, linewidth: 2 });
+//   const wireMaterial = new THREE.LineBasicMaterial({ color, linewidth: 2 });
+//   const solidMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 });
+
+//   // Create meshes
+//   const wireframeCube = new THREE.LineSegments(edges, wireMaterial);
+//   const solidCube = new THREE.Mesh(geometry, solidMaterial);
+
+//     // Make position property writable
+//     Object.defineProperty(wireframeCube, 'position', {
+//       writable: true,
+//       value: wireframeCube.position
+//     });
+
+//   // Set position and scale
+//   [wireframeCube, solidCube].forEach(cube => {
+//     if (convertedData.position) cube.position.copy(convertedData.position);
+//       cube.scale.setScalar(convertedData.size);
+//   });
+  
+//   Object.assign(wireframeCube, {
+//     ...convertedData,
+//     shape: "wireframeCube",
+//   });
+
+//   Object.assign(solidCube, {
+//     ...convertedData,
+//     userData: { id: id + "_solid" },
+//     shape: "solidCube",
+//     uuid: uuid + "-solid",
+//   });
+
+//   nonBloomScene.add(wireframeCube);
+//   nonBloomScene.add(solidCube);
+
+//   console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube);
+
+//   return { wireframeCube, solidCube };
+// }
+
 
 export function resetSphereScales(spheres, defaultScale = 1) {
   spheres.forEach((sphere) => {
@@ -329,20 +404,6 @@ window.onresize = function () {
   markNeedsRender();
 };
 
-// function randomColorGenerator() {
-//   const color = new THREE.Color();
-//   color.setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
-//   return color;
-// }
-
-// function setupScene() {
-//   scene.traverse(disposeMaterial);
-//   scene.children.length = 0;
-//   nonBloomScene.traverse(disposeMaterial);
-//   nonBloomScene.children.length = 0;
-
-//   markNeedsRender();
-// }
 
 function saveCameraState() {
   const cameraState = {
@@ -385,22 +446,26 @@ controls.addEventListener("change", () => {
   saveCameraState();
 });
 
-export function createSphere(
-  x,
-  y,
-  z,
-  size,
-  version = 1,
-  uuid = "",
-  userId = "",
-  colorIn = null
-) {
+
+export function createSphere(data) {
+  const convertedData = convertToThreeJSFormat(data);
+  const {
+    position,
+    scale,
+    size = 1,
+    color: colorIn = null,
+    uuid = THREE.MathUtils.generateUUID(),
+    id = generateUniqueId(),
+    version = 1,
+    lastEditedBy = 'noUserId',
+  } = convertedData;
+
   const geometry = new THREE.IcosahedronGeometry(1, 15);
 
   // Color handling
   let color;
-  if (colorIn !== null) {
-    color = new THREE.Color(colorIn);
+  if (colorIn !== null && colorIn.isColor) {
+    color = colorIn;
   } else {
     color = new THREE.Color().setHSL(
       Math.random(),
@@ -409,31 +474,23 @@ export function createSphere(
     );
   }
 
-  // Ensure color is not null
-  if (!color.isColor) {
-    console.warn("Invalid color, using default");
-    color = new THREE.Color(0x808080); // Default to gray if color is invalid
-  }
-
-  let material = new THREE.MeshBasicMaterial({ color: color });
+  const material = new THREE.MeshBasicMaterial({ color });
   const sphere = new THREE.Mesh(geometry, material);
-  sphere.position.set(x, y, z);
+
+  if (position) sphere.position.copy(position);
   sphere.scale.setScalar(size * 0.05);
-  sphere.shape = "sphere";
 
-  const userData = {
-    id: userId || generateUniqueId(),
-  };
-  if (version) sphere.version = version;
+  Object.assign(sphere, {
+    shape: "sphere",
+    userData: { id },
+    size,
+    version,
+    lastEditedBy,
+    uuid,
+    versionNonce: generateVersionNonce(),
+  });
 
-  sphere.userData = userData;
-  sphere.size = size;
   scene.add(sphere);
-  sphere.lastEditedBy = loginName;
-  sphere.version = 1;
-  sphere.versionNonce = generateVersionNonce();
-
-  if (uuid) sphere.uuid = uuid;
 
   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
 
@@ -441,10 +498,10 @@ export function createSphere(
 
   console.log("JUST CREATED THIS SPHERE", sphere);
 
-  return {
-    sphere,
-  };
+  return { sphere };
 }
+
+
 function disposeMaterial(obj) {
   if (obj.material) {
     obj.material.dispose();
@@ -552,13 +609,15 @@ export function share3dDat() {
     controls: typeof controls !== "undefined" ? controls : null,
   };
 }
-
 export function removeEmptyCubes(scene, nonBloomScene) {
   // Create a snapshot of the current scene
   const snapshot = createSceneSnapshot([scene, nonBloomScene]);
 
+  console.log("snapshot in removeEmptyCubes", snapshot);
+
   // Array to store cubes that need to be removed
   const cubesToRemove = [];
+  const removedCubes = [];
 
   // Check each cube in the snapshot
   snapshot.boxes.forEach((box) => {
@@ -589,11 +648,19 @@ export function removeEmptyCubes(scene, nonBloomScene) {
       snapshot.boxes.splice(boxIndex, 1);
     }
     delete snapshot.containment[box.id];
+
+    // Add to the removedCubes array
+    removedCubes.push(box);
   });
 
   // render();
   markNeedsRender();
+
+  // Return the removed cubes
+  return removedCubes;
 }
+
+
 export function reconstructScene(snapshot) {
   console.log(
     "----------------------------------------------------------------------------"
@@ -740,43 +807,27 @@ function findObjectById(id) {
   return foundObject;
 }
 
-// function createCubeWrapper(objectState) {
-//   const { wireframeCube, solidCube } = createWireframeCube(
-//     objectState.size,
-//     objectState.position[0],
-//     objectState.position[1],
-//     objectState.position[2],
-//     objectState.color,
-//     objectState.uuid
-//   );
-//   wireframeCube.uuid = objectState.uuid;
-//   solidCube.uuid = objectState.uuid;
-// }
-
 function createCubeWrapper(objectState) {
   if (objectState.shape === "wireframeCube") {
-    createWireframeCube(
-      objectState.size,
-      objectState.position[0],
-      objectState.position[1],
-      objectState.position[2],
-      objectState.scale, // This can be undefined/null if not set
-      objectState.version,
-      objectState.color,
-      objectState.uuid
-    );
+    const objData = convertToThreeJSFormat(objectState);
+    createWireframeCube(objData);
   }
 }
 
+// function createSphereWrapper(objectState) {
+//   const { sphere } = createSphere(
+//     objectState.position[0],
+//     objectState.position[1],
+//     objectState.position[2],
+//     objectState.scale[0] * 20,
+//     objectState.version,
+//     objectState.uuid,
+//     objectState.color
+//   );
+//   sphere.uuid = objectState.uuid;
+// }
+
 function createSphereWrapper(objectState) {
-  const { sphere } = createSphere(
-    objectState.position[0],
-    objectState.position[1],
-    objectState.position[2],
-    objectState.scale[0] * 20,
-    objectState.version,
-    objectState.uuid,
-    objectState.color
-  );
+  const { sphere } = createSphere(objectState);
   sphere.uuid = objectState.uuid;
 }

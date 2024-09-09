@@ -14,7 +14,7 @@ import { sceneState } from './memory/collaboration/scene_colab';
 import { scene, nonBloomScene, initializeGraph } from './ui/graph_v2/create';
 
 
-const userId = "k.ai"
+const userId = "kai"
 localStorage.setItem("login_block", userId);
 
 // Initialize Quill editor

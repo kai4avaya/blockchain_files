@@ -26,8 +26,8 @@ class SceneState {
   private savedObjects: Set<string>; // New set to track objects saved in IndexedDB
   private readonly STORAGE_KEY = 'graph';
   private saveTimeout: NodeJS.Timeout | null = null;
-  private userId: string = "noUserId";
   private broadcastChannel: BroadcastChannel;
+  private p2pSync: P2PSync;
 
 
   private constructor() {
@@ -36,12 +36,14 @@ class SceneState {
     this.savedObjects = new Set();
     this.broadcastChannel = new BroadcastChannel('sceneStateChannel');
     this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
+    // this.p2pSync = P2PSync.getInstance(this);
   }
   
-  private broadcastUpdate(state: ObjectState) {
+  private broadcastUpdate(state: any) {
     this.broadcastChannel.postMessage(state);
 
-    p2pSync.broadcastUpdate(state);
+    // p2pSync.broadcastUpdate(state);
+    // this.p2pSync.broadcastUpdate(state);
   }
   
   private handleBroadcastMessage(event: MessageEvent) {
@@ -50,8 +52,14 @@ class SceneState {
   }
 
   connectToPeer(peerId: string) {
-    p2pSync.connectToPeer(peerId);
+    // p2pSync.connectToPeer(peerId);
   }
+
+
+  getMyPeerId(): string {
+    // return p2pSync.getMyPeerId();
+  }
+
   
   static getInstance(): SceneState {
     if (!SceneState.instance) {
@@ -66,12 +74,30 @@ class SceneState {
       if (storedState && storedState.length > 0) {
         this.loadState(storedState);
         // Add all loaded objects to savedObjects set
-        storedState.forEach(state => this.savedObjects.add(state.uuid));
+        storedState.forEach(state => {
+          this.savedObjects.add(state.uuid)
+          // this.p2pSync.broadcastUpdate(state);
+        });
       }
     } catch (error) {
       console.error('Error initializing SceneState:', error);
     }
   }
+
+  getInitializedObjects(): ObjectState[] {
+    return this.getSerializableState();
+  }
+
+  syncWithPeer(peerObjects: ObjectState[]): void {
+    peerObjects.forEach(peerObject => {
+      const existingObject = this.objects.get(peerObject.uuid);
+      if (!existingObject || this.isNewerState(peerObject, existingObject)) {
+        this.mergeUpdate(peerObject);
+      }
+    });
+    this.reconstructScene();
+  }
+
   private loadState(storedState: ObjectState[]): void {
     storedState.forEach(state => this.objects.set(state.uuid, state));
     this.reconstructScene();
@@ -80,66 +106,28 @@ class SceneState {
   private reconstructScene(): void {
     reconstructScene(Array.from(this.objects.values()));
   }
-
-  // updateObject(objectState: Partial<ObjectState> & { uuid: string }): void {
-  //   const existingState = this.objects.get(objectState.uuid);
-
-  //   if (existingState) {
-  //     if (this.hasChanged(existingState, objectState)) {
-  //       const updatedState = { 
-  //         ...existingState, 
-  //         ...objectState, 
-  //         version: existingState.version + 1,
-  //         versionNonce: this.generateVersionNonce(),
-  //         lastEditedBy: this.userId 
-  //       };
-  //       this.mergeUpdate(updatedState);
-  //       this.updatedObjects.add(objectState.uuid);
-  //     }
-  //   } else {
-  //     this.createObject(objectState as ObjectState);
-  //     this.updatedObjects.add(objectState.uuid);
-  //   }
-  // }
-
-
+  
   updateObject(objectState: Partial<ObjectState> & { uuid: string }): void {
     const existingState = this.objects.get(objectState.uuid);
 
-    console.log("am in in existingState?", existingState, "objectState", objectState)
-
     if (existingState) {
-      console.log("this.hasChanged(existingState, objectState)", this.hasChanged(existingState, objectState))
       if (this.hasChanged(existingState, objectState)) {
-        const updatedState = { 
-          ...existingState, 
-          ...objectState, 
-          // version: existingState.version + 1,
+        const updatedState = {
+          ...existingState,
+          ...objectState,
           versionNonce: this.generateVersionNonce(),
-          lastEditedBy: this.userId 
         };
-        this.mergeUpdate(updatedState);
-        this.updatedObjects.add(objectState.uuid);
 
-        // If it's a cube, update both wireframe and solid parts
-        if (updatedState.shape === 'wireframeCube' || updatedState.shape === 'solidCube') {
-          const counterpartUuid = updatedState.shape === 'wireframeCube' 
-            ? updatedState.uuid + '-solid' 
-            : updatedState.uuid.replace('-solid', '');
-          
-          const counterpartState = this.objects.get(counterpartUuid);
-          if (counterpartState) {
-            const updatedCounterpartState = {
-              ...counterpartState,
-              position: updatedState.position,
-              rotation: updatedState.rotation,
-              scale: updatedState.scale,
-              version: counterpartState.version + 1,
-              versionNonce: this.generateVersionNonce(),
-              lastEditedBy: this.userId
-            };
-            this.mergeUpdate(updatedCounterpartState);
-            this.updatedObjects.add(counterpartUuid);
+        // Handle deletion
+        if (updatedState.isDeleted) {
+          this.handleDeletion(updatedState);
+        } else {
+          this.mergeUpdate(updatedState);
+          this.updatedObjects.add(updatedState.uuid);
+
+          // Handle cube counterpart update
+          if (updatedState.shape === 'wireframeCube' || updatedState.shape === 'solidCube') {
+            this.updateCubeCounterpart(updatedState);
           }
         }
       }
@@ -148,6 +136,51 @@ class SceneState {
       this.updatedObjects.add(objectState.uuid);
     }
   }
+
+  private handleDeletion(state: ObjectState): void {
+    this.mergeUpdate(state);
+    this.updatedObjects.add(state.uuid);
+
+    // If it's a cube, also delete its counterpart
+    if (state.shape === 'wireframeCube' || state.shape === 'solidCube') {
+      const counterpartUuid = state.shape === 'wireframeCube' 
+        ? state.uuid + '-solid' 
+        : state.uuid.replace('-solid', '');
+      
+      const counterpartState = this.objects.get(counterpartUuid);
+      if (counterpartState) {
+        const updatedCounterpartState = {
+          ...counterpartState,
+          isDeleted: true,
+          version: counterpartState.version + 1,
+          versionNonce: this.generateVersionNonce(),
+        };
+        this.mergeUpdate(updatedCounterpartState);
+        this.updatedObjects.add(counterpartUuid);
+      }
+    }
+  }
+
+  private updateCubeCounterpart(state: ObjectState): void {
+    const counterpartUuid = state.shape === 'wireframeCube' 
+      ? state.uuid + '-solid' 
+      : state.uuid.replace('-solid', '');
+    
+    const counterpartState = this.objects.get(counterpartUuid);
+    if (counterpartState) {
+      const updatedCounterpartState = {
+        ...counterpartState,
+        position: state.position,
+        rotation: state.rotation,
+        scale: state.scale,
+        version: counterpartState.version + 1,
+        versionNonce: this.generateVersionNonce(),
+      };
+      this.mergeUpdate(updatedCounterpartState);
+      this.updatedObjects.add(counterpartUuid);
+    }
+  }
+
 
   private hasChanged(existing: ObjectState, incoming: Partial<ObjectState>): boolean {
     return Object.keys(incoming).some(key => {
@@ -165,25 +198,15 @@ class SceneState {
     }
     return true;
   }
-
- 
+  
   mergeUpdate(incomingState: ObjectState): void {
     const existingState = this.objects.get(incomingState.uuid);
-    console.log("this.isNewerState", this.isNewerState(incomingState, existingState) )
+
     if (!existingState || this.isNewerState(incomingState, existingState)) {
       if (incomingState.isDeleted) {
-        // If the incoming state is marked as deleted, update only if it's newer
-        this.objects.set(incomingState.uuid, {
-          ...existingState,
-          ...incomingState,
-          isDeleted: true
-        });
-      } else if (existingState && existingState.isDeleted) {
-        // If the existing state was deleted but the incoming state is not,
-        // only update if the incoming state is newer
-        if (this.isNewerState(incomingState, existingState)) {
-          this.objects.set(incomingState.uuid, incomingState);
-        }
+        // If the incoming state is marked as deleted and it's newer, keep it in the objects map
+        // but mark it as deleted
+        this.objects.set(incomingState.uuid, incomingState);
       } else {
         // Normal update for non-deleted objects
         this.objects.set(incomingState.uuid, {
@@ -194,13 +217,12 @@ class SceneState {
       this.updatedObjects.add(incomingState.uuid);
       this.scheduleSave();
       this.reconstructScene();
-      this.broadcastUpdate(incomingState);
     }
   }
+
   private createObject(state: ObjectState): void {
     const newState = {
       ...state,
-      lastEditedBy: this.userId
     };
     this.objects.set(newState.uuid, newState);
     if (!this.savedObjects.has(newState.uuid)) {
@@ -219,21 +241,35 @@ class SceneState {
   deleteObject(uuid: string): void {
     const state = this.objects.get(uuid);
     if (state) {
-      const updatedState = {
+      this.updateObject({
         ...state,
         isDeleted: true,
-        version: state.version + 1,
-        versionNonce: this.generateVersionNonce(),
-        lastEditedBy: this.userId
-      };
-      this.mergeUpdate(updatedState);
-      this.updatedObjects.add(uuid);
+        version: state.version + 1
+      });
     }
   }
 
+  // deleteObject(uuid: string): void {
+  //   const state = this.objects.get(uuid);
+  //   if (state) {
+  //     const updatedState = {
+  //       ...state,
+  //       isDeleted: true,
+  //       version: state.version + 1,
+  //       versionNonce: this.generateVersionNonce(),
+  //       lastEditedBy: this.userId
+  //     };
+  //     this.mergeUpdate(updatedState);
+  //     this.updatedObjects.add(uuid);
+  //   }
+  // }
+
+  // getSerializableState(): ObjectState[] {
+  //   console.log("Array.from(this.objects.values()", Array.from(this.objects.values()))
+  //   return Array.from(this.objects.values());
+  // }
   getSerializableState(): ObjectState[] {
-    console.log("Array.from(this.objects.values()", Array.from(this.objects.values()))
-    return Array.from(this.objects.values());
+    return Array.from(this.objects.values()).filter(state => !state.isDeleted);
   }
 
   private scheduleSave() {
@@ -277,6 +313,8 @@ class SceneState {
           return state;
         });
   
+        this.broadcastUpdate(dataToSave);
+
         await indexDBOverlay.saveData(this.STORAGE_KEY, dataToSave);
         
         updatedStates.forEach(state => {
@@ -322,4 +360,4 @@ class SceneState {
 }
 
 export const sceneState = SceneState.getInstance();
-const p2pSync = new P2PSync(sceneState);
+// const p2pSync = new P2PSync(sceneState);
