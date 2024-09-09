@@ -280,7 +280,6 @@ class SceneState {
   }
 
   private async saveStateToDB() {
-    console.log("this.updatedObjects", this.updatedObjects)
     try {
       const updatedStates = Array.from(this.updatedObjects)
         .map(uuid => this.objects.get(uuid))

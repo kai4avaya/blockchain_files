@@ -289,8 +289,6 @@ export function randomColorGenerator() {
   
   // Your createWireframeCube function
   export function createWireframeCube(convertedData) {
-    console.log("I AM CUBE convertedData", convertedData);
-  
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const edges = new THREE.EdgesGeometry(geometry);
   
@@ -613,7 +611,7 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   // Create a snapshot of the current scene
   const snapshot = createSceneSnapshot([scene, nonBloomScene]);
 
-  console.log("snapshot in removeEmptyCubes", snapshot);
+  // console.log("snapshot in removeEmptyCubes", snapshot);
 
   // Array to store cubes that need to be removed
   const cubesToRemove = [];
@@ -677,18 +675,13 @@ export function reconstructScene(snapshot) {
   scene.traverse((object) => traverseScene(object, true));
   nonBloomScene.traverse((object) => traverseScene(object, false));
 
-  console.log("Existing objects before reconstruction:", existingObjects);
-
   // Update or create objects from snapshot
   snapshot.forEach((objectState) => {
-    console.log(
-      `Processing object: ${objectState.uuid}, Type: ${objectState.type}, Shape: ${objectState.shape}`
-    );
+ 
     const existingEntry = existingObjects.get(objectState.uuid);
 
     if (objectState.isDeleted) {
       if (existingEntry) {
-        console.log(`Removing deleted object: ${objectState.uuid}`);
         removeObject(existingEntry);
       }
       existingObjects.delete(objectState.uuid);

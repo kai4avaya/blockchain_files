@@ -73,7 +73,6 @@ setupDragAndDrop();
 
 
 function getCubeUnderPointer(event, intersects) {
-  console.log("I am getCubeUnderPointer intersects", intersects)
   const { camera, scene, nonBloomScene, controls } = share3dDat();
   // Update mouse position
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -94,7 +93,6 @@ function getCubeUnderPointer(event, intersects) {
           box.solid.uuid === intersectedObject.object.uuid
       );
 
-      console.log("i am matchingbox", matchingBox);
       // If we found a solid cube (ending with '-solid'), find its wireframe twin
       if (matchingBox && matchingBox.id.endsWith('-solid')) {
         const wireframeId = matchingBox.id.replace('-solid', '');
@@ -154,34 +152,34 @@ function getCubeUnderPointer(event, intersects) {
 export function dragCube() {
   if (!selectedObject || !selectedObject.wireframeCube) return;
 
-  console.log("+++++++++++++++++++++++++++++++++++++++++++++++++++")
+  // Store the initial position of the wireframe cube
+  const initialPosition = selectedObject.wireframeCube.position.clone();
+
   // Calculate the movement delta based on the change in intersect point
   const movementDelta = new THREE.Vector3().subVectors(intersectPoint, previousIntersectPoint);
 
-  console.log("Movement delta: " + movementDelta.toArray());
-  console.log("wireframe POSITION: " + selectedObject.wireframeCube.position.toArray());
-  
-  // Move the cubes
+  // Move the wireframe and solid cubes
   selectedObject.wireframeCube.position.add(movementDelta);
-  selectedObject.solidCube.position.add(movementDelta);
+  selectedObject.solidCube.position.copy(selectedObject.wireframeCube.position);
+
+  // Calculate the actual movement of the cube
+  const actualMovement = new THREE.Vector3().subVectors(selectedObject.wireframeCube.position, initialPosition);
 
   // Move all spheres inside this cube
   selectedObject.containedSpheres.forEach((sphere) => {
-    sphere.object.position.add(movementDelta);
+
+    console.log("+++sphere in cube being draggged", sphere.object.uuid)
+    console.log("sphere in cube being POSITION: " , JSON.stringify(sphere.object.position))
+    sphere.object.position.add(actualMovement);
     // Update the position in the selectedObject
     sphere.position = sphere.object.position.toArray();
-    console.log("Sphere moved:", sphere.object.uuid);
-    console.log("New position:", sphere.object.position.toArray());
   });
 
   // Update the previous intersect point for the next drag event
   previousIntersectPoint.copy(intersectPoint);
 
-  console.log("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
   markNeedsRender();
 }
-
-
 
 function highlightCube(cube) {
   if (CUBEINTERSECTED !== cube) {
@@ -891,9 +889,6 @@ export function saveObjectChanges(objectData) {
     color: convertColor(objectData.material?.color || objectData.color),
     lastEditedBy: objectData.loginName || loginName,
   };
-
-  console.log("commonData", commonData)
-
   sceneState.updateObject(commonData);
 }
 
@@ -943,25 +938,131 @@ export function saveObjectChanges(objectData) {
 // }
 
 
+// async function onPointerUp(event) {
+//   if (isDragging) {
+//     const { controls, scene, nonBloomScene } = share3dDat();
+
+//     isDragging = false;
+//     controls.enabled = true;
+
+//     if (selectedSphere) {
+//        const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
+
+//        if (cubesToDelete.length > 0) {
+//          // Update the scene state with the cubes to delete
+//          cubesToDelete.forEach(cube => {
+//            saveObjectChanges(cube.wire);
+//            saveObjectChanges(cube.solid);
+//          });
+//        }
+//       saveObjectChanges(selectedSphere);
+
+//     } else if (selectedObject && selectedObject.wireframeCube) {
+//       // Save wireframe cube
+//       saveObjectChanges(selectedObject.wireframeCube);
+//       // Save solid cube
+//       saveObjectChanges(selectedObject.solidCube);
+
+//       if (selectedObject.containedSpheres) {
+//         console.log("selectedObject.containedSpheres", selectedObject.containedSpheres);
+//         selectedObject.containedSpheres.forEach(sphereData => {
+//           if (sphereData.object) {
+//             console.log("spheredata each object", sphereData)
+//             console.log("sphereData.position updated from the drag cube event", sphereData.uuid, sphereData.position);
+//             sphereData.object.position.fromArray(sphereData.position);
+//             saveObjectChanges(sphereData.object);
+//           }
+//         });
+//       }
+//     }
+
+//     selectedSphere = null;
+//     selectedObject = null;
+//     currentSnapshot = null;
+
+//     if (CUBEINTERSECTED) {
+//       resetCubeColor(CUBEINTERSECTED);
+//       CUBEINTERSECTED = null;
+//     }
+
+//     // removeEmptyCubes(scene, nonBloomScene);
+//     event.target.releasePointerCapture(event.pointerId);
+
+//     // Force a re-render of the scene
+//     markNeedsRender();
+//   }
+// }
+
+// async function onPointerUp(event) {
+//   if (isDragging) {
+//     const { controls } = share3dDat();
+
+//     isDragging = false;
+//     controls.enabled = true;
+
+//     if (selectedSphere) {
+//       // ... (existing code for handling selected sphere)
+//        const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
+
+//        if (cubesToDelete.length > 0) {
+//          // Update the scene state with the cubes to delete
+//          cubesToDelete.forEach(cube => {
+//            saveObjectChanges(cube.wire);
+//            saveObjectChanges(cube.solid);
+//          });
+//        }
+//       saveObjectChanges(selectedSphere);
+//     } else if (selectedObject && selectedObject.wireframeCube) {
+//       // Save wireframe cube
+//       saveObjectChanges(selectedObject.wireframeCube);
+//       // Save solid cube
+//       saveObjectChanges(selectedObject.solidCube);
+
+//       if (selectedObject.containedSpheres) {
+//         // const cubePosition = selectedObject.wireframeCube.position;
+//         selectedObject.containedSpheres.forEach(sphereData => {
+//           if (sphereData.object) {
+//             // Calculate the sphere's offset from the cube's center
+//             // const offset = new THREE.Vector3().subVectors(sphereData.object.position, cubePosition);
+            
+//             // // Update the sphere's position based on the cube's final position and the offset
+//             // sphereData.object.position.copy(cubePosition).add(offset);
+//             // sphereData.position = sphereData.object.position.toArray();
+
+//             console.log("++sphereData.position updated from the drag cube event", sphereData.object.uuid, sphereData.object.position);
+//             saveObjectChanges(sphereData.object);
+//           }
+//         });
+//       }
+//     }
+
+//     selectedSphere = null;
+//     selectedObject = null;
+//     currentSnapshot = null;
+
+//     if (CUBEINTERSECTED) {
+//       resetCubeColor(CUBEINTERSECTED);
+//       CUBEINTERSECTED = null;
+//     }
+
+//     // removeEmptyCubes(scene, nonBloomScene);
+//     event.target.releasePointerCapture(event.pointerId);
+
+//     // Force a re-render of the scene
+//     markNeedsRender();
+//   }
+// }
+
+
 async function onPointerUp(event) {
   if (isDragging) {
-    const { controls, scene, nonBloomScene } = share3dDat();
+    const { controls } = share3dDat();
 
     isDragging = false;
     controls.enabled = true;
 
     if (selectedSphere) {
-       const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
-
-       if (cubesToDelete.length > 0) {
-         // Update the scene state with the cubes to delete
-         cubesToDelete.forEach(cube => {
-           saveObjectChanges(cube.wire);
-           saveObjectChanges(cube.solid);
-         });
-       }
-      saveObjectChanges(selectedSphere);
-
+      // ... (existing code for handling selected sphere)
     } else if (selectedObject && selectedObject.wireframeCube) {
       // Save wireframe cube
       saveObjectChanges(selectedObject.wireframeCube);
@@ -971,9 +1072,19 @@ async function onPointerUp(event) {
       if (selectedObject.containedSpheres) {
         selectedObject.containedSpheres.forEach(sphereData => {
           if (sphereData.object) {
-            console.log("sphereData.position", sphereData.position);
-            sphereData.object.position.fromArray(sphereData.position);
-            saveObjectChanges(sphereData.object);
+            // Use the updated position from sphere.position
+            const updatedPosition = new THREE.Vector3().fromArray(sphereData.position);
+            sphereData.object.position.copy(updatedPosition);
+            
+            console.log("++sphereData.position updated from the drag cube event", sphereData.object.uuid, updatedPosition);
+            
+            // Create a new object with the updated position for saving
+            const updatedSphereData = {
+              ...sphereData.object,
+              position: updatedPosition
+            };
+            
+            saveObjectChanges(updatedSphereData);
           }
         });
       }
@@ -996,7 +1107,6 @@ async function onPointerUp(event) {
   }
 }
 
-
 const onPointerMove = debounce((event) => {
   if (!isDragging) return;
 
@@ -1004,9 +1114,6 @@ const onPointerMove = debounce((event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-
-  console.log("++++in onPointerMove", "moving a sphere with moveSphere", selectedSphere);
-  console.log("++++in onPointerMove", "moving a cube NOT SPHERE with selectedObject", selectedObject);
 
   if (selectedSphere) {
     moveSphere(event);
