@@ -585,8 +585,6 @@ async function handleFileDrop_sphere(event) {
         const createdCube = createWireframeCube(cubeData);
         createdShapes.push(createdCube);
 
-        console.log("Created sphere:", createdSphere);
-        console.log("Created cube:", createdCube);
       } else {
         createdShapes.push(createSphere(sphereData));
       }

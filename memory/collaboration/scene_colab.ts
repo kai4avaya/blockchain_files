@@ -37,14 +37,14 @@ class SceneState {
     this.savedObjects = new Set();
     this.broadcastChannel = new BroadcastChannel('sceneStateChannel');
     this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
-    // this.p2pSync = P2PSync.getInstance(this);
+    this.p2pSync = P2PSync.getInstance(this);
   }
   
   private broadcastUpdate(state: any) {
     this.broadcastChannel.postMessage(state);
 
     // p2pSync.broadcastUpdate(state);
-    // this.p2pSync.broadcastUpdate(state);
+    this.p2pSync.broadcastUpdate(state);
   }
   
   private handleBroadcastMessage(event: MessageEvent) {
@@ -53,12 +53,12 @@ class SceneState {
   }
 
   connectToPeer(peerId: string) {
-    // p2pSync.connectToPeer(peerId);
+    this.p2pSync.connectToPeer(peerId);
   }
 
 
   getMyPeerId(): string {
-    // return p2pSync.getMyPeerId();
+    return this.p2pSync.getMyPeerId();
   }
 
   
@@ -77,7 +77,7 @@ class SceneState {
         // Add all loaded objects to savedObjects set
         storedState.forEach(state => {
           this.savedObjects.add(state.uuid)
-          // this.p2pSync.broadcastUpdate(state);
+          this.p2pSync.broadcastUpdate(state);
         });
       }
     } catch (error) {

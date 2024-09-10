@@ -217,56 +217,6 @@ export function randomColorGenerator() {
     return { wireframeCube, solidCube };
   }
 
-// export function createWireframeCube(convertedData) {
-//   // const convertedData = convertToThreeJSFormat(data);
-//   console.log("I AM CUBE convertedData", convertedData);
-
-//   const geometry = new THREE.BoxGeometry(1, 1, 1);
-//   const edges = new THREE.EdgesGeometry(geometry);
-
-//   const color = convertedData.color;
-//   // Create materials
-//   // const wireMaterial = new THREE.LineBasicMaterial({ convertedData.color, linewidth: 2 });
-//   const wireMaterial = new THREE.LineBasicMaterial({ color, linewidth: 2 });
-//   const solidMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 });
-
-//   // Create meshes
-//   const wireframeCube = new THREE.LineSegments(edges, wireMaterial);
-//   const solidCube = new THREE.Mesh(geometry, solidMaterial);
-
-//     // Make position property writable
-//     Object.defineProperty(wireframeCube, 'position', {
-//       writable: true,
-//       value: wireframeCube.position
-//     });
-
-//   // Set position and scale
-//   [wireframeCube, solidCube].forEach(cube => {
-//     if (convertedData.position) cube.position.copy(convertedData.position);
-//       cube.scale.setScalar(convertedData.size);
-//   });
-  
-//   Object.assign(wireframeCube, {
-//     ...convertedData,
-//     shape: "wireframeCube",
-//   });
-
-//   Object.assign(solidCube, {
-//     ...convertedData,
-//     userData: { id: id + "_solid" },
-//     shape: "solidCube",
-//     uuid: uuid + "-solid",
-//   });
-
-//   nonBloomScene.add(wireframeCube);
-//   nonBloomScene.add(solidCube);
-
-//   console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube);
-
-//   return { wireframeCube, solidCube };
-// }
-
-
 export function resetSphereScales(spheres, defaultScale = 1) {
   spheres.forEach((sphere) => {
     sphere.scale.set(defaultScale, defaultScale, defaultScale);
@@ -406,7 +356,6 @@ export function createSphere(convertedData) {
 
   // Set scale (size)
   const scaleFactor = convertedData.size * SCALEFACTOR; // scaling
-  console.log("Scale factor:", scaleFactor);
 
   // Set the scale
   sphere.scale.setScalar(scaleFactor);
@@ -682,90 +631,6 @@ function removeObject(entry) {
 
   if (entry.object.material) entry.object.material.dispose();
   if (entry.object.geometry) entry.object.geometry.dispose();
-}
-
-// function createObject(objectState) {
-//   if (objectState.shape === "sphere") {
-//     createSphereWrapper(objectState);
-//   } else if (
-//     objectState.shape === "wireframeCube"
-//   ) {
-//     createCubeWrapper(objectState);
-//   }
-// }
-
-// function updateObjectProperties(object, objectState) {
-//   // Update the given object
-//   applyUpdates(object, objectState);
-
-//   // Check if this is a cube and update its twin
-//   if (
-//     objectState.shape === "wireframeCube" ||
-//     objectState.shape === "solidCube"
-//   ) {
-//     const twinId = object.userData.id.endsWith("_solid")
-//       ? object.userData.id.slice(0, -6) // Remove "_solid" suffix
-//       : object.userData.id + "_solid"; // Add "_solid" suffix
-
-//     const twinObject = findObjectById(twinId);
-//     if (twinObject) {
-//       applyUpdates(twinObject, objectState);
-//     }
-//   }
-// }
-
-function applyUpdates(object, objectState) {
-  console.log("i am object", object)
-  // Update position
-  object.position.set(
-    objectState.position[0],
-    objectState.position[1],
-    objectState.position[2]
-  );
-
-  // Update scale
-  // if (objectState.scale) {
-  //   object.scale.set(
-  //     objectState.scale[0],
-  //     objectState.scale[1],
-  //     objectState.scale[2]
-  //   );
-  // }
-
-  if(objectState.version) {
-    object.version = objectState.version;
-  }
-
-  // Update color
-  if (object.material && objectState.color !== undefined) {
-    object.material.color.setHex(objectState.color);
-  }
-
-  // Update size for cubes
-  if (
-    (object.shape === "wireframeCube" || object.shape === "solidCube") &&
-    objectState.size !== undefined
-  ) {
-    const newSize = objectState.size;
-    object.scale.set(newSize, newSize, newSize);
-  }
-}
-
-function findObjectById(id) {
-  let foundObject = null;
-  scene.traverse((object) => {
-    if (object.userData && object.userData.id === id) {
-      foundObject = object;
-    }
-  });
-  if (!foundObject) {
-    nonBloomScene.traverse((object) => {
-      if (object.userData && object.userData.id === id) {
-        foundObject = object;
-      }
-    });
-  }
-  return foundObject;
 }
 
 function createCubeWrapper(objectState) {
