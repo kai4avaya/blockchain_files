@@ -12,6 +12,7 @@ interface ObjectState {
   versionNonce: number;
   lastEditedBy: string;
   isDeleted: boolean;
+  isUpdated: boolean;
   color: number;
   size?: number;
   userData: {
@@ -115,6 +116,7 @@ class SceneState {
         const updatedState = {
           ...existingState,
           ...objectState,
+          isUpdated: true,
           versionNonce: this.generateVersionNonce(),
         };
 

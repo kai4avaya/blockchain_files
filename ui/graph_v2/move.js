@@ -21,6 +21,7 @@ let selectedObject = null;
 let currentSnapshot = null;
 const BLOOM_SCENE = 1;
 let isFileDragging = false;
+const SCALEFACTOR = 0.05
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -551,70 +552,57 @@ async function handleFileDrop_sphere(event) {
 
   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
   let dataObject = {};
+  
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
     const size = normalizeSize(file.size);
-    // let dropPosition;
     const fileIds = await handleFileDrop(event);
-
-    console.log("fileIds generated", fileIds)
 
     if (allIntersects.length > 0) {
       const intersect = allIntersects[0];
       const dropPosition = intersect.point;
 
-      dataObject = convertToThreeJSFormat({
-        position: [dropPosition.x, dropPosition.y, dropPosition.z],// new THREE.Vector3(dropPosition.x, dropPosition.y, dropPosition.z),
+      const sphereData = convertToThreeJSFormat({
+        position: [dropPosition.x, dropPosition.y, dropPosition.z],
         size: size,
-        userData:{id: fileIds[i]},
+        userData: {id: fileIds[i]},
         color: randomColorGenerator(),
         lastEditedBy: loginName,
       });
 
-      if (
-        intersect.object.geometry.type === "EdgesGeometry" ||
-        intersect.object.geometry.type === "BoxGeometry"
-      ) {
-        intersect.object.material.color.set(0xff0000);
+      if (intersect.object.geometry.type === "IcosahedronGeometry") {
+        // Create sphere
+        const createdSphere = createSphere(sphereData);
+        createdShapes.push(createdSphere);
 
-        // x, y, z, size, id = ""
-        createdShapes.push(
-          createSphere(
-            dataObject
-          )
-        );
-      } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
+        // Create cube with a size relative to the sphere
+        const cubeSize = size * 4 * SCALEFACTOR; // Adjust this factor as needed
+        const cubeData = convertToThreeJSFormat({
+          ...sphereData,
+          size: cubeSize,
+          position: [dropPosition.x, dropPosition.y, dropPosition.z],
+        });
+        const createdCube = createWireframeCube(cubeData);
+        createdShapes.push(createdCube);
 
-        createdShapes.push(
-          createWireframeCube(
-            dataObject
-          )
-        );
-        createdShapes.push(
-          createSphere(
-            dataObject
-          )
-        );
+        console.log("Created sphere:", createdSphere);
+        console.log("Created cube:", createdCube);
       } else {
-        createdShapes.push(
-          createSphere(
-            dataObject
-          )
-        );
+        createdShapes.push(createSphere(sphereData));
       }
     } else {
       planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
           plane.normal.copy(planeNormal);
           raycaster.ray.intersectPlane(plane, intersectPoint);
 
-          dataObject = {
+          dataObject = convertToThreeJSFormat({
             position: new THREE.Vector3(intersectPoint.x, intersectPoint.y, intersectPoint.z),
             size: size,
             color: randomColorGenerator(),
             userData:{id: fileIds[i]},
             lastEditedBy: loginName,
 
-          };
+          });
 
           createdShapes.push(
 
@@ -672,7 +660,7 @@ async function handleDrop_sphere(event) {
       // Only create a cube if we're dropping onto another sphere
       if (selectedSphere && selectedSphere !== intersect.object) {
         const size = getSize(intersect);
-        const actualSphereSize = size * 0.05;
+        const actualSphereSize = size * SCALEFACTOR;
         const scaledCubeSize = actualSphereSize * 4;
 
         const dataObject = convertToThreeJSFormat({
@@ -762,45 +750,6 @@ function getObjectType(object) {
       return geometryType;
   }
 }
-
-// export function onPointerDown(event) {
-//   const { mouse, raycaster, scene, nonBloomScene, camera, controls } =
-//     share3dDat();
-
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-//   raycaster.setFromCamera(mouse, camera);
-//   const intersectsBloom = raycaster.intersectObjects(scene.children, true);
-//   const intersectsNonBloom = raycaster.intersectObjects(
-//     nonBloomScene.children,
-//     true
-//   );
-
-//   const intersects = [...intersectsBloom, ...intersectsNonBloom];
-
-//   const sphereIntersect = intersects.find(
-//     (intersect) => getObjectType(intersect.object) === "Sphere"
-//   );
-
-//   if (sphereIntersect) {
-//     isDragging = true;
-//     controls.enabled = false;
-//     selectedSphere = sphereIntersect.object;
-//     selectedObject = selectedSphere;
-//     sphereIntersect.object.layers.toggle(BLOOM_SCENE);
-//   } else {
-//     const selectedCube = getCubeUnderPointer(event);
-//     if (selectedCube) {
-//       isDragging = true;
-//       controls.enabled = false;
-//       selectedObject = selectedCube;
-//     }
-//   }
-
-//   // render();
-//   markNeedsRender();
-// }
 
 
 export function onPointerDown(event) {
@@ -1049,13 +998,14 @@ export function saveObjectChanges(objectData) {
 
 async function onPointerUp(event) {
   if (isDragging) {
-    const { controls } = share3dDat();
+    const { controls,scene, nonBloomScene } = share3dDat();
 
     isDragging = false;
     controls.enabled = true;
 
     if (selectedSphere) {
-      // ... (existing code for handling selected sphere)
+       const _ = removeEmptyCubes(scene, nonBloomScene);
+       saveObjectChanges(selectedSphere);
     } else if (selectedObject && selectedObject.wireframeCube) {
       // Save wireframe cube
       saveObjectChanges(selectedObject.wireframeCube);
@@ -1064,6 +1014,7 @@ async function onPointerUp(event) {
 
       if (selectedObject.containedSpheres) {
         selectedObject.containedSpheres.forEach(sphereData => {
+          
           if (sphereData.object) {
             // Use the updated position from sphere.position
             const updatedPosition = new THREE.Vector3().fromArray(sphereData.position);

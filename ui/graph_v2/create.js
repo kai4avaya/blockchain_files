@@ -13,6 +13,8 @@ import { createSceneSnapshot } from "./snapshot.js";
 const BLOOM_SCENE = 1;
 const bloomLayer = new THREE.Layers();
 bloomLayer.set(BLOOM_SCENE);
+const SCALEFACTOR = 0.05
+const RESCALEFACTOR = 20
 
 export const scene = new THREE.Scene();
 export const nonBloomScene = new THREE.Scene();
@@ -170,123 +172,7 @@ export function randomColorGenerator() {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-// export function convertToThreeJSFormat(data) {
-//   // Start with a shallow copy of all data
-//   const result = { ...data };
 
-//   // Convert position
-//   if (Array.isArray(data.position)) {
-//     result.position = new THREE.Vector3().fromArray(data.position);
-//   }
-
-//   // Convert rotation
-//   if (Array.isArray(data.rotation)) {
-//     if (data.rotation.length === 4) {
-//       // Assuming the rotation is stored as [x, y, z, order]
-//       result.rotation = new THREE.Euler(
-//         data.rotation[0],
-//         data.rotation[1],
-//         data.rotation[2],
-//         data.rotation[3]
-//       );
-//     } else if (data.rotation.length === 3) {
-//       // If only x, y, z are provided, use default order 'XYZ'
-//       result.rotation = new THREE.Euler().fromArray(data.rotation);
-//     } else {
-//       console.warn('Unexpected rotation format:', data.rotation);
-//     }
-//   }
-
-//   // Convert scale
-//   if (Array.isArray(data.scale)) {
-//     result.scale = new THREE.Vector3().fromArray(data.scale);
-//   }
-
-//   // Convert color if it's a number (assuming it's stored as a hex value)
-//   if (typeof data.color === 'number') {
-//     result.color = new THREE.Color(data.color);
-//   }
-
-//   // Remove specific fields
-//   delete result.type;
-//   delete result.shape;
-
-//   // Set default values if not present
-//   // result.color = result.color || randomColorGenerator(); 
-//   result.version = result.version || 1;
-//   result.userData = result.userData || { id: generateUniqueId(3) };
-//   result.versionNonce = generateVersionNonce()
-//   return result;
-// }
-
-
-// export function createWireframeCube(data) {
-//   const convertedData = convertToThreeJSFormat(data);
-//   console.log("I AM CUBE convertedData", convertedData);
-//   const {
-//     position,
-//     scale,
-//     size = 1,
-//     color = randomColorGenerator(),
-//     uuid = THREE.MathUtils.generateUUID(),
-//     // id =  generateUniqueId(),
-//     userData,
-//     version = 1,
-//     lastEditedBy = 'noUserId',
-//   } = convertedData;
-
-//   console.log("I AM CUBE SIZE", size);
-
-//   // Create geometries
-//   const geometry = new THREE.BoxGeometry(1, 1, 1);
-//   const edges = new THREE.EdgesGeometry(geometry);
-
-//   // Create materials
-//   const wireMaterial = new THREE.LineBasicMaterial({ color, linewidth: 2 });
-//   const solidMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 });
-
-//   // Create meshes
-//   const wireframeCube = new THREE.LineSegments(edges, wireMaterial);
-//   const solidCube = new THREE.Mesh(geometry, solidMaterial);
-
-//   // Set position and scale
-//   [wireframeCube, solidCube].forEach(cube => {
-//     if (position) cube.position.copy(position);
-//       cube.scale.setScalar(size);
-//   });
-
-//   // Set common properties
-//   const commonProps = {
-//     size,
-//     version,
-//     lastEditedBy,
-//     versionNonce: generateVersionNonce(),
-//   };
-
-//   Object.assign(wireframeCube, {
-//     ...commonProps,
-//     userData: { id },
-//     shape: "wireframeCube",
-//     uuid,
-//   });
-
-//   Object.assign(solidCube, {
-//     ...commonProps,
-//     userData: { id: id + "_solid" },
-//     shape: "solidCube",
-//     uuid: uuid + "-solid",
-//   });
-
-//   nonBloomScene.add(wireframeCube);
-//   nonBloomScene.add(solidCube);
-
-//   console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube);
-
-//   return { wireframeCube, solidCube };
-// }
-
-
-  
   // Your createWireframeCube function
   export function createWireframeCube(convertedData) {
     const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -445,49 +331,95 @@ controls.addEventListener("change", () => {
 });
 
 
-export function createSphere(data) {
-  const convertedData = convertToThreeJSFormat(data);
-  const {
-    position,
-    scale,
-    size = 1,
-    color: colorIn = null,
-    uuid = THREE.MathUtils.generateUUID(),
-    id = generateUniqueId(),
-    version = 1,
-    lastEditedBy = 'noUserId',
-    userData
-  } = convertedData;
+// export function createSphere(data) {
+//   const convertedData = convertToThreeJSFormat(data);
+//   const {
+//     position,
+//     scale,
+//     size = 1,
+//     color: colorIn = null,
+//     uuid = THREE.MathUtils.generateUUID(),
+//     id = generateUniqueId(),
+//     version = 1,
+//     lastEditedBy = 'noUserId',
+//     userData
+//   } = convertedData;
 
+//   const geometry = new THREE.IcosahedronGeometry(1, 15);
+
+//   // Color handling
+//   let color;
+//   if (colorIn !== null && colorIn.isColor) {
+//     color = colorIn;
+//   } else {
+//     color = new THREE.Color().setHSL(
+//       Math.random(),
+//       0.7,
+//       Math.random() * 0.2 + 0.05
+//     );
+//   }
+
+//   const material = new THREE.MeshBasicMaterial({ color });
+//   const sphere = new THREE.Mesh(geometry, material);
+
+//   if (position) sphere.position.copy(position);
+//   sphere.scale.setScalar(size * 0.05);
+
+//   Object.assign(sphere, {
+//     shape: "sphere",
+//     userData,
+//     size,
+//     version,
+//     lastEditedBy,
+//     uuid,
+//     versionNonce: generateVersionNonce(),
+//   });
+
+//   scene.add(sphere);
+
+//   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
+
+//   markNeedsRender();
+
+//   console.log("JUST CREATED THIS SPHERE", sphere);
+
+//   return { sphere };
+// }
+export function createSphere(convertedData) {
+  console.log("Creating sphere with data:", convertedData);
   const geometry = new THREE.IcosahedronGeometry(1, 15);
 
-  // Color handling
-  let color;
-  if (colorIn !== null && colorIn.isColor) {
-    color = colorIn;
-  } else {
-    color = new THREE.Color().setHSL(
-      Math.random(),
-      0.7,
-      Math.random() * 0.2 + 0.05
-    );
-  }
+  const color = convertedData.color || new THREE.Color().setHSL(
+    Math.random(),
+    0.7,
+    Math.random() * 0.2 + 0.05
+  );
 
   const material = new THREE.MeshBasicMaterial({ color });
   const sphere = new THREE.Mesh(geometry, material);
 
-  if (position) sphere.position.copy(position);
-  sphere.scale.setScalar(size * 0.05);
+  // Make entire object writable
+  makeObjectWritable(sphere);
 
+  // Set position
+  if (convertedData.position) sphere.position.copy(convertedData.position);
+
+  // Set scale (size)
+  const scaleFactor = convertedData.size * SCALEFACTOR; // scaling
+  console.log("Scale factor:", scaleFactor);
+
+  // Set the scale
+  sphere.scale.setScalar(scaleFactor);
+
+  // Assign other properties, but don't overwrite the scale
   Object.assign(sphere, {
+    ...convertedData,
+    scale: sphere.scale, // Preserve the scale we just set
     shape: "sphere",
-    userData,
-    size,
-    version,
-    lastEditedBy,
-    uuid,
-    versionNonce: generateVersionNonce(),
   });
+
+  // Store the original size as a separate property
+  sphere.originalSize = convertedData.size;
 
   scene.add(sphere);
 
@@ -495,7 +427,7 @@ export function createSphere(data) {
 
   markNeedsRender();
 
-  console.log("JUST CREATED THIS SPHERE", sphere);
+  console.log("Created sphere:", sphere);
 
   return { sphere };
 }
@@ -612,7 +544,7 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   // Create a snapshot of the current scene
   const snapshot = createSceneSnapshot([scene, nonBloomScene]);
 
-  // console.log("snapshot in removeEmptyCubes", snapshot);
+  console.log("snapshot in removeEmptyCubes", snapshot);
 
   // Array to store cubes that need to be removed
   const cubesToRemove = [];
@@ -652,53 +584,91 @@ export function removeEmptyCubes(scene, nonBloomScene) {
     removedCubes.push(box);
   });
 
-  // render();
   markNeedsRender();
-
   // Return the removed cubes
   return removedCubes;
 }
 
 
-export function reconstructScene(snapshot) {
-  console.log(
-    "----------------------------------------------------------------------------"
-  );
-  console.log("Reconstructing scene with snapshot:", snapshot);
-  const existingObjects = new Map();
+// export function reconstructScene(snapshot) {
+//   console.log(
+//     "----------------------------------------------------------------------------"
+//   );
+//   console.log("Reconstructing scene with snapshot:", snapshot);
+//   const existingObjects = new Map();
 
-  // Collect existing objects
-  function traverseScene(object, isMainScene) {
-    if (object.uuid) {
-      existingObjects.set(object.uuid, { object, inScene: isMainScene });
-    }
-  }
-  scene.traverse((object) => traverseScene(object, true));
-  nonBloomScene.traverse((object) => traverseScene(object, false));
+//   // Collect existing objects
+//   function traverseScene(object, isMainScene) {
+//     if (object.uuid) {
+//       existingObjects.set(object.uuid, { object, inScene: isMainScene });
+//     }
+//   }
+//   scene.traverse((object) => traverseScene(object, true));
+//   nonBloomScene.traverse((object) => traverseScene(object, false));
 
-  // Update or create objects from snapshot
-  snapshot.forEach((objectState) => {
+//   // Update or create objects from snapshot
+//   snapshot.forEach((objectState) => {
  
-    const existingEntry = existingObjects.get(objectState.uuid);
+//     const existingEntry = existingObjects.get(objectState.uuid);
 
-    if (objectState.isDeleted) {
-      if (existingEntry) {
-        removeObject(existingEntry);
-      }
-      existingObjects.delete(objectState.uuid);
-    } else {
-      if (existingEntry) {
-        updateObjectProperties(existingEntry.object, objectState);
+//     if (objectState.isDeleted) {
+//       if (existingEntry) {
+//         removeObject(existingEntry);
+//       }
+//       existingObjects.delete(objectState.uuid);
+//     } else {
+//       if (existingEntry) {
+//       //   updateObjectProperties(existingEntry.object, objectState);
+//       } else {
+//         createObject(objectState);
+//       }
+//     }
+//   });
+
+//   console.log(
+//     "----------------------------------------------------------------------------"
+//   );
+//   markNeedsRender();
+// }
+export function reconstructScene(snapshot) {
+  console.log("Reconstructing scene with snapshot:", snapshot);
+  snapshot.forEach((objectState) => {
+    const existingObject = scene.getObjectByProperty('uuid', objectState.uuid) || 
+                             nonBloomScene.getObjectByProperty('uuid', objectState.uuid);
+      if (existingObject) {
+        objectState.isUpdated && updateObjectProperties(existingObject, objectState);
+      } 
+      else if (objectState.isDeleted) {
+        removeObject(existingObject);
       } else {
         createObject(objectState);
       }
-    }
   });
-
-  console.log(
-    "----------------------------------------------------------------------------"
-  );
   markNeedsRender();
+}
+
+function updateObjectProperties(object, objectState) {
+  objectState.isUpdated = false;
+
+  if (objectState.position) object.position.fromArray(objectState.position);
+  // if (objectState.scale) object.scale.fromArray(objectState.scale);
+  if (objectState.color !== undefined && object.material) {
+    object.material.color.setHex(objectState.color);
+  }
+  if (objectState.version !== undefined) object.version = objectState.version;
+
+  // Update size for cubes
+  if ((object.shape === "wireframeCube" || object.shape === "solidCube") && objectState.size !== undefined) {
+    object.scale.setScalar(objectState.size);
+  }
+}
+
+function createObject(objectState) {
+  if (objectState.shape === "sphere") {
+    createSphereWrapper(objectState);
+  } else if (objectState.shape === "wireframeCube") {
+    createCubeWrapper(objectState);
+  }
 }
 
 function removeObject(entry) {
@@ -714,41 +684,38 @@ function removeObject(entry) {
   if (entry.object.geometry) entry.object.geometry.dispose();
 }
 
-function createObject(objectState) {
-  if (objectState.shape === "sphere") {
-    createSphereWrapper(objectState);
-  } else if (
-    objectState.shape === "wireframeCube"
-    // objectState.shape === "solidCube"
-  ) {
-    createCubeWrapper(objectState);
-  }
-  // else {
-  //   console.warn(`Unknown object type: ${objectState.shape}`);
-  // }
-}
+// function createObject(objectState) {
+//   if (objectState.shape === "sphere") {
+//     createSphereWrapper(objectState);
+//   } else if (
+//     objectState.shape === "wireframeCube"
+//   ) {
+//     createCubeWrapper(objectState);
+//   }
+// }
 
-function updateObjectProperties(object, objectState) {
-  // Update the given object
-  applyUpdates(object, objectState);
+// function updateObjectProperties(object, objectState) {
+//   // Update the given object
+//   applyUpdates(object, objectState);
 
-  // Check if this is a cube and update its twin
-  if (
-    objectState.shape === "wireframeCube" ||
-    objectState.shape === "solidCube"
-  ) {
-    const twinId = object.userData.id.endsWith("_solid")
-      ? object.userData.id.slice(0, -6) // Remove "_solid" suffix
-      : object.userData.id + "_solid"; // Add "_solid" suffix
+//   // Check if this is a cube and update its twin
+//   if (
+//     objectState.shape === "wireframeCube" ||
+//     objectState.shape === "solidCube"
+//   ) {
+//     const twinId = object.userData.id.endsWith("_solid")
+//       ? object.userData.id.slice(0, -6) // Remove "_solid" suffix
+//       : object.userData.id + "_solid"; // Add "_solid" suffix
 
-    const twinObject = findObjectById(twinId);
-    if (twinObject) {
-      applyUpdates(twinObject, objectState);
-    }
-  }
-}
+//     const twinObject = findObjectById(twinId);
+//     if (twinObject) {
+//       applyUpdates(twinObject, objectState);
+//     }
+//   }
+// }
 
 function applyUpdates(object, objectState) {
+  console.log("i am object", object)
   // Update position
   object.position.set(
     objectState.position[0],
@@ -757,13 +724,13 @@ function applyUpdates(object, objectState) {
   );
 
   // Update scale
-  if (objectState.scale) {
-    object.scale.set(
-      objectState.scale[0],
-      objectState.scale[1],
-      objectState.scale[2]
-    );
-  }
+  // if (objectState.scale) {
+  //   object.scale.set(
+  //     objectState.scale[0],
+  //     objectState.scale[1],
+  //     objectState.scale[2]
+  //   );
+  // }
 
   if(objectState.version) {
     object.version = objectState.version;
@@ -822,6 +789,7 @@ function createCubeWrapper(objectState) {
 // }
 
 function createSphereWrapper(objectState) {
-  const { sphere } = createSphere(objectState);
-  sphere.uuid = objectState.uuid;
+  const convertedData = convertToThreeJSFormat(objectState);
+  const { sphere } = createSphere(convertedData);
+  // sphere.uuid = objectState.uuid;
 }
