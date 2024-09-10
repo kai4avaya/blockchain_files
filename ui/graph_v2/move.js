@@ -168,8 +168,8 @@ export function dragCube() {
   // Move all spheres inside this cube
   selectedObject.containedSpheres.forEach((sphere) => {
 
-    console.log("+++sphere in cube being draggged", sphere.object.uuid)
-    console.log("sphere in cube being POSITION: " , JSON.stringify(sphere.object.position))
+    // console.log("+++sphere in cube being draggged", sphere.object.uuid)
+    // console.log("sphere in cube being POSITION: " , JSON.stringify(sphere.object.position))
     sphere.object.position.add(actualMovement);
     // Update the position in the selectedObject
     sphere.position = sphere.object.position.toArray();
@@ -557,6 +557,8 @@ async function handleFileDrop_sphere(event) {
     // let dropPosition;
     const fileIds = await handleFileDrop(event);
 
+    console.log("fileIds generated", fileIds)
+
     if (allIntersects.length > 0) {
       const intersect = allIntersects[0];
       const dropPosition = intersect.point;
@@ -582,9 +584,7 @@ async function handleFileDrop_sphere(event) {
           )
         );
       } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
-        // console.log("---intersected sphere drop file");
-        // const actualSphereSize = size * 0.05;
-        // const scaledCubeSize = actualSphereSize * 4;
+
         createdShapes.push(
           createWireframeCube(
             dataObject
@@ -813,15 +813,10 @@ export function onPointerDown(event) {
   const intersectsBloom = raycaster.intersectObjects(scene.children, true);
   const intersectsNonBloom = raycaster.intersectObjects(nonBloomScene.children, true);
 
-  // const intersects = [...intersectsBloom, ...intersectsNonBloom];
-
-  // console.log("onpointerdown intersects", intersects)
-  // const sphereIntersect = intersects.find(
     const sphereIntersect = intersectsBloom.find(
     (intersect) => getObjectType(intersect.object) === "Sphere"
   );
 
-  console.log("I AM SELECTED intersectsNonBloom inside of onpointerdown", intersectsNonBloom, "intersectsBloom", intersectsBloom, "sphereIntersect", sphereIntersect)
 
   if (sphereIntersect) {
     isDragging = true;
@@ -831,9 +826,7 @@ export function onPointerDown(event) {
     sphereIntersect.object.layers.toggle(BLOOM_SCENE);
   } else if(intersectsNonBloom?.length > 0) {
 
-    console.log("mooooo should have found da cube")
     const selectedCube = getCubeUnderPointer(event, intersectsNonBloom);
-    console.log("I AM SELECTED CUBE inside of onpointerdown", selectedCube)
     if (selectedCube) {
       isDragging = true;
       controls.enabled = false;
@@ -1076,7 +1069,6 @@ async function onPointerUp(event) {
             const updatedPosition = new THREE.Vector3().fromArray(sphereData.position);
             sphereData.object.position.copy(updatedPosition);
             
-            console.log("++sphereData.position updated from the drag cube event", sphereData.object.uuid, updatedPosition);
             
             // Create a new object with the updated position for saving
             const updatedSphereData = {

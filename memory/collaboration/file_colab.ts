@@ -89,6 +89,8 @@ class FileSystem {
 
   getMetadata<T extends FileMetadata | DirectoryMetadata>(id: string, type: 'file' | 'directory'): T | undefined {
     const items = type === 'file' ? this.snapshot.files : this.snapshot.directories;
+
+    console.log("i am items", items)
     return items.find(item => item.id === id) as T | undefined;
   }
 

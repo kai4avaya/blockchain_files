@@ -456,6 +456,7 @@ export function createSphere(data) {
     id = generateUniqueId(),
     version = 1,
     lastEditedBy = 'noUserId',
+    userData
   } = convertedData;
 
   const geometry = new THREE.IcosahedronGeometry(1, 15);
@@ -480,7 +481,7 @@ export function createSphere(data) {
 
   Object.assign(sphere, {
     shape: "sphere",
-    userData: { id },
+    userData,
     size,
     version,
     lastEditedBy,

@@ -1,14 +1,8 @@
-// import { handleFileDrop } from './memory/fileHandler.js';
-// import { share3dDat } from './graph.js';
-// import * as THREE from 'three';
+
 import { editor } from './quillEditor.js';
-// import fileStore from './memory/stores/fileStore';
 import userActionStore from './memory/stores/userActionStore';
-// import graphStore from './memory/stores/graphStore';
 import { showPopup } from './ui/popup.js';
-// import {getObjectUnderPointer} from './ui/graph/dragging_shapes'
 import {getObjectUnderPointer} from './ui/graph_v2/move'
-// import { openDB, getData, saveData, initializeDB } from './memory/local/dbgeneral';
 import { initializeFileSystem, getFileSystem } from './memory/collaboration/file_colab';
 import { sceneState } from './memory/collaboration/scene_colab';
 import { scene, nonBloomScene, initializeGraph } from './ui/graph_v2/create';
@@ -55,7 +49,8 @@ window.addEventListener('click', async event => {
     if (selectedObject) {
       const nodeId = selectedObject.userData.id;
       const fileSystem = getFileSystem();
-      const fileMetadata = fileSystem.getMetadata(nodeId);
+      console.log("fileSystem", fileSystem,"nodeId", nodeId)
+      const fileMetadata = fileSystem.getMetadata(nodeId, 'file');
       if (fileMetadata) {
         showPopup(fileMetadata, event.clientX, event.clientY);
       }
@@ -70,32 +65,11 @@ window.addEventListener('click', async event => {
     userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
     userActionStore.setMouseDown(userId, true, event.clientX, event.clientY, event.target); // Log mouse down
 
-    // Calculate mouse position in normalized device coordinates (-1 to +1) for both components
-    // mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    // mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    // // Update the picking ray with the camera and mouse position
-    // raycaster.setFromCamera(mouse, camera);
-
-    // // Calculate objects intersecting the picking ray
-    // const intersects = raycaster.intersectObjects(scene.children);
-
-    // if (intersects.length > 0) {
-    //     const nodeId = intersects[0].object.userData.id;
-    //     await fileStore.selectFile(nodeId); // Fetch and update selected file in MobX store
-    //     showPopup(fileStore.selectedFile, event.clientX, event.clientY); // Display the selected file's metadata
-    // } else {
-    //     document.getElementById('popup').style.display = 'none';
-    // }
-
     userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target); // Log mouse up
 
     const selectedObject = getObjectUnderPointer(event);
     if (selectedObject) {
-        // Perform operations on the selected object
-        // const nodeId = selectedObject.userData.id;
-        // await fileStore.selectFile(nodeId); // Fetch and update selected file in MobX store
-        // console.log("nodeId LETS SHOW POPUP!", nodeId)
+
         const nodeId = selectedObject.userData.id;
       const fileSystem = getFileSystem();
       const fileMetadata = fileSystem.getMetadata(nodeId, "file");

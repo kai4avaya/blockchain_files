@@ -48,12 +48,16 @@ export function convertToThreeJSFormat(data: any) {
   // Set default values if not present
   // result.color = result.color || randomColorGenerator(); 
   result.version = result.version || 1;
-  result.userData = result.userData || { id: generateUniqueId(3) };
+  // console.log("result in convert to js", result)
+  // result.userData = result.userData || { id: generateUniqueId(3) };
   result.versionNonce = generateVersionNonce()
 
-  if ('id' in data) {
+  if ('id' in data) { // hack since this is added in indexdb
     delete result.id;
   }
+
+  console.log("result in convert to js AFTER NOT A DISASTER convertToJs", result)
+
   return result;
 }
 
