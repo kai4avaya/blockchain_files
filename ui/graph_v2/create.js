@@ -621,7 +621,7 @@ function createObject(objectState) {
 }
 
 function removeObject(entry) {
-  if (!entry.object.shape) return;
+  if (!entry?.object) return;
 
   if (entry.inScene) {
     scene.remove(entry.object);

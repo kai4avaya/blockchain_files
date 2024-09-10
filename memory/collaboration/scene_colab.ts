@@ -201,21 +201,41 @@ class SceneState {
     return true;
   }
   
+  // mergeUpdate(incomingState: ObjectState): void {
+  //   const existingState = this.objects.get(incomingState.uuid);
+
+  //   if (!existingState || this.isNewerState(incomingState, existingState)) {
+  //     if (incomingState.isDeleted) {
+  //       // If the incoming state is marked as deleted and it's newer, keep it in the objects map
+  //       // but mark it as deleted
+  //       this.objects.set(incomingState.uuid, incomingState);
+  //     } else {
+  //       // Normal update for non-deleted objects
+  //       this.objects.set(incomingState.uuid, {
+  //         ...existingState,
+  //         ...incomingState,
+  //       });
+  //     }
+  //     this.updatedObjects.add(incomingState.uuid);
+  //     this.scheduleSave();
+  //     this.reconstructScene();
+  //   }
+  // }
+
+  
   mergeUpdate(incomingState: ObjectState): void {
     const existingState = this.objects.get(incomingState.uuid);
 
     if (!existingState || this.isNewerState(incomingState, existingState)) {
-      if (incomingState.isDeleted) {
-        // If the incoming state is marked as deleted and it's newer, keep it in the objects map
-        // but mark it as deleted
-        this.objects.set(incomingState.uuid, incomingState);
-      } else {
-        // Normal update for non-deleted objects
-        this.objects.set(incomingState.uuid, {
-          ...existingState,
-          ...incomingState,
-        });
-      }
+      // If the object is already marked as deleted, keep it deleted
+      const isDeleted = existingState?.isDeleted || incomingState.isDeleted;
+      
+      this.objects.set(incomingState.uuid, {
+        ...existingState,
+        ...incomingState,
+        isDeleted, // Ensure isDeleted flag is preserved
+      });
+      
       this.updatedObjects.add(incomingState.uuid);
       this.scheduleSave();
       this.reconstructScene();
@@ -281,6 +301,9 @@ class SceneState {
     this.saveTimeout = setTimeout(() => this.saveStateToDB(), 1000);
   }
 
+
+  
+
   private async saveStateToDB() {
     try {
       const updatedStates = Array.from(this.updatedObjects)
@@ -288,34 +311,23 @@ class SceneState {
         .filter(state => state !== undefined);
       
       if (updatedStates.length > 0) {
-        // Fetch existing data from IndexedDB
         const existingData = await indexDBOverlay.getData(this.STORAGE_KEY);
         const existingMap = new Map(existingData.map(item => [item.uuid, item]));
   
-        // Prepare data to be saved
         const dataToSave = updatedStates.map(state => {
           if (state) {
             const existingState = existingMap.get(state.uuid);
-            if (existingState) {
-              // If the state already exists in IndexedDB, update it
-              return {
-                ...existingState,
-                ...state,
-                version: (existingState.version || 0) + 1
-              };
-            } else {
-              // If it's a new state, add it
-              return {
-                ...state,
-                version: 1
-              };
-            }
+            return {
+              ...existingState,
+              ...state,
+              isDeleted: state.isDeleted || existingState?.isDeleted, // Preserve isDeleted flag
+              version: (existingState?.version || 0) + 1
+            };
           }
           return state;
         });
   
         this.broadcastUpdate(dataToSave);
-
         await indexDBOverlay.saveData(this.STORAGE_KEY, dataToSave);
         
         updatedStates.forEach(state => {
@@ -329,6 +341,54 @@ class SceneState {
       console.error('Error saving state to IndexedDB:', error);
     }
   }
+  // private async saveStateToDB() {
+  //   try {
+  //     const updatedStates = Array.from(this.updatedObjects)
+  //       .map(uuid => this.objects.get(uuid))
+  //       .filter(state => state !== undefined);
+      
+  //     if (updatedStates.length > 0) {
+  //       // Fetch existing data from IndexedDB
+  //       const existingData = await indexDBOverlay.getData(this.STORAGE_KEY);
+  //       const existingMap = new Map(existingData.map(item => [item.uuid, item]));
+  
+  //       // Prepare data to be saved
+  //       const dataToSave = updatedStates.map(state => {
+  //         if (state) {
+  //           const existingState = existingMap.get(state.uuid);
+  //           if (existingState) {
+  //             // If the state already exists in IndexedDB, update it
+  //             return {
+  //               ...existingState,
+  //               ...state,
+  //               version: (existingState.version || 0) + 1
+  //             };
+  //           } else {
+  //             // If it's a new state, add it
+  //             return {
+  //               ...state,
+  //               version: 1
+  //             };
+  //           }
+  //         }
+  //         return state;
+  //       });
+  
+  //       this.broadcastUpdate(dataToSave);
+
+  //       await indexDBOverlay.saveData(this.STORAGE_KEY, dataToSave);
+        
+  //       updatedStates.forEach(state => {
+  //         if (state) {
+  //           this.savedObjects.add(state.uuid);
+  //         }
+  //       });
+  //     }
+  //     this.updatedObjects.clear();
+  //   } catch (error) {
+  //     console.error('Error saving state to IndexedDB:', error);
+  //   }
+  // }
   // private async saveStateToDB() {
   //   try {
   //     const updatedStates = Array.from(this.updatedObjects)

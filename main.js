@@ -118,42 +118,34 @@ localStorage.setItem("login_block", userId);
 editor();
 
 async function main() {
-  console.log("Main function started");
   await initializeFileSystem();
   const fileSystem = getFileSystem();
 
   fileSystem.onReady(() => {
-    console.log("File system is ready");
   });
 
   // Initialize the graph and SceneState
   await initializeGraph();
   await sceneState.initialize(scene, nonBloomScene);
-  console.log("Graph and SceneState initialized");
 
   // Add event listeners after initialization
   addEventListeners();
 }
 
 function addEventListeners() {
-  console.log("Adding event listeners");
 
   let pointerDownTime = 0;
   const CLICK_DURATION_THRESHOLD = 200; // milliseconds
 
   window.addEventListener('pointerdown', event => {
     pointerDownTime = Date.now();
-    console.log('Pointer down at:', pointerDownTime);
     userActionStore.setMouseDown(userId, true, event.clientX, event.clientY, event.target);
   });
 
   window.addEventListener('pointerup', event => {
     const clickDuration = Date.now() - pointerDownTime;
-    console.log('Pointer up. Click duration:', clickDuration);
     userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target);
-    console.log("Click duration:", clickDuration, "<=", CLICK_DURATION_THRESHOLD);
     if (clickDuration <= CLICK_DURATION_THRESHOLD) {
-      console.log('Quick click detected');
       handleQuickClick(event);
     } else {
       console.log('Long click detected, not showing popup');
@@ -176,34 +168,24 @@ function addEventListeners() {
     userActionStore.removeKeyPressed(userId, event.key);
   });
 
-  console.log("Event listeners added");
 }
 
 function handleQuickClick(event) {
-  console.log('Handling quick click');
   const selectedObject = getObjectUnderPointer(event);
-  console.log('Selected object:', selectedObject);
 
   if (selectedObject) {
     const nodeId = selectedObject.userData.id;
-    console.log('Node ID:', nodeId);
     const fileSystem = getFileSystem();
-    console.log('File system:', fileSystem);
     const fileMetadata = fileSystem.getMetadata(nodeId, 'file');
-    console.log('File metadata:', fileMetadata);
 
     if (fileMetadata) {
-      console.log('Showing popup');
       showPopup(fileMetadata, event.clientX, event.clientY);
     } else {
-      console.log('No file metadata found');
     }
   } else {
-    console.log('No object under pointer');
     const popup = document.getElementById('popup');
     if (popup) {
       popup.style.display = 'none';
-      console.log('Popup hidden');
     } else {
       console.log('Popup element not found');
     }
@@ -217,7 +199,6 @@ document.body.addEventListener('dragover', event => {
 
 document.body.addEventListener('drop', event => {
   event.preventDefault();
-  console.log('File(s) dropped');
   // handleFileDrop(event);
 });
 
