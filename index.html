@@ -178,6 +178,23 @@
     } */
 
     /* sidebar */
+
+    .tooltip {
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%) translateX(10px);
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
     .sidebar {
             position: fixed;
             left: 0;
@@ -192,13 +209,14 @@
             padding-top: 20px;
         }
         .sidebar-icon {
-            color: #333;
-            width: 24px;
-            height: 24px;
-            margin-bottom: 30px;
-            cursor: pointer;
-            transition: color 0.3s ease;
-        }
+        position: relative;
+        color: #333;
+        width: 24px;
+        height: 24px;
+        margin-bottom: 30px;
+        cursor: pointer;
+        transition: color 0.3s ease;
+    }
         .sidebar-icon:hover {
             color: #007bff;
         }
@@ -227,10 +245,82 @@
         }
 
         .small-icon {
-          height: 24;
-          width: 24;
+          height: 24px;
+          width: 24px;
         }
-    
+        .modal {
+            position: fixed;
+            left: 5rem; /* Converted from 80px */
+            background-color: white;
+            padding: 1.25rem; /* Converted from 20px */
+            box-shadow: 0.125rem 0 0.3125rem rgba(0,0,0,0.1); /* Converted from 2px 0 5px */
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            width: 15.625rem; /* Converted from 250px */
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+            transform: translateY(1.25rem); /* Converted from 20px */
+            opacity: 0;
+            pointer-events: none;
+        }
+        .modal::before {
+            content: '';
+            position: absolute;
+            left: -0.625rem; /* Converted from -10px */
+            width: 0;
+            height: 0;
+            border-top: 0.625rem solid transparent; /* Converted from 10px */
+            border-bottom: 0.625rem solid transparent; /* Converted from 10px */
+            border-right: 0.625rem solid white; /* Converted from 10px */
+        }
+        .modal.active {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal.active {
+            display: flex;
+            transform: translateY(0);
+        }
+        .modal input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .modal button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+        }
+        .tooltip {
+        position: absolute;
+        left: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+        background-color: #333;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s, transform 0.3s;
+        z-index: 1000;
+        margin-left: 10px;
+    }
+    .sidebar-icon:hover .tooltip {
+        opacity: 1;
+        transform: translateY(-50%) translateX(5px);
+    }
+
+        
     </style>
     <script type="x-shader/x-vertex" id="vertexshader">
       varying vec2 vUv;
@@ -252,27 +342,50 @@
   </head>
   <body>
     <div class="sidebar">
-      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-      </svg>
-      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-      </svg>
-      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-          <circle cx="12" cy="7" r="4"></circle>
-      </svg>
-      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-      </svg>
-      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-          <polyline points="22,6 12,13 2,6"></polyline>
-      </svg>
+      <div class="sidebar-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          <span class="tooltip">Home</span>
+      </div>
+      <div class="sidebar-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span class="tooltip">Search</span>
+      </div>
+      <div class="sidebar-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <span class="tooltip">Profile</span>
+      </div>
+      <div class="sidebar-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span class="tooltip">Settings</span>
+      </div>
+      <div class="sidebar-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+          <span class="tooltip">Messages</span>
+      </div>
   </div>
+
+  <div class="modal">
+    <input type="text" placeholder="Enter your text here">
+    <button>
+        Submit
+        <span class="tooltip">Click to submit your input</span>
+    </button>
+</div>
     <div id="popup"></div>
     <button id="toggleButton">Chat</button>
     <div class="slideout" id="chatSlideout">
@@ -333,5 +446,64 @@
         innerSlideout.classList.toggle('active'); // Close inner slideout if open
       });
     </script>
-  </body>
+
+<script>
+  const icons = document.querySelectorAll('.sidebar-icon');
+  const modal = document.querySelector('.modal');
+  let activeIcon = null;
+
+  // function showModal(icon) {
+  //     const iconRect = icon.getBoundingClientRect();
+  //     modal.style.top = `${iconRect.top}px`;
+  //     modal.classList.add('active');
+  //     activeIcon = icon;
+  // }
+  function showModal(icon) {
+        const iconRect = icon.getBoundingClientRect();
+        // Adjust the vertical position of the modal
+        modal.style.top = `${iconRect.top - 15}px`; // Moved slightly up
+        modal.classList.add('active');
+        
+        // Position the arrow pointer
+        const arrowOffset = iconRect.height / 2;
+        modal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`); // Adjusted for the modal's upward shift
+        
+        activeIcon = icon;
+    }
+  function hideModal() {
+      modal.classList.remove('active');
+      activeIcon = null;
+  }
+
+  icons.forEach((icon, index) => {
+      icon.addEventListener('click', (e) => {
+          if (activeIcon === icon) {
+              hideModal();
+          } else {
+              if (activeIcon) {
+                  hideModal();
+                  setTimeout(() => showModal(icon), 300); // Wait for fade-out before showing new modal
+              } else {
+                  showModal(icon);
+              }
+          }
+      });
+  });
+
+  document.addEventListener('click', (e) => {
+      if (!modal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
+          hideModal();
+      }
+  });
+
+ document.querySelectorAll('.sidebar-icon').forEach(icon => {
+        icon.addEventListener('mouseenter', () => {
+            icon.querySelector('.tooltip').style.opacity = '1';
+        });
+        icon.addEventListener('mouseleave', () => {
+            icon.querySelector('.tooltip').style.opacity = '0';
+        });
+    });
+  </script>
+      </body>
 </html>
