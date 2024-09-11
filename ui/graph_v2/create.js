@@ -6,7 +6,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
-import { generateUniqueId, generateVersionNonce, makeObjectWritable, convertToThreeJSFormat } from "../../utils/utils";
+import { makeObjectWritable, convertToThreeJSFormat } from "../../utils/utils";
 import { createSceneSnapshot } from "./snapshot.js";
 // import { sceneState } from "../../memory/collaboration/scene_colab";
 
@@ -14,7 +14,6 @@ const BLOOM_SCENE = 1;
 const bloomLayer = new THREE.Layers();
 bloomLayer.set(BLOOM_SCENE);
 const SCALEFACTOR = 0.05
-const RESCALEFACTOR = 20
 
 export const scene = new THREE.Scene();
 export const nonBloomScene = new THREE.Scene();
