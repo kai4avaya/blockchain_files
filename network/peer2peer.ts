@@ -21,6 +21,38 @@ export class P2PSync {
     });
     this.initializePeer();
   }
+
+  
+public connectToSpecificPeer(peerId: string) {
+  if (!this.peer) {
+    console.error('Peer object is undefined. Cannot connect.');
+    return;
+  }
+  console.log('Attempting to connect to specific peer:', peerId);
+  if (this.connections.has(peerId) || peerId === this.peer.id) {
+    console.log('Already connected to peer or attempting to connect to self. Peer ID:', peerId);
+    return;
+  }
+  const conn = this.peer.connect(peerId);
+  this.handleConnection(conn);
+}
+
+
+public initialize_public(sceneState: SceneState, initialPeers?: string[]): void {
+  console.log('Initializing P2PSync instance');
+  this.sceneState = sceneState;
+  this.peer.on('open', (id) => {
+    this.handlePeerOpen(id);
+    // Connect to initial peers if provided
+    if (initialPeers) {
+      initialPeers.forEach(peerId => this.connectToSpecificPeer(peerId));
+    }
+  });
+  this.peer.on('connection', this.handleConnection.bind(this));
+  this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
+  this.connectToExistingTabs();
+  setInterval(this.connectToExistingTabs.bind(this), 5000);
+}
   
   private initializePeer() {
     this.peer = new Peer(this.generateUniqueId());
@@ -167,3 +199,39 @@ private generateUniqueId(): string {
     });
   }
 }
+
+console.log("HELLO TURD CAT")
+// UI Integration
+const p2pSync = P2PSync.getInstance();
+
+// DOM elements
+const userIdInput = document.getElementById('userIdInput') as HTMLInputElement;
+const peerIdInput = document.getElementById('peerIdInput') as HTMLInputElement;
+const connectButton = document.getElementById('connectButton') as HTMLButtonElement;
+const statusDiv = document.getElementById('status') as HTMLDivElement;
+
+function updateStatus(message: string) {
+  statusDiv.textContent = message;
+  console.log('Status update:', message);
+}
+
+// Initialize P2PSync when user enters their ID
+userIdInput.addEventListener('change', () => {
+  const userId = userIdInput.value.trim();
+  if (userId) {
+    p2pSync.initialize(userId, sceneState); // Assume sceneState is defined elsewhere
+    updateStatus(`Initializing with user ID: ${userId}`);
+  }
+});
+
+// Connect to peer when button is clicked
+connectButton.addEventListener('click', () => {
+  const peerId = peerIdInput.value.trim();
+  if (peerId) {
+    p2pSync.connectToSpecificPeer(peerId);
+    updateStatus(`Attempting to connect to peer: ${peerId}`);
+    peerIdInput.value = ''; // Clear the input after connecting
+  } else {
+    updateStatus('Please enter a peer ID to connect.');
+  }
+});

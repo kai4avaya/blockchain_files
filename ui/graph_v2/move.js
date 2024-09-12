@@ -841,6 +841,7 @@ async function onPointerUp(event) {
        console.log("cubesToDelete", cubesToDelete);
        saveObjectChanges(selectedSphere);
        cubesToDelete.forEach((cube) => {
+         if (!cube.wireframe) return
          cube.wireframe.isDeleted = true;
          cube.solid.isDeleted = true;
          saveObjectChanges(cube.wireframe);

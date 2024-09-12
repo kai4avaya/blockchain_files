@@ -151,9 +151,98 @@ bloomTexturePass.uniforms["bloomTexture"].value =
 nonBloomTexturePass.uniforms["nonBloomTexture"].value = nonBloomRT.texture;
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-setupScene();
+// setupScene();
 let cubes = [];
 const loginName = localStorage.getItem("login_block") || "no_login";
+
+
+function addBasicLighting() {
+  // Add ambient light
+  const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+  scene.add(ambientLight);
+
+  // Add directional light
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  directionalLight.position.set(1, 1, 1).normalize();
+  scene.add(directionalLight);
+}
+
+// Add this function to your code
+function addGridHelper() {
+  const size = 100;
+  const divisions = 100;
+  const gridHelper = new THREE.GridHelper(size, divisions);
+  scene.add(gridHelper);
+  
+}
+function createEnvironment() {
+  // Create a large grid
+  const gridSize = 1000;
+  const gridDivisions = 100;
+  const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x444444, 0x444444);
+  scene.add(gridHelper);
+
+  // Add ambient light
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+
+  // Add directional light
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  directionalLight.position.set(1, 1, 1).normalize();
+  scene.add(directionalLight);
+
+  console.log("Simple environment created");
+  console.log("Number of objects in scene:", scene.children.length);
+}
+
+function loadTerrain(file, callback) {
+  const xhr = new XMLHttpRequest();
+  xhr.responseType = 'arraybuffer';
+  xhr.open('GET', file, true);
+  xhr.onload = function(evt) {    
+    if (xhr.response) {
+      callback(new Uint16Array(xhr.response));
+    }
+  };  
+  xhr.send(null);
+}
+
+function createEnvironmentTerrain() {
+  // Set the background to black
+  scene.background = new THREE.Color(0x000000);
+
+  loadTerrain('../../assets/besseggen.bin', function(data) {
+    const width = 199;
+    const height = 199;
+    const geometry = new THREE.PlaneGeometry(60, 60, width - 1, height - 1);
+
+    for (let i = 0, l = geometry.attributes.position.count; i < l; i++) {
+      geometry.attributes.position.setZ(i, data[i] / 65535 * 10);
+    }
+
+    geometry.computeVertexNormals();
+
+    const material = new THREE.MeshPhongMaterial({
+      color: 0xdddddd,
+      wireframe: true
+    });
+
+    const terrain = new THREE.Mesh(geometry, material);
+    terrain.rotation.x = -Math.PI / 2;  // Rotate to lay flat
+    scene.add(terrain);
+
+    console.log("Terrain created");
+    markNeedsRender();
+  });
+
+  // Add lights
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  directionalLight.position.set(1, 1, 1).normalize();
+  scene.add(directionalLight);
+}
 
 controls.addEventListener("change", () => {
   markNeedsRender();
@@ -171,50 +260,53 @@ export function randomColorGenerator() {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+// Define global variables for geometry and materials
+const geometry = new THREE.BoxGeometry(1, 1, 1);
+const edges = new THREE.EdgesGeometry(geometry);
+let wireMaterial;
+let solidMaterial;
 
-  // Your createWireframeCube function
-  export function createWireframeCube(convertedData) {
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const edges = new THREE.EdgesGeometry(geometry);
-  
-    const color = convertedData.color;
-    const wireMaterial = new THREE.LineBasicMaterial({ color, linewidth: 2 });
-    const solidMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 });
-  
-    const wireframeCube = new THREE.LineSegments(edges, wireMaterial);
-    const solidCube = new THREE.Mesh(geometry, solidMaterial);
-  
-    // Make entire object writable
-    makeObjectWritable(wireframeCube);
-    makeObjectWritable(solidCube);
-  
-    // Set position and scale
-    [wireframeCube, solidCube].forEach(cube => {
-      if (convertedData.position) cube.position.copy(convertedData.position);
-      cube.scale.setScalar(convertedData.size);
-    });
-  
-    Object.assign(wireframeCube, {
-      ...convertedData,
-      shape: "wireframeCube",
-    });
+export function createWireframeCube(convertedData) {
+  // Update materials with the new color
+  wireMaterial = new THREE.LineBasicMaterial({ color: convertedData.color, linewidth: 2 });
+  solidMaterial = new THREE.MeshBasicMaterial({ color: convertedData.color, transparent: true, opacity: 0 });
+
+  // Create wireframe and solid cubes using the global geometry and updated materials
+  const wireframeCube = new THREE.LineSegments(edges, wireMaterial);
+  const solidCube = new THREE.Mesh(geometry, solidMaterial);
+
+  // Make entire object writable
+  makeObjectWritable(wireframeCube);
+  makeObjectWritable(solidCube);
+
+  // Set position and scale
+  [wireframeCube, solidCube].forEach(cube => {
+    if (convertedData.position) cube.position.copy(convertedData.position);
+    cube.scale.setScalar(convertedData.size);
+  });
+
+  Object.assign(wireframeCube, {
+    ...convertedData,
+    shape: "wireframeCube",
+  });
 
   const uuid = wireframeCube.uuid;
-  
-    Object.assign(solidCube, {
-      ...convertedData,
-      userData: { id: convertedData?.userData?.id + "_solid" },
-      shape: "solidCube",
-      uuid: uuid + "-solid",
-    });
-  
-    nonBloomScene.add(wireframeCube);
-    nonBloomScene.add(solidCube);
-  
-    console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube);
-  
-    return { wireframeCube, solidCube };
-  }
+
+  Object.assign(solidCube, {
+    ...convertedData,
+    userData: { id: convertedData?.userData?.id + "_solid" },
+    shape: "solidCube",
+    uuid: uuid + "-solid",
+  });
+
+  nonBloomScene.add(wireframeCube);
+  nonBloomScene.add(solidCube);
+
+  console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube);
+
+  return { wireframeCube, solidCube };
+}
+
 
 export function resetSphereScales(spheres, defaultScale = 1) {
   spheres.forEach((sphere) => {
@@ -264,8 +356,16 @@ function setupScene() {
   scene.children.length = 0;
   nonBloomScene.traverse(disposeMaterial);
   nonBloomScene.children.length = 0;
-
+// 
   loadCameraState();
+
+  createEnvironment();
+  
+
+  console.log("One-point perspective scene setup complete");
+  console.log("Camera position:", camera.position);
+  console.log("Camera lookAt:", camera.getWorldDirection(new THREE.Vector3()));
+  console.log("Camera far:", camera.far);
 
   markNeedsRender();
 }
@@ -279,73 +379,23 @@ controls.addEventListener("change", () => {
   saveCameraState();
 });
 
+// Define global variables for geometry and material
+const sphereGeometry = new THREE.IcosahedronGeometry(1, 15);
+let sphereMaterial;
 
-// export function createSphere(data) {
-//   const convertedData = convertToThreeJSFormat(data);
-//   const {
-//     position,
-//     scale,
-//     size = 1,
-//     color: colorIn = null,
-//     uuid = THREE.MathUtils.generateUUID(),
-//     id = generateUniqueId(),
-//     version = 1,
-//     lastEditedBy = 'noUserId',
-//     userData
-//   } = convertedData;
-
-//   const geometry = new THREE.IcosahedronGeometry(1, 15);
-
-//   // Color handling
-//   let color;
-//   if (colorIn !== null && colorIn.isColor) {
-//     color = colorIn;
-//   } else {
-//     color = new THREE.Color().setHSL(
-//       Math.random(),
-//       0.7,
-//       Math.random() * 0.2 + 0.05
-//     );
-//   }
-
-//   const material = new THREE.MeshBasicMaterial({ color });
-//   const sphere = new THREE.Mesh(geometry, material);
-
-//   if (position) sphere.position.copy(position);
-//   sphere.scale.setScalar(size * 0.05);
-
-//   Object.assign(sphere, {
-//     shape: "sphere",
-//     userData,
-//     size,
-//     version,
-//     lastEditedBy,
-//     uuid,
-//     versionNonce: generateVersionNonce(),
-//   });
-
-//   scene.add(sphere);
-
-//   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
-
-//   markNeedsRender();
-
-//   console.log("JUST CREATED THIS SPHERE", sphere);
-
-//   return { sphere };
-// }
 export function createSphere(convertedData) {
   console.log("Creating sphere with data:", convertedData);
-  const geometry = new THREE.IcosahedronGeometry(1, 15);
 
+  // Update material with the new color
   const color = convertedData.color || new THREE.Color().setHSL(
     Math.random(),
     0.7,
     Math.random() * 0.2 + 0.05
   );
+  sphereMaterial = new THREE.MeshBasicMaterial({ color });
 
-  const material = new THREE.MeshBasicMaterial({ color });
-  const sphere = new THREE.Mesh(geometry, material);
+  // Create sphere using the global geometry and updated material
+  const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
 
   // Make entire object writable
   makeObjectWritable(sphere);
@@ -355,8 +405,6 @@ export function createSphere(convertedData) {
 
   // Set scale (size)
   const scaleFactor = convertedData.size * SCALEFACTOR; // scaling
-
-  // Set the scale
   sphere.scale.setScalar(scaleFactor);
 
   // Assign other properties, but don't overwrite the scale
@@ -379,7 +427,6 @@ export function createSphere(convertedData) {
 
   return { sphere };
 }
-
 
 function disposeMaterial(obj) {
   if (obj.material) {

@@ -283,7 +283,7 @@
             transform: translateY(0);
         }
         .modal input {
-            width: 100%;
+            /* width: 100%; */
             padding: 10px;
             margin-bottom: 10px;
             border: 1px solid #ccc;
@@ -318,6 +318,10 @@
     .sidebar-icon:hover .tooltip {
         opacity: 1;
         transform: translateY(-50%) translateX(5px);
+    }
+
+    .p2p_peer_input {
+        width: 90%;
     }
 
         
@@ -380,12 +384,15 @@
   </div>
 
   <div class="modal">
-    <input type="text" placeholder="Enter your text here">
-    <button>
-        Submit
-        <span class="tooltip">Click to submit your input</span>
+    <input type="text" class="p2p_peer_input" id="userIdInput" placeholder="Enter your user ID">
+    <input type="text" class="p2p_peer_input" id="peerIdInput" placeholder="Enter peer ID to connect">
+    <button id="connectButton">
+        Connect
+        <span class="tooltip">Click to connect to the peer</span>
     </button>
+    <div id="status"></div>
 </div>
+
     <div id="popup"></div>
     <button id="toggleButton">Chat</button>
     <div class="slideout" id="chatSlideout">
