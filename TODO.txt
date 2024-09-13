@@ -1,3 +1,14 @@
 move is not saving positions in scene_colab
 
 i like this color for wireframe cubes it's a whitish color. 11913426
+
+
+
+
+FEATURES
+- if file is in space then we should be able to click directory view to go to that file....
+- i need to fix if only one file in island we need to remove cubes 
+- if i drag a node over another node that's already in space (both) then it should create cube
+- if i drag a node over another node, and it gets green it should suck it into the cube .... 
+- when i drag a file over a sphere i should have some indication that a node is being hovered over...
+- speed up dragging of nodes.... 

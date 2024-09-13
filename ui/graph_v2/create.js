@@ -521,6 +521,7 @@ export function share3dDat() {
     scene: typeof scene !== "undefined" ? scene : null,
     cubes: typeof cubes !== "undefined" ? cubes : null,
     controls: typeof controls !== "undefined" ? controls : null,
+    ghostCube: typeof ghostCube !== "undefined" ? ghostCube : null,
   };
 }
 export function removeEmptyCubes(scene, nonBloomScene) {
@@ -571,6 +572,39 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   // Return the removed cubes
   return removedCubes;
 }
+
+// At the top of your file
+let ghostCube = null;
+
+export function createGhostCube(position, size) {
+  if (ghostCube) return; // Prevent multiple ghost cubes
+
+  const geometry = new THREE.BoxGeometry(size, size, size);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    opacity: 0.5,
+    transparent: true,
+  });
+
+  ghostCube = new THREE.Mesh(geometry, material);
+  ghostCube.position.copy(position);
+
+  const { scene } = share3dDat();
+  scene.add(ghostCube);
+  markNeedsRender();
+}
+
+export function removeGhostCube() {
+  if (ghostCube) {
+    const { scene } = share3dDat();
+    scene.remove(ghostCube);
+    ghostCube.geometry.dispose();
+    ghostCube.material.dispose();
+    ghostCube = null;
+    markNeedsRender();
+  }
+}
+
 
 
 // export function reconstructScene(snapshot) {
