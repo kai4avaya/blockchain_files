@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import config from '../../configs/config.json';
 
 export function createSceneSnapshot(scenes) {
     const snapshot = {
@@ -12,7 +13,7 @@ export function createSceneSnapshot(scenes) {
 
     scenes.forEach((currentScene, sceneIndex) => {
         currentScene.traverse((object) => {
-            if (object.isMesh || object instanceof THREE.LineSegments) {
+            if (isRelevantObject(object)) {
                 const objectId = getObjectId(object);
                 const objectData = {
                     id: objectId,
@@ -24,7 +25,7 @@ export function createSceneSnapshot(scenes) {
                 snapshot.objects.push(objectData);
 
                 // Handle boxes (both wireframe and solid versions)
-                if (object.geometry.type === "BoxGeometry" || object instanceof THREE.LineSegments) {
+                if (isBoxObject(object)) {
                     const boxId = getBoxId(object);
                     let existingBox = snapshot.boxes.find(box => box.id === boxId);
                     
@@ -60,7 +61,7 @@ export function createSceneSnapshot(scenes) {
         snapshot.containment[box.id] = [];
 
         snapshot.objects.forEach(obj => {
-            if (obj.type === "IcosahedronGeometry" || obj.type === "SphereGeometry") {
+            if (isSphereObject(obj.object)) {
                 const sphereBoundingBox = new THREE.Box3().setFromObject(obj.object);
                 if (boxBoundingBox.intersectsBox(sphereBoundingBox)) {
                     snapshot.containment[box.id].push(obj.id);
@@ -70,6 +71,30 @@ export function createSceneSnapshot(scenes) {
     });
 
     return snapshot;
+}
+
+function isRelevantObject(object) {
+    if (!(object.isMesh || object instanceof THREE.LineSegments)) {
+        return false;
+    }
+    
+    if (!object.geometry) {
+        return false;
+    }
+
+    const geometryType = object.geometry.type;
+    const objectType = object.type;
+
+    return !config.excluded.includes(geometryType) && !config.excluded.includes(objectType);
+}
+
+function isBoxObject(object) {
+    return object.geometry.type === "BoxGeometry" || 
+           (object instanceof THREE.LineSegments && object.geometry.type === "EdgesGeometry");
+}
+
+function isSphereObject(object) {
+    return object.geometry.type === "IcosahedronGeometry" || object.geometry.type === "SphereGeometry";
 }
 
 function getObjectId(object) {

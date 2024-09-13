@@ -153,19 +153,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 // setupScene();
 let cubes = [];
-const loginName = localStorage.getItem("login_block") || "no_login";
 
-
-function addBasicLighting() {
-  // Add ambient light
-  const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-  scene.add(ambientLight);
-
-  // Add directional light
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-  directionalLight.position.set(1, 1, 1).normalize();
-  scene.add(directionalLight);
-}
 
 // Add this function to your code
 function addGridHelper() {

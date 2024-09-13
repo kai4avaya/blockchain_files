@@ -1,0 +1,7 @@
+{
+    "excluded": [
+      "GridHelper",
+      "PlaneGeometry",
+      "BufferGeometry"
+    ]
+  }
