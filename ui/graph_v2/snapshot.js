@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import config from '../../configs/config.json';
+import { share3dDat } from './create';
 
 export function createSceneSnapshot(scenes) {
     const snapshot = {
@@ -127,3 +128,42 @@ export function getObjectById(snapshot, id) {
 export function addDebugVisualsToScene(scene, snapshot) {
     scene.add(snapshot.debugObjects);
 }
+
+
+export function getCubeContainingSphere(sphere) {
+    const { nonBloomScene } = share3dDat();
+    let containingCube = null;
+  
+    nonBloomScene.traverse((object) => {
+      if (object.geometry && object.geometry.type === "BoxGeometry") {
+        const cube = object;
+        const cubePosition = cube.position;
+        const cubeSize = cube.scale.x; // Assuming uniform scale
+  
+        const halfSize = cubeSize / 2;
+        const minX = cubePosition.x - halfSize;
+        const maxX = cubePosition.x + halfSize;
+        const minY = cubePosition.y - halfSize;
+        const maxY = cubePosition.y + halfSize;
+        const minZ = cubePosition.z - halfSize;
+        const maxZ = cubePosition.z + halfSize;
+  
+        const spherePos = sphere.position;
+  
+        if (
+          spherePos.x >= minX &&
+          spherePos.x <= maxX &&
+          spherePos.y >= minY &&
+          spherePos.y <= maxY &&
+          spherePos.z >= minZ &&
+          spherePos.z <= maxZ
+        ) {
+          containingCube = cube;
+          return; // Stop traversal
+        }
+      }
+    });
+  
+    return containingCube;
+  }
+  

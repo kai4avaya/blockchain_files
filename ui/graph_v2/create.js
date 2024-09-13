@@ -576,7 +576,25 @@ export function removeEmptyCubes(scene, nonBloomScene) {
 // At the top of your file
 let ghostCube = null;
 
-export function createGhostCube(position, size) {
+// export function createGhostCube(position, size) {
+//   if (ghostCube) return; // Prevent multiple ghost cubes
+
+//   const geometry = new THREE.BoxGeometry(size, size, size);
+//   const material = new THREE.MeshBasicMaterial({
+//     color: 0xffffff,
+//     opacity: 0.5,
+//     transparent: true,
+//   });
+
+//   ghostCube = new THREE.Mesh(geometry, material);
+//   ghostCube.position.copy(position);
+
+//   const { scene } = share3dDat();
+//   scene.add(ghostCube);
+//   markNeedsRender();
+// }
+
+export function createGhostCube(position, size, existingCube = null) {
   if (ghostCube) return; // Prevent multiple ghost cubes
 
   const geometry = new THREE.BoxGeometry(size, size, size);
@@ -589,10 +607,14 @@ export function createGhostCube(position, size) {
   ghostCube = new THREE.Mesh(geometry, material);
   ghostCube.position.copy(position);
 
+  // **Store reference to existing cube, if any**
+  ghostCube.existingCube = existingCube;
+
   const { scene } = share3dDat();
   scene.add(ghostCube);
   markNeedsRender();
 }
+
 
 export function removeGhostCube() {
   if (ghostCube) {
