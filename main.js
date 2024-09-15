@@ -1,108 +1,3 @@
-
-// import { editor } from './quillEditor.js';
-// import userActionStore from './memory/stores/userActionStore';
-// import { showPopup } from './ui/popup.js';
-// import {getObjectUnderPointer} from './ui/graph_v2/move'
-// import { initializeFileSystem, getFileSystem } from './memory/collaboration/file_colab';
-// import { sceneState } from './memory/collaboration/scene_colab';
-// import { scene, nonBloomScene, initializeGraph } from './ui/graph_v2/create';
-
-
-// const userId = "kai"
-// localStorage.setItem("login_block", userId);
-
-// // Initialize Quill editor
-// editor();
-
-// async function main() {
-// //   await loadInitialState();
-//   await initializeFileSystem();
-//   const fileSystem = getFileSystem();
-
-//   fileSystem.onReady(() => {
-//     // Perform operations that require the file system
-//   });
-
-//   // Initialize the graph and SceneState
-//   await initializeGraph();
-//   await sceneState.initialize(scene, nonBloomScene);
-  
-
-// }
-
-// // Set up drag-and-drop file handling
-// document.body.addEventListener('dragover', event => {
-//     event.preventDefault();
-// });
-
-// document.body.addEventListener('drop', event => {
-//     event.preventDefault();
-//     console.log('File(s) dropped');
-//     // handleFileDrop(event);
-// });
-
-// window.addEventListener('click', async event => {
-//     userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
-//     userActionStore.setMouseDown(userId, true, event.clientX, event.clientY, event.target);
-
-//     const selectedObject = getObjectUnderPointer(event);
-//     if (selectedObject) {
-//       const nodeId = selectedObject.userData.id;
-//       const fileSystem = getFileSystem();
-//       console.log("fileSystem", fileSystem,"nodeId", nodeId)
-//       const fileMetadata = fileSystem.getMetadata(nodeId, 'file');
-//       if (fileMetadata) {
-//         showPopup(fileMetadata, event.clientX, event.clientY);
-//       }
-//     } else {
-//       document.getElementById('popup').style.display = 'none';
-//     }
-
-//     userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target);
-
-//     // Log user action
-//     userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
-//     userActionStore.setMouseDown(userId, true, event.clientX, event.clientY, event.target); // Log mouse down
-
-//     userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target); // Log mouse up
-
-//     if (selectedObject) {
-
-//         const nodeId = selectedObject.userData.id;
-//       const fileSystem = getFileSystem();
-//       const fileMetadata = fileSystem.getMetadata(nodeId, "file");
-//         showPopup(fileMetadata, event.clientX, event.clientY); // Display the selected file's metadata
-//     } else {
-//         document.getElementById('popup').style.display = 'none';
-//         console.log("No object under click.");
-//     }
-// });
-
-
-// // Track mouse movements
-// window.addEventListener('mousemove', event => {
-//     userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
-// });
-
-// // Track mouse down and up events
-// window.addEventListener('mousedown', event => {
-//     userActionStore.setMouseDown(userId, true, event.clientX, event.clientY, event.target);
-// });
-// window.addEventListener('mouseup', event => {
-//     userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target);
-// });
-
-// // Track key press and release events
-// window.addEventListener('keydown', event => {
-//     userActionStore.addKeyPressed(userId, event.key);
-// });
-// window.addEventListener('keyup', event => {
-//     userActionStore.removeKeyPressed(userId, event.key);
-// });
-
-// main().catch(console.error);
-
-
 import { editor } from './quillEditor.js';
 import userActionStore from './memory/stores/userActionStore';
 import { showPopup } from './ui/popup.js';
@@ -111,7 +6,6 @@ import { initializeFileSystem, getFileSystem } from './memory/collaboration/file
 import { sceneState } from './memory/collaboration/scene_colab';
 import { scene, nonBloomScene, initializeGraph } from './ui/graph_v2/create';
 import { P2PSync } from './network/peer2peer_simple'; // Import the P2PSync class
-
 
 const userId = "kai";
 localStorage.setItem("login_block", userId);
@@ -124,6 +18,7 @@ async function main() {
   const fileSystem = getFileSystem();
 
   fileSystem.onReady(() => {
+    // Perform operations that require the file system
   });
 
   // Initialize the graph and SceneState
@@ -133,9 +28,9 @@ async function main() {
   const p2pSync = P2PSync.getInstance();
   p2pSync.initialize(userId, sceneState);
 
+  // Set up P2P UI elements
+  setupP2PUI(p2pSync);
 
-    // Set up P2P UI elements
-    setupP2PUI(p2pSync)
   // Add event listeners after initialization
   addEventListeners();
 }
@@ -160,30 +55,63 @@ function setupP2PUI(p2pSync) {
 }
 
 function addEventListeners() {
+  let pointerDownTime = null;
+  let isDragging = false;
+  const CLICK_DURATION_THRESHOLD = 300; // milliseconds
+  const DRAG_THRESHOLD = 10; // pixels
 
-  let pointerDownTime = 0;
-  const CLICK_DURATION_THRESHOLD = 200; // milliseconds
+  let startX = 0;
+  let startY = 0;
 
   window.addEventListener('pointerdown', event => {
     pointerDownTime = Date.now();
+    startX = event.clientX;
+    startY = event.clientY;
+    isDragging = false;
+    console.log(`Pointer down at: ${pointerDownTime} | Position: (${startX}, ${startY})`);
     userActionStore.setMouseDown(userId, true, event.clientX, event.clientY, event.target);
-  });
+  }, { capture: true });
 
   window.addEventListener('pointerup', event => {
-    const clickDuration = Date.now() - pointerDownTime;
+    if (pointerDownTime === null) {
+      return;
+    }
+
+    const pointerUpTime = Date.now();
+    const clickDuration = pointerUpTime - pointerDownTime;
+    console.log(`Pointer up at: ${pointerUpTime} | Duration: ${clickDuration}ms | isDragging: ${isDragging}`);
+
     userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target);
-    if (clickDuration <= CLICK_DURATION_THRESHOLD) {
+
+    if (!isDragging && clickDuration <= CLICK_DURATION_THRESHOLD) {
+      console.log('Quick click detected');
       handleQuickClick(event);
     } else {
-      console.log('Long click detected, not showing popup');
+      if (isDragging) {
+        console.log('Drag detected, not showing popup');
+      } else {
+        console.log('Long click detected, not showing popup');
+      }
     }
 
     // Log user action
     userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
-  });
 
-  // Track pointer movements
+    // Reset pointerDownTime
+    pointerDownTime = null;
+  }, { capture: true });
+
   window.addEventListener('pointermove', event => {
+    if (pointerDownTime !== null) {
+      const moveX = event.clientX - startX;
+      const moveY = event.clientY - startY;
+      const distance = Math.sqrt(moveX * moveX + moveY * moveY);
+
+      if (distance > DRAG_THRESHOLD) {
+        isDragging = true;
+      }
+    }
+
     userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
   });
 
@@ -194,7 +122,6 @@ function addEventListeners() {
   window.addEventListener('keyup', event => {
     userActionStore.removeKeyPressed(userId, event.key);
   });
-
 }
 
 function handleQuickClick(event) {
@@ -208,6 +135,7 @@ function handleQuickClick(event) {
     if (fileMetadata) {
       showPopup(fileMetadata, event.clientX, event.clientY);
     } else {
+      console.log('File metadata not found for nodeId:', nodeId);
     }
   } else {
     const popup = document.getElementById('popup');
@@ -219,15 +147,15 @@ function handleQuickClick(event) {
   }
 }
 
-// Set up drag-and-drop file handling
-document.body.addEventListener('dragover', event => {
-  event.preventDefault();
-});
+// // Set up drag-and-drop file handling
+// document.body.addEventListener('dragover', event => {
+//   event.preventDefault();
+// });
 
-document.body.addEventListener('drop', event => {
-  event.preventDefault();
-  // handleFileDrop(event);
-});
+// document.body.addEventListener('drop', event => {
+//   event.preventDefault();
+//   // handleFileDrop(event);
+// });
 
 main().catch(error => {
   console.error("Error in main function:", error);

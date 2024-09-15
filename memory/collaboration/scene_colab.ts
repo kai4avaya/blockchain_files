@@ -1,6 +1,8 @@
 import { reconstructScene } from "../../ui/graph_v2/create";
 import indexDBOverlay from '../local/file_worker';
 import { P2PSync } from '../../network/peer2peer';
+const loginName = localStorage.getItem("login_block") || "no_login";
+
 interface ObjectState {
   uuid: string; // original id of object
   type: string;
@@ -37,14 +39,12 @@ class SceneState {
     this.savedObjects = new Set();
     this.broadcastChannel = new BroadcastChannel('sceneStateChannel');
     this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
-    // this.p2pSync = P2PSync.getInstance(this);
+    this.p2pSync = P2PSync.getInstance(this);
   }
   
-  private broadcastUpdate(state: any) {
-    this.broadcastChannel.postMessage(state);
-
-    // p2pSync.broadcastUpdate(state);
-    // this.p2pSync.broadcastUpdate(state);
+  private broadcastUpdate(states: ObjectState[]) {
+    this.broadcastChannel.postMessage(states);
+    this.p2pSync.broadcastUpdate(states);
   }
   
   private handleBroadcastMessage(event: MessageEvent) {
@@ -422,3 +422,39 @@ class SceneState {
 
 export const sceneState = SceneState.getInstance();
 // const p2pSync = new P2PSync(sceneState);
+
+
+
+export function saveObjectChanges(objectData) {
+  console.log("saveObjectChanges", objectData);
+  if (!objectData) return;
+
+  const convertToArray = (value) => {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value.toArray === "function") return value.toArray();
+    return value;
+  };
+
+  const convertColor = (color) => {
+    if (typeof color === "number") return color;
+    if (color && typeof color.getHex === "function") return color.getHex();
+    return color;
+  };
+
+  const commonData = {
+    type: objectData.type,
+    shape: objectData.shape,
+    uuid: objectData.uuid,
+    userData: objectData.userData || {},
+    position: convertToArray(objectData.position),
+    rotation: convertToArray(objectData.rotation),
+    scale: convertToArray(objectData.scale),
+    version: objectData.version + 1,
+    versionNonce: objectData.versionNonce,
+    size: objectData.size,
+    isDeleted: objectData.isDeleted || false,
+    color: convertColor(objectData.material?.color || objectData.color),
+    lastEditedBy: objectData.loginName || loginName,
+  };
+  sceneState.updateObject(commonData);
+}

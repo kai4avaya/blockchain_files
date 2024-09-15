@@ -7,7 +7,7 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
 import { makeObjectWritable, convertToThreeJSFormat } from "../../utils/utils";
-import { createSceneSnapshot } from "./snapshot.js";
+import { createSceneSnapshot, findSpheresInCube } from "./snapshot.js";
 // import { sceneState } from "../../memory/collaboration/scene_colab";
 
 const BLOOM_SCENE = 1;
@@ -179,8 +179,6 @@ function createEnvironment() {
   directionalLight.position.set(1, 1, 1).normalize();
   scene.add(directionalLight);
 
-  console.log("Simple environment created");
-  console.log("Number of objects in scene:", scene.children.length);
 }
 
 function loadTerrain(file, callback) {
@@ -219,7 +217,6 @@ function createEnvironmentTerrain() {
     terrain.rotation.x = -Math.PI / 2;  // Rotate to lay flat
     scene.add(terrain);
 
-    console.log("Terrain created");
     markNeedsRender();
   });
 
@@ -254,6 +251,55 @@ const edges = new THREE.EdgesGeometry(geometry);
 let wireMaterial;
 let solidMaterial;
 
+
+export function resizeCubeToFitSpheres(cube, minSizeAllowed = false, buffer = 5) {
+  // Instead of using cubeGroups, we'll find spheres within the cube
+  const spheres = findSpheresInCube(cube);
+  if (spheres.length === 0) return;
+
+  // Calculate the bounding box that fits all spheres
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+  spheres.forEach((sphere) => {
+    const spherePosition = sphere.position;
+    const sphereRadius = sphere.scale.x / 2; // Assuming uniform scale
+
+    minX = Math.min(minX, spherePosition.x - sphereRadius);
+    minY = Math.min(minY, spherePosition.y - sphereRadius);
+    minZ = Math.min(minZ, spherePosition.z - sphereRadius);
+    maxX = Math.max(maxX, spherePosition.x + sphereRadius);
+    maxY = Math.max(maxY, spherePosition.y + sphereRadius);
+    maxZ = Math.max(maxZ, spherePosition.z + sphereRadius);
+  });
+
+  // Add buffer to the bounding box dimensions
+  minX -= buffer;
+  minY -= buffer;
+  minZ -= buffer;
+  maxX += buffer;
+  maxY += buffer;
+  maxZ += buffer;
+
+  // Calculate the new size of the cube based on the bounding box
+  const newCubeSize = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
+
+  // Get the current size of the cube
+  const currentCubeSize = cube.scale.x; // Assuming uniform scale
+
+  // Determine the final cube size
+  const finalCubeSize = minSizeAllowed ? newCubeSize : Math.max(newCubeSize, currentCubeSize);
+
+  // Set the cube size to the final calculated size
+  cube.scale.set(finalCubeSize, finalCubeSize, finalCubeSize);
+
+  // Center the cube on the spheres
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  const centerZ = (minZ + maxZ) / 2;
+  cube.position.set(centerX, centerY, centerZ);
+}
+
 export function createWireframeCube(convertedData) {
   // Update materials with the new color
   wireMaterial = new THREE.LineBasicMaterial({ color: convertedData.color, linewidth: 2 });
@@ -287,10 +333,15 @@ export function createWireframeCube(convertedData) {
     uuid: uuid + "-solid",
   });
 
+  resizeCubeToFitSpheres(wireframeCube);
+  resizeCubeToFitSpheres(solidCube);
+
   nonBloomScene.add(wireframeCube);
   nonBloomScene.add(solidCube);
 
   console.log("BIG BAD CUBE IS CREATED", wireframeCube, solidCube);
+
+  
 
   return { wireframeCube, solidCube };
 }
@@ -348,12 +399,6 @@ function setupScene() {
   loadCameraState();
 
   createEnvironment();
-  
-
-  console.log("One-point perspective scene setup complete");
-  console.log("Camera position:", camera.position);
-  console.log("Camera lookAt:", camera.getWorldDirection(new THREE.Vector3()));
-  console.log("Camera far:", camera.far);
 
   markNeedsRender();
 }
@@ -372,7 +417,6 @@ const sphereGeometry = new THREE.IcosahedronGeometry(1, 15);
 let sphereMaterial;
 
 export function createSphere(convertedData) {
-  console.log("Creating sphere with data:", convertedData);
 
   // Update material with the new color
   const color = convertedData.color || new THREE.Color().setHSL(
@@ -528,8 +572,6 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   // Create a snapshot of the current scene
   const snapshot = createSceneSnapshot([scene, nonBloomScene]);
 
-  console.log("snapshot in removeEmptyCubes", snapshot);
-
   // Array to store cubes that need to be removed
   const cubesToRemove = [];
   const removedCubes = [];
@@ -628,47 +670,6 @@ export function removeGhostCube() {
 }
 
 
-
-// export function reconstructScene(snapshot) {
-//   console.log(
-//     "----------------------------------------------------------------------------"
-//   );
-//   console.log("Reconstructing scene with snapshot:", snapshot);
-//   const existingObjects = new Map();
-
-//   // Collect existing objects
-//   function traverseScene(object, isMainScene) {
-//     if (object.uuid) {
-//       existingObjects.set(object.uuid, { object, inScene: isMainScene });
-//     }
-//   }
-//   scene.traverse((object) => traverseScene(object, true));
-//   nonBloomScene.traverse((object) => traverseScene(object, false));
-
-//   // Update or create objects from snapshot
-//   snapshot.forEach((objectState) => {
- 
-//     const existingEntry = existingObjects.get(objectState.uuid);
-
-//     if (objectState.isDeleted) {
-//       if (existingEntry) {
-//         removeObject(existingEntry);
-//       }
-//       existingObjects.delete(objectState.uuid);
-//     } else {
-//       if (existingEntry) {
-//       //   updateObjectProperties(existingEntry.object, objectState);
-//       } else {
-//         createObject(objectState);
-//       }
-//     }
-//   });
-
-//   console.log(
-//     "----------------------------------------------------------------------------"
-//   );
-//   markNeedsRender();
-// }
 export function reconstructScene(snapshot) {
   console.log("Reconstructing scene with snapshot:", snapshot);
   snapshot.forEach((objectState) => {

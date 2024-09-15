@@ -2,12 +2,84 @@ import * as THREE from 'three';
 import config from '../../configs/config.json';
 import { share3dDat } from './create';
 
+// export function createSceneSnapshot(scenes) {
+//     const snapshot = {
+//         objects: [],
+//         boxes: [],
+//         containment: {},
+//         debugObjects: new THREE.Group()
+//     };
+
+//     const boundingBoxes = new Map();
+
+//     scenes.forEach((currentScene, sceneIndex) => {
+//         currentScene.traverse((object) => {
+//             if (isRelevantObject(object)) {
+//                 const objectId = getObjectId(object);
+//                 const objectData = {
+//                     id: objectId,
+//                     object: object,
+//                     type: object.geometry.type,
+//                     scene: sceneIndex
+//                 };
+
+//                 snapshot.objects.push(objectData);
+
+//                 // Handle boxes (both wireframe and solid versions)
+//                 if (isBoxObject(object)) {
+//                     const boxId = getBoxId(object);
+//                     let existingBox = snapshot.boxes.find(box => box.id === boxId);
+                    
+//                     if (!existingBox) {
+//                         existingBox = { id: boxId, wireframe: null, solid: null };
+//                         snapshot.boxes.push(existingBox);
+//                     }
+
+//                     if (object instanceof THREE.LineSegments) {
+//                         existingBox.wireframe = object;
+//                     } else {
+//                         existingBox.solid = object;
+//                     }
+
+//                     // Create bounding box if not exists
+//                     if (!boundingBoxes.has(boxId)) {
+//                         const boundingBox = new THREE.Box3().setFromObject(object);
+//                         boundingBoxes.set(boxId, boundingBox);
+//                     }
+//                 }
+
+//                 // Add debug visual for all objects
+//                 const objectBoundingBox = new THREE.Box3().setFromObject(object);
+//                 const objectHelper = new THREE.Box3Helper(objectBoundingBox, new THREE.Color(0x00ff00));
+//                 snapshot.debugObjects.add(objectHelper);
+//             }
+//         });
+//     });
+
+//     // Compute containment
+//     snapshot.boxes.forEach(box => {
+//         const boxBoundingBox = boundingBoxes.get(box.id);
+//         snapshot.containment[box.id] = [];
+
+//         snapshot.objects.forEach(obj => {
+//             if (isSphereObject(obj.object)) {
+//                 const sphereBoundingBox = new THREE.Box3().setFromObject(obj.object);
+//                 if (boxBoundingBox.intersectsBox(sphereBoundingBox)) {
+//                     snapshot.containment[box.id].push(obj.id);
+//                 }
+//             }
+//         });
+//     });
+
+//     return snapshot;
+// }
+
+
 export function createSceneSnapshot(scenes) {
     const snapshot = {
         objects: [],
         boxes: [],
-        containment: {},
-        debugObjects: new THREE.Group()
+        containment: {}
     };
 
     const boundingBoxes = new Map();
@@ -47,11 +119,6 @@ export function createSceneSnapshot(scenes) {
                         boundingBoxes.set(boxId, boundingBox);
                     }
                 }
-
-                // Add debug visual for all objects
-                const objectBoundingBox = new THREE.Box3().setFromObject(object);
-                const objectHelper = new THREE.Box3Helper(objectBoundingBox, new THREE.Color(0x00ff00));
-                snapshot.debugObjects.add(objectHelper);
             }
         });
     });
@@ -73,6 +140,7 @@ export function createSceneSnapshot(scenes) {
 
     return snapshot;
 }
+
 
 function isRelevantObject(object) {
     if (!(object.isMesh || object instanceof THREE.LineSegments)) {
@@ -165,5 +233,26 @@ export function getCubeContainingSphere(sphere) {
     });
   
     return containingCube;
+  }
+  
+
+  
+export function findSpheresInCube(cube) {
+    const { scene, nonBloomScene } = share3dDat();
+    const spheres = [];
+    const cubeBox = new THREE.Box3().setFromObject(cube);
+  
+    [scene, nonBloomScene].forEach(currentScene => {
+      currentScene.traverse((object) => {
+        if (object.geometry && object.geometry.type === "IcosahedronGeometry") {
+          const sphereBox = new THREE.Box3().setFromObject(object);
+          if (cubeBox.intersectsBox(sphereBox)) {
+            spheres.push(object);
+          }
+        }
+      });
+    });
+  
+    return spheres;
   }
   
