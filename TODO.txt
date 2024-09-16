@@ -12,3 +12,9 @@ FEATURES
 - if i drag a node over another node, and it gets green it should suck it into the cube .... 
 - when i drag a file over a sphere i should have some indication that a node is being hovered over...
 - speed up dragging of nodes.... 
+
+
+- simple click should not cause an update... need apply quick click across apply
+- some files not showing up
+- popover not showing up
+- cursor?

@@ -16,15 +16,19 @@ import {convertToThreeJSFormat } from "../../utils/utils";
 import { saveObjectChanges } from "../../memory/collaboration/scene_colab";
 
 let isDragging = false;
+let isClicking = false;
 let selectedSphere = null;
 let CUBEINTERSECTED;
-const cubeGroups = new Map(); // Map of cube UUIDs to arrays of spheres inside them
+// const cubeGroups = new Map(); // Map of cube UUIDs to arrays of spheres inside them
 let selectedObject = null;
 let currentSnapshot = null;
 const BLOOM_SCENE = 1;
 let isFileDragging = false;
 const SCALEFACTOR = 0.05
 const RESCALEFACTOR = 10;
+let initialPointerPosition = { x: 0, y: 0 };
+let initialPointerTime = 0;
+const DRAG_THRESHOLD = 5; // Adjust this value as needed
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -391,60 +395,6 @@ function getSize(intersect, scale = 1) {
 
   return Math.max(size.x, size.y, size.z) * scale;
 }
-// async function handleDrop_sphere(event) {
-//   if (!isDragging) return; // may need endpoint for isDragging
-
-//   resetCubeHighlight();
-//   const { camera, scene, nonBloomScene } = share3dDat();
-
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-//   raycaster.setFromCamera(mouse, camera);
-
-//   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
-//   if (allIntersects.length > 0) {
-//     const intersect = allIntersects[0];
-//     const dropPosition = intersect.point;
-
-//     if (
-//       intersect.object.geometry.type === "EdgesGeometry" ||
-//       intersect.object.geometry.type === "BoxGeometry"
-//     ) {
-//       intersect.object.material.color.set(0xff0000);
-//     } else if (intersect.object.geometry.type === "IcosahedronGeometry") {
-//       // Only create a cube if we're dropping onto another sphere
-//       if (selectedSphere && selectedSphere !== intersect.object) {
-//         const size = getSize(intersect);
-//         const actualSphereSize = size * SCALEFACTOR;
-//         const scaledCubeSize = actualSphereSize * 4;
-
-//         const dataObject = convertToThreeJSFormat({
-//           size: scaledCubeSize,
-//           // position: new THREE.Vector3(dropPosition.x, dropPosition.y, dropPosition.z),
-//           position: [dropPosition.x, dropPosition.y, dropPosition.z], ////new THREE.Vector3(dropPosition.x, dropPosition.y, dropPosition.z),
-
-//           color: randomColorGenerator(),
-//           // userData:{id: fileIds[i]},
-//         });
-        
-//         createWireframeCube(
-//           dataObject
-//         );
-//       }
-//     }
-//   } else {
-//     planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
-//     plane.normal.copy(planeNormal);
-//     raycaster.ray.intersectPlane(plane, intersectPoint);
-//   }
-
-//   // Reset cube highlighting after drop
-//   if (CUBEINTERSECTED) {
-//     resetCubeColor(CUBEINTERSECTED);
-//     CUBEINTERSECTED = null;
-//   }
-// }
-
 
 function resetCubeColor(cube) {
   if (cube && cube.originalMaterial) {
@@ -504,37 +454,97 @@ function getObjectType(object) {
 }
 
 
+// export function onPointerDown(event) {
+//   const { mouse, raycaster, renderer, scene, nonBloomScene, camera, controls } = share3dDat();
+//   const canvas = renderer.domElement;
+//   const rect = canvas.getBoundingClientRect();
+
+//   // Calculate mouse position relative to the canvas
+//   mouse.x = (event.clientX - rect.left) / rect.width * 2 - 1;
+//   mouse.y = -(event.clientY - rect.top) / rect.height * 2 + 1;
+//   raycaster.setFromCamera(mouse, camera);
+//   const intersectsBloom = raycaster.intersectObjects(scene.children, true);
+//   const intersectsNonBloom = raycaster.intersectObjects(nonBloomScene.children, true);
+  
+//   // Record initial pointer position and time
+//   initialPointerPosition = { x: event.clientX, y: event.clientY };
+//   initialPointerTime = Date.now();
+//   isDragging = false; // Reset isDragging
+
+//     const sphereIntersect = intersectsBloom.find(
+//     (intersect) => getObjectType(intersect.object) === "Sphere"
+//   );
+
+
+//   if (sphereIntersect) {
+//     isDragging = true;
+//     controls.enabled = false;
+//     selectedSphere = sphereIntersect.object;
+//     selectedObject = selectedSphere;
+//     sphereIntersect.object.layers.toggle(BLOOM_SCENE);
+//   } else if(intersectsNonBloom?.length > 0) {
+
+//     const selectedCube = getCubeUnderPointer(event, intersectsNonBloom);
+//     if (selectedCube) {
+//       isDragging = true;
+//       controls.enabled = false;
+//       selectedObject = selectedCube;
+      
+//       // Initialize the previousIntersectPoint for cube dragging
+//       plane.setFromNormalAndCoplanarPoint(
+//         new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
+//         selectedObject.wireframeCube.position
+//       );
+//       raycaster.ray.intersectPlane(plane, previousIntersectPoint);
+//     }
+//   }
+
+//   if (isDragging) {
+//     // Prevent default behavior when dragging starts
+//     event.preventDefault();
+//     event.stopPropagation();
+//   }
+//   event.target.setPointerCapture(event.pointerId);
+//   markNeedsRender();
+// }
+
+
 export function onPointerDown(event) {
   const { mouse, raycaster, renderer, scene, nonBloomScene, camera, controls } = share3dDat();
   const canvas = renderer.domElement;
   const rect = canvas.getBoundingClientRect();
 
   // Calculate mouse position relative to the canvas
-  mouse.x = (event.clientX - rect.left) / rect.width * 2 - 1;
-  mouse.y = -(event.clientY - rect.top) / rect.height * 2 + 1;
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const intersectsBloom = raycaster.intersectObjects(scene.children, true);
   const intersectsNonBloom = raycaster.intersectObjects(nonBloomScene.children, true);
 
-    const sphereIntersect = intersectsBloom.find(
+  // Record initial pointer position and time
+  initialPointerPosition = { x: event.clientX, y: event.clientY };
+  initialPointerTime = Date.now();
+  isDragging = false; // Reset isDragging
+  isClicking = false; // Add this line
+
+  const sphereIntersect = intersectsBloom.find(
     (intersect) => getObjectType(intersect.object) === "Sphere"
   );
 
-
   if (sphereIntersect) {
-    isDragging = true;
-    controls.enabled = false;
+    controls.enabled = false; // Disable controls
     selectedSphere = sphereIntersect.object;
     selectedObject = selectedSphere;
     sphereIntersect.object.layers.toggle(BLOOM_SCENE);
-  } else if(intersectsNonBloom?.length > 0) {
-
+    console.log("turned on BLOOM willy boon! ", sphereIntersect.object.layers)
+    isClicking = true; // Indicate that an object was clicked
+  } else if (intersectsNonBloom?.length > 0) {
     const selectedCube = getCubeUnderPointer(event, intersectsNonBloom);
     if (selectedCube) {
-      isDragging = true;
-      controls.enabled = false;
+      controls.enabled = false; // Disable controls
       selectedObject = selectedCube;
-      
+      isClicking = true; // Indicate that an object was clicked
+
       // Initialize the previousIntersectPoint for cube dragging
       plane.setFromNormalAndCoplanarPoint(
         new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
@@ -542,52 +552,16 @@ export function onPointerDown(event) {
       );
       raycaster.ray.intersectPlane(plane, previousIntersectPoint);
     }
+  } else {
+    isDragging = false
   }
 
-  if (isDragging) {
-    // Prevent default behavior when dragging starts
-    event.preventDefault();
-    event.stopPropagation();
-  }
   event.target.setPointerCapture(event.pointerId);
   markNeedsRender();
 }
-``
+
 // Make sure to declare previousIntersectPoint at the top of your file
 let previousIntersectPoint = new THREE.Vector3();
-// export function saveObjectChanges(objectData) {
-//   console.log("saveObjectChanges", objectData);
-//   if (!objectData) return;
-
-//   const convertToArray = (value) => {
-//     if (Array.isArray(value)) return value;
-//     if (value && typeof value.toArray === "function") return value.toArray();
-//     return value;
-//   };
-
-//   const convertColor = (color) => {
-//     if (typeof color === "number") return color;
-//     if (color && typeof color.getHex === "function") return color.getHex();
-//     return color;
-//   };
-
-//   const commonData = {
-//     type: objectData.type,
-//     shape: objectData.shape,
-//     uuid: objectData.uuid,
-//     userData: objectData.userData || {},
-//     position: convertToArray(objectData.position),
-//     rotation: convertToArray(objectData.rotation),
-//     scale: convertToArray(objectData.scale),
-//     version: objectData.version + 1,
-//     versionNonce: objectData.versionNonce,
-//     size: objectData.size,
-//     isDeleted: objectData.isDeleted || false,
-//     color: convertColor(objectData.material?.color || objectData.color),
-//     lastEditedBy: objectData.loginName || loginName,
-//   };
-//   sceneState.updateObject(commonData);
-// }
 
 
 function getRandomOffset(cubeSize) {
@@ -600,119 +574,8 @@ function getRandomOffset(cubeSize) {
 
 
 
-// async function onPointerUp(event) {
-//   if (isDragging) {
-//     const { controls, scene, nonBloomScene, ghostCube } = share3dDat();
-
-
-//     isDragging = false;
-//     controls.enabled = true;
-
-
-//     // just if i am dragging sphere
-//     if (selectedSphere) {
-//       const sphereRadius = selectedSphere.scale.x || selectedSphere.geometry.parameters.radius
-      
-//       if (ghostCube) {
-//         if (ghostCube.existingCube) {
-//           // **The ghost cube represents an existing cube**
-//           const existingCube = ghostCube.existingCube;
-
-//           // Remove the ghost cube
-//           removeGhostCube();
-
-//           // **Move the selected sphere into the existing cube**
-//           const cubeSize = existingCube.scale.x;
-//           const cubePosition = existingCube.position.clone();
-
-//           const offset = getRandomOffset(cubeSize, sphereRadius);
-//           selectedSphere.position.copy(cubePosition.clone().add(offset));
-
-//           // **Save changes**
-//           saveObjectChanges(selectedSphere);
-//         } else {
-
-//           const cubeSize = sphereRadius * RESCALEFACTOR;
-//           const cubePosition = ghostCube.position.clone();
-//           const cubeColor = ghostCube.material.color.clone();
-
-//           // Remove the ghost cube
-//           removeGhostCube();
-
-//           // Create a real cube at the ghost cube's position
-//           const cubeData = convertToThreeJSFormat({
-//             position: cubePosition.toArray(),
-//             size: cubeSize,
-//             color: cubeColor.getHex(),
-//             userData: { id: `cube_${Date.now()}` },
-//             lastEditedBy: loginName,
-//           });
-//           const createdCube = createWireframeCube(cubeData);
-
-//           // Move the selected sphere into the new cube
-//           const offset = getRandomOffset(cubeSize, sphereRadius);
-//           selectedSphere.position.copy(cubePosition.clone().add(offset));
-
-//           // Save changes
-//           saveObjectChanges(selectedSphere);
-//           saveObjectChanges(createdCube.wireframeCube);
-//           saveObjectChanges(createdCube.solidCube);
-//         }
-//       } else {
-//         // Existing logic for when the sphere is not dropped over another sphere
-//         const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
-//         saveObjectChanges(selectedSphere);
-//         cubesToDelete.forEach((cube) => {
-//           if (!cube.wireframe) return;
-//           cube.wireframe.isDeleted = true;
-//           cube.solid.isDeleted = true;
-//           saveObjectChanges(cube.wireframe);
-//           saveObjectChanges(cube.solid);
-//         });
-//       }
-//     } else if (selectedObject && selectedObject.wireframeCube) {
-//       // Existing logic for when a cube is being dragged
-//       saveObjectChanges(selectedObject.wireframeCube);
-//       saveObjectChanges(selectedObject.solidCube);
-
-//       if (selectedObject.containedSpheres) {
-//         selectedObject.containedSpheres.forEach((sphereData) => {
-
-//           console.log("I am dragging these spheres have no fears MOVE", sphereData.object)
-//           if (sphereData.object) {
-//             const updatedPosition = new THREE.Vector3().fromArray(
-//               sphereData.object?.position
-//             );
-//             sphereData.object.position.copy(updatedPosition);
-//             const updatedSphereData = {
-//               ...sphereData.object,
-//               position: updatedPosition,
-//             };
-//             saveObjectChanges(updatedSphereData);
-//           }
-//         });
-//       }
-//     }
-
-//     selectedSphere = null;
-//     selectedObject = null;
-//     currentSnapshot = null;
-
-//     // Remove the ghost cube if it exists
-//     removeGhostCube();
-
-//     // Reset cube highlighting
-//     resetCubeHighlight();
-
-//     event.target.releasePointerCapture(event.pointerId);
-
-//     // Force a re-render of the scene
-//     markNeedsRender();
-//   }
-// }
-
-
 async function onPointerUp(event) {
+  console.log("tell me about DRAGG", isDragging)
   if (isDragging) {
     const { controls, scene, nonBloomScene, ghostCube } = share3dDat();
 
@@ -789,69 +652,137 @@ async function onPointerUp(event) {
       // resizeCubeToFitSpheres(selectedObject.wireframeCube);
     }
 
-    selectedSphere = null;
-    selectedObject = null;
-    currentSnapshot = null;
-
-    removeGhostCube();
-    resetCubeHighlight();
+  //  // Reset variables
+  //  isDragging = false;
+  //  isClicking = false;
+  //  selectedSphere = null;
+  //  selectedObject = null;
+  //  currentSnapshot = null;
+  //   removeGhostCube();
+  //   resetCubeHighlight();
 
     event.target.releasePointerCapture(event.pointerId);
     markNeedsRender();
   }
+     // Reset variables
+     isDragging = false;
+     isClicking = false;
+     selectedSphere = null;
+     selectedObject = null;
+     currentSnapshot = null;
+      removeGhostCube();
+      resetCubeHighlight();
 }
 
 
+// const onPointerMove = (event) => {
+//   if (!isDragging) return;
+
+//   const { camera, scene, nonBloomScene } = share3dDat();
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+//   raycaster.setFromCamera(mouse, camera);
+
+  
+
+//   if (selectedSphere) {
+//     moveSphere(event);
+
+//     const intersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+
+//     const sphereIntersect = intersects.find((intersect) => {
+//       return (
+//         intersect.object.geometry.type === "IcosahedronGeometry" &&
+//         intersect.object !== selectedSphere
+//       );
+//     });
+
+//     if (sphereIntersect) {
+//       const intersectedSphere = sphereIntersect.object;
+
+//       // **Check if the intersected sphere is inside a cube**
+//       const containingCube = getCubeContainingSphere(intersectedSphere);
+
+//       const sphereRadius = intersectedSphere.geometry.parameters.radius;
+//       const cubeSize = containingCube ? containingCube.scale.x : sphereRadius * 2;
+
+//       // **Create ghost cube, passing the existing cube if found**
+//       createGhostCube(intersectedSphere.position, cubeSize, containingCube);
+//     } else {
+//       removeGhostCube();
+//     }
+//   } else if (selectedObject) {
+//     // Existing code for dragging cubes
+//     plane.setFromNormalAndCoplanarPoint(
+//       new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
+//       new THREE.Vector3()
+//     );
+//     raycaster.ray.intersectPlane(plane, intersectPoint);
+//     dragCube();
+//   }
+
+//   markNeedsRender();
+// };
+
+
 const onPointerMove = (event) => {
-  if (!isDragging) return;
+  const { controls, camera, scene, nonBloomScene } = share3dDat();
+  if (!selectedSphere && !selectedObject) return;
 
-  const { camera, scene, nonBloomScene } = share3dDat();
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
+  const deltaX = event.clientX - initialPointerPosition.x;
+  const deltaY = event.clientY - initialPointerPosition.y;
+  const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-  if (selectedSphere) {
-    moveSphere(event);
-
-    const intersects = checkIntersections(raycaster, [scene, nonBloomScene]);
-
-    const sphereIntersect = intersects.find((intersect) => {
-      return (
-        intersect.object.geometry.type === "IcosahedronGeometry" &&
-        intersect.object !== selectedSphere
-      );
-    });
-
-    if (sphereIntersect) {
-      const intersectedSphere = sphereIntersect.object;
-
-      // **Check if the intersected sphere is inside a cube**
-      const containingCube = getCubeContainingSphere(intersectedSphere);
-
-      const sphereRadius = intersectedSphere.geometry.parameters.radius;
-      const cubeSize = containingCube ? containingCube.scale.x : sphereRadius * 2;
-
-      // **Create ghost cube, passing the existing cube if found**
-      createGhostCube(intersectedSphere.position, cubeSize, containingCube);
-    } else {
-      removeGhostCube();
-    }
-  } else if (selectedObject) {
-    // Existing code for dragging cubes
-    plane.setFromNormalAndCoplanarPoint(
-      new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-      new THREE.Vector3()
-    );
-    raycaster.ray.intersectPlane(plane, intersectPoint);
-    dragCube();
+  if (distanceMoved > DRAG_THRESHOLD) {
+    isDragging = true;
+    isClicking = false; // No longer a click, it's a drag
+    controls.enabled = false; // Disable controls during drag
   }
 
-  markNeedsRender();
-};
+  if (isDragging) {
+    mouse.x = ((event.clientX / window.innerWidth) * 2) - 1;
+    mouse.y = -((event.clientY / window.innerHeight) * 2) + 1;
+    raycaster.setFromCamera(mouse, camera);
 
-// window.addEventListener("pointerdown", onPointerDown);
-// window.addEventListener("pointermove", onPointerMove);
-// window.addEventListener("pointerup", onPointerUp);
+    if (selectedSphere) {
+      moveSphere(event);
+
+      const intersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+
+      const sphereIntersect = intersects.find((intersect) => {
+        return (
+          intersect.object.geometry.type === "IcosahedronGeometry" &&
+          intersect.object !== selectedSphere
+        );
+      });
+
+      if (sphereIntersect) {
+        const intersectedSphere = sphereIntersect.object;
+
+        // Check if the intersected sphere is inside a cube
+        const containingCube = getCubeContainingSphere(intersectedSphere);
+
+        const sphereRadius = intersectedSphere.geometry.parameters.radius;
+        const cubeSize = containingCube ? containingCube.scale.x : sphereRadius * 2;
+
+        // Create ghost cube, passing the existing cube if found
+        createGhostCube(intersectedSphere.position, cubeSize, containingCube);
+      } else {
+        removeGhostCube();
+      }
+    } else if (selectedObject) {
+      // Existing code for dragging cubes
+      plane.setFromNormalAndCoplanarPoint(
+        new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
+        new THREE.Vector3()
+      );
+      raycaster.ray.intersectPlane(plane, intersectPoint);
+      dragCube();
+    }
+
+    markNeedsRender();
+  }
+};
 
 function setupPointerEvents() {
   const { renderer } = share3dDat(); // Access the renderer to get the canvas

@@ -153,7 +153,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 // setupScene();
 let cubes = [];
-
+const updateMiniMap = createMiniMap(scene, nonBloomScene, camera, renderer);
 
 // Add this function to your code
 function addGridHelper() {
@@ -515,6 +515,7 @@ function restoreMaterial(obj) {
 export function markNeedsRender() {
   needsRender = true;
   renderCount = 2; // Render for the next 2 frames
+  updateMiniMap();
 }
 
 function animate() {
@@ -748,4 +749,209 @@ function createSphereWrapper(objectState) {
   const convertedData = convertToThreeJSFormat(objectState);
   const { sphere } = createSphere(convertedData);
   // sphere.uuid = objectState.uuid;
+}
+
+
+// // mini-map.js
+
+// export function createMiniMap(scene, nonBloomScene, camera, renderer) {
+// const mapSize = 150; // Size of the mini-map
+//   const padding = 10; // Padding from the edges of the screen
+//   const borderWidth = 2; // Width of the border
+
+//   // Create container div for border
+//   const container = document.createElement('div');
+//   container.style.position = 'absolute';
+//   container.style.right = `${padding}px`;
+//   container.style.bottom = `${padding}px`;
+//   container.style.width = `${mapSize + 2 * borderWidth}px`;
+//   container.style.height = `${mapSize + 2 * borderWidth}px`;
+//   container.style.backgroundColor = 'rgba(211, 211, 211, 0.5)'; // Light gray, semi-transparent
+//   container.style.padding = `${borderWidth}px`;
+//   document.body.appendChild(container);
+
+//   // Create canvas element
+//   const canvas = document.createElement('canvas');
+//   canvas.width = mapSize;
+//   canvas.height = mapSize;
+//   canvas.style.display = 'block'; // Removes tiny gap between canvas and border
+//   canvas.style.backgroundColor = 'rgba(0,0,0,0.5)';
+//   container.appendChild(canvas);
+
+//   const ctx = canvas.getContext('2d');
+
+//   // Create viewport indicator
+//   const viewportIndicator = document.createElement('div');
+//   viewportIndicator.style.position = 'absolute';
+//   viewportIndicator.style.border = '1px solid yellow';
+//   viewportIndicator.style.pointerEvents = 'none';
+//   document.body.appendChild(viewportIndicator);
+//   function updateMiniMap() {
+//     ctx.clearRect(0, 0, mapSize, mapSize);
+
+//     // Function to draw objects from a scene
+//     function drawSceneObjects(sceneToRender) {
+//       sceneToRender.traverse((object) => {
+//         if (object.isMesh) {
+//           let x, y, color;
+
+//           if (object.geometry.type === "IcosahedronGeometry") {
+//             // Sphere (from main scene)
+//             x = (object.position.x + 50) * (mapSize / 100);
+//             y = (object.position.z + 50) * (mapSize / 100);
+//             color = 'red';
+//           } else if (object.geometry.type === "BoxGeometry") {
+//             // Cube (from nonBloomScene)
+//             x = (object.position.x + 50) * (mapSize / 100);
+//             y = (object.position.z + 50) * (mapSize / 100);
+//             color = object.material.color.getStyle(); // Use the cube's actual color
+//           } else {
+//             return; // Skip other object types
+//           }
+
+//           ctx.fillStyle = color;
+//           ctx.beginPath();
+//           ctx.arc(x, y, 2, 0, Math.PI * 2);
+//           ctx.fill();
+//         }
+//       });
+//     }
+
+//     // Draw objects from both scenes
+//     drawSceneObjects(scene);
+//     drawSceneObjects(nonBloomScene);
+
+//     // Draw camera viewport
+//     const aspect = camera.aspect;
+//     const vFov = camera.fov * Math.PI / 180;
+//     const height = 2 * Math.tan(vFov / 2) * camera.position.y;
+//     const width = height * aspect;
+
+//     const vpX = (camera.position.x + 50) * (mapSize / 100);
+//     const vpY = (camera.position.z + 50) * (mapSize / 100);
+//     const vpWidth = width * (mapSize / 100);
+//     const vpHeight = height * (mapSize / 100);
+
+//     ctx.strokeStyle = 'green';
+//     ctx.strokeRect(vpX - vpWidth/2, vpY - vpHeight/2, vpWidth, vpHeight);
+
+//     // Update viewport indicator
+//     viewportIndicator.style.left = `${canvas.offsetLeft + vpX - vpWidth/2}px`;
+//     viewportIndicator.style.top = `${canvas.offsetTop + vpY - vpHeight/2}px`;
+//     viewportIndicator.style.width = `${vpWidth}px`;
+//     viewportIndicator.style.height = `${vpHeight}px`;
+//   }
+
+//   // Initial update
+//   updateMiniMap();
+
+//   // Return the update function so it can be called in the animation loop
+//   return updateMiniMap;
+// }
+
+export function createMiniMap(scene, nonBloomScene, camera, renderer) {
+  const mapSize = 150; // Size of the mini-map
+  const padding = 10; // Padding from the edges of the screen
+  const borderWidth = 2; // Width of the border
+
+  // Create container div for border
+  const container = document.createElement('div');
+  container.style.position = 'absolute';
+  container.style.right = `${padding}px`;
+  container.style.bottom = `${padding}px`;
+  container.style.width = `${mapSize + 2 * borderWidth}px`;
+  container.style.height = `${mapSize + 2 * borderWidth}px`;
+  container.style.backgroundColor = 'rgba(211, 211, 211, 0.5)'; // Light gray, semi-transparent
+  container.style.padding = `${borderWidth}px`;
+  document.body.appendChild(container);
+
+  // Create canvas element
+  const canvas = document.createElement('canvas');
+  canvas.width = mapSize;
+  canvas.height = mapSize;
+  canvas.style.display = 'block'; // Removes tiny gap between canvas and border
+  canvas.style.backgroundColor = 'rgba(0,0,0,0.5)';
+  container.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+
+  function updateMiniMap() {
+    ctx.clearRect(0, 0, mapSize, mapSize);
+
+    // Function to draw objects from a scene
+    function drawSceneObjects(sceneToRender) {
+      sceneToRender.traverse((object) => {
+        if (object.isMesh) {
+          let x, y, color;
+
+          if (object.geometry.type === "IcosahedronGeometry") {
+            // Sphere (from main scene)
+            x = (object.position.x + 50) * (mapSize / 100);
+            y = (object.position.z + 50) * (mapSize / 100);
+            color = 'red';
+          } else if (object.geometry.type === "BoxGeometry") {
+            // Cube (from nonBloomScene)
+            x = (object.position.x + 50) * (mapSize / 100);
+            y = (object.position.z + 50) * (mapSize / 100);
+            color = object.material.color.getStyle(); // Use the cube's actual color
+          } else {
+            return; // Skip other object types
+          }
+
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+    }
+
+    // Draw objects from both scenes
+    drawSceneObjects(scene);
+    drawSceneObjects(nonBloomScene);
+
+    // Calculate camera position on mini-map
+    const cameraX = (camera.position.x + 50) * (mapSize / 100);
+    const cameraZ = (camera.position.z + 50) * (mapSize / 100);
+
+    // Calculate viewport rectangle
+    const fov = camera.fov * Math.PI / 180;
+    const aspectRatio = camera.aspect;
+    const distance = Math.abs(camera.position.y); // Distance from camera to ground plane
+    const vFov = 2 * Math.atan(Math.tan(fov / 2) / aspectRatio);
+    
+    // Adjust for zoom
+    const zoomFactor = 1 / camera.zoom;
+    const viewportWidth = 2 * distance * Math.tan(fov / 2) * (mapSize / 100) * zoomFactor;
+    const viewportHeight = 2 * distance * Math.tan(vFov / 2) * (mapSize / 100) * zoomFactor;
+
+    // Ensure viewport doesn't exceed mini-map bounds
+    const maxSize = mapSize * 0.9; // 90% of mini-map size
+    const scale = Math.min(1, maxSize / Math.max(viewportWidth, viewportHeight));
+    const scaledWidth = viewportWidth * scale;
+    const scaledHeight = viewportHeight * scale;
+
+    // Rotate the viewport rectangle
+    ctx.save();
+    ctx.translate(cameraX, cameraZ);
+    ctx.rotate(-camera.rotation.y);
+
+    // Draw viewport rectangle
+    ctx.strokeStyle = 'yellow';
+    ctx.strokeRect(-scaledWidth / 2, -scaledHeight / 2, scaledWidth, scaledHeight);
+
+    // Draw direction indicator
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -scaledHeight / 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // Initial update
+  updateMiniMap();
+
+  // Return the update function so it can be called in the animation loop
+  return updateMiniMap;
 }
