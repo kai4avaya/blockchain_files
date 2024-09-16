@@ -6,7 +6,7 @@ interface SceneState {
   updateObject: (objectState: any) => void;
 }
 
-export class P2PSync {
+class P2PSync {
   private static instance: P2PSync | null = null;
   private peer: Peer | null = null;
   private connections: Map<string, DataConnection> = new Map();
@@ -14,6 +14,8 @@ export class P2PSync {
   private knownPeers: Set<string> = new Set();
   private heartbeatInterval: number = 5000; // Heartbeat every 5 seconds
   private heartbeatTimer: number | null = null;
+  private reconnectInterval: number = 10000;
+  private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 
   private constructor() {}
 
@@ -24,30 +26,26 @@ export class P2PSync {
     return P2PSync.instance;
   }
 
+ 
   initialize(userId: string, sceneState: SceneState): void {
     this.sceneState = sceneState;
     this.loadKnownPeers();
 
-    // Append a session ID to avoid 'ID is taken' errors
-    const sessionId = Date.now();
-    const peerId = `${userId}-${sessionId}`;
+    const storedPeerId = localStorage.getItem('myPeerId');
+    const peerId = storedPeerId || `${userId}-${Date.now()}`;
     this.peer = new Peer(peerId);
 
     this.peer.on('open', (id) => {
       console.log('My peer ID is:', id);
+      localStorage.setItem('myPeerId', id);
       updateStatus(`Initialized with peer ID: ${id}`);
+      this.updateUserIdInput(id);  // Update the user ID input instead
 
-      // Attempt to reconnect to known peers
-      this.knownPeers.forEach((peerId) => {
-        this.connectToSpecificPeer(peerId);
-      });
-
-      // Start heartbeat
+      this.knownPeers.forEach((peerId) => this.connectToSpecificPeer(peerId));
       this.startHeartbeat();
     });
 
     this.peer.on('connection', (conn) => {
-      // Wait for the connection to open before handling it
       if (conn.open) {
         this.handleConnection(conn);
       } else {
@@ -57,8 +55,7 @@ export class P2PSync {
 
     this.peer.on('disconnected', () => {
       console.log('Peer disconnected');
-      updateStatus('Peer disconnected');
-      // Try to reconnect
+      updateStatus('Peer disconnected. Attempting to reconnect...');
       if (this.peer && !this.peer.destroyed) {
         this.peer.reconnect();
       }
@@ -73,21 +70,17 @@ export class P2PSync {
     this.peer.on('error', (error) => {
       console.error('PeerJS error:', error);
       updateStatus(`PeerJS error: ${error.type}`);
-
-      if (error.type === 'unavailable-id') {
-        // Generate a new peer ID and retry
-        updateStatus('ID is taken, generating a new ID');
-        const newSessionId = Date.now();
-        const newPeerId = `${userId}-${newSessionId}`;
-        this.peer = new Peer(newPeerId);
-      }
     });
   }
 
+  setSceneState(sceneState: SceneState): void {
+    this.sceneState = sceneState;
+  }
+
   connectToSpecificPeer(peerId: string): void {
-    if (!this.peer) {
-      console.error('Peer object is undefined. Cannot connect.');
-      updateStatus('Error: Peer not initialized');
+    if (!this.peer || this.peer.destroyed) {
+      console.error('Peer object is undefined or destroyed. Cannot connect.');
+      updateStatus('Error: Peer not initialized or destroyed');
       return;
     }
     if (this.connections.has(peerId) || peerId === this.peer.id) {
@@ -103,25 +96,23 @@ export class P2PSync {
     conn.on('open', () => {
       console.log(`Connection to peer ${peerId} opened`);
       this.handleConnection(conn);
+      this.clearReconnectTimer(peerId);
     });
 
     conn.on('error', (err) => {
       console.error(`Connection error with peer ${peerId}:`, err);
       updateStatus(`Connection error with peer ${peerId}: ${err.message}`);
+      this.scheduleReconnect(peerId);
     });
   }
 
+
   private handleConnection(conn: DataConnection): void {
     console.log('Handling connection for peer:', conn.peer);
-
-    // Add connection to the map only after it's open
     this.connections.set(conn.peer, conn);
     updateStatus(`Connected to peer: ${conn.peer}`);
-
-    // Save known peer
     this.saveKnownPeer(conn.peer);
 
-    // Send our current state to the new peer
     if (this.sceneState) {
       const currentState = this.sceneState.getSerializableState();
       conn.send({ type: 'full_state', data: currentState });
@@ -129,20 +120,18 @@ export class P2PSync {
 
     conn.on('data', (data: { type: string; data: any }) => {
       if (!this.sceneState) return;
-
+    
       if (data.type === 'full_state') {
         console.log('Received full state from peer. Syncing...');
         this.sceneState.syncWithPeer(data.data);
       } else if (data.type === 'update') {
         if (Array.isArray(data.data)) {
           data.data.forEach((objectState) =>
-            this.sceneState!.updateObject(objectState)
+            this.sceneState!.updateObject(objectState, { fromPeer: true })
           );
         } else {
-          this.sceneState.updateObject(data.data);
+          this.sceneState.updateObject(data.data, { fromPeer: true });
         }
-      } else if (data.type === 'heartbeat') {
-        // Handle heartbeat messages if needed
       }
     });
 
@@ -150,13 +139,27 @@ export class P2PSync {
       console.log(`Connection closed with peer: ${conn.peer}`);
       this.connections.delete(conn.peer);
       updateStatus(`Disconnected from peer: ${conn.peer}`);
+      this.scheduleReconnect(conn.peer);
     });
 
     conn.on('error', (err) => {
       console.error(`Connection error with peer ${conn.peer}:`, err);
       updateStatus(`Connection error with peer ${conn.peer}: ${err.message}`);
+      this.scheduleReconnect(conn.peer);
     });
   }
+
+  
+  private scheduleReconnect(peerId: string): void {
+    if (!this.reconnectTimers.has(peerId)) {
+      const timer = setTimeout(() => {
+        this.connectToSpecificPeer(peerId);
+      }, this.reconnectInterval);
+      this.reconnectTimers.set(peerId, timer);
+    }
+  }
+
+  
 
   private startHeartbeat(): void {
     this.heartbeatTimer = setInterval(() => {
@@ -167,6 +170,7 @@ export class P2PSync {
       });
     }, this.heartbeatInterval) as unknown as number;
   }
+
 
   private stopHeartbeat(): void {
     if (this.heartbeatTimer !== null) {
@@ -195,12 +199,22 @@ export class P2PSync {
       }
     }
   }
-
   destroyConn(): void {
+    this.connections.forEach((conn) => conn.close());
+    this.connections.clear();
     if (this.peer && !this.peer.destroyed) {
       this.peer.destroy();
     }
     this.stopHeartbeat();
+    this.reconnectTimers.forEach((timer) => clearTimeout(timer));
+    this.reconnectTimers.clear();
+  }
+
+  getSerializableState(): any {
+    if (this.sceneState) {
+      return this.sceneState.getSerializableState();
+    }
+    return null; // or a default state if appropriate
   }
 
   broadcastUpdate(state: any): void {
@@ -210,9 +224,25 @@ export class P2PSync {
       }
     });
   }
-}
 
-// UI Integration
+  getSceneState(): SceneState | null {
+    return this.sceneState;
+  }
+
+  private updateUserIdInput(peerId: string): void {
+    const userIdInput = document.getElementById('userIdInput') as HTMLInputElement;
+    if (userIdInput) {
+      userIdInput.value = peerId;
+    }
+  }
+  
+  private updatePeerIdInput(peerId: string): void {
+    const peerIdInput = document.getElementById('peerIdInput') as HTMLInputElement;
+    if (peerIdInput) {
+      peerIdInput.value = peerId;
+    }
+  }
+}
 const p2pSync = P2PSync.getInstance();
 
 // DOM elements
@@ -228,22 +258,32 @@ function updateStatus(message: string): void {
   console.log('Status update:', message);
 }
 
-// Initialize P2PSync when user enters their ID
-userIdInput?.addEventListener('change', () => {
-  const userId = userIdInput.value.trim();
+// Auto-populate user ID input if stored peer ID exists
+const storedPeerId = localStorage.getItem('myPeerId');
+if (storedPeerId && userIdInput) {
+  userIdInput.value = storedPeerId;
+}
+
+// Initialize P2PSync when user enters their ID or when the page loads with a stored ID
+function initializeP2PSync() {
+  const userId = userIdInput?.value.trim();
   if (userId) {
-    // Mock SceneState for demonstration
     const mockSceneState: SceneState = {
       getSerializableState: () => ({ /* mock state */ }),
-      syncWithPeer: (state) =>
-        console.log('Syncing with peer state:', state),
-      updateObject: (objectState) =>
-        console.log('Updating object:', objectState),
+      syncWithPeer: (state) => console.log('Syncing with peer state:', state),
+      updateObject: (objectState) => console.log('Updating object:', objectState),
     };
     p2pSync.initialize(userId, mockSceneState);
     updateStatus(`Initializing with user ID: ${userId}`);
   }
-});
+}
+
+// Call initializeP2PSync on page load if there's a stored peer ID
+if (storedPeerId) {
+  initializeP2PSync();
+}
+
+userIdInput?.addEventListener('change', initializeP2PSync);
 
 // Connect to peer when button is clicked
 connectButton?.addEventListener('click', () => {
@@ -251,7 +291,6 @@ connectButton?.addEventListener('click', () => {
   if (peerId) {
     p2pSync.connectToSpecificPeer(peerId);
     updateStatus(`Attempting to connect to peer: ${peerId}`);
-    if (peerIdInput) peerIdInput.value = ''; // Clear the input after connecting
   } else {
     updateStatus('Please enter a peer ID to connect.');
   }
@@ -261,8 +300,27 @@ window.addEventListener('beforeunload', () => {
   p2pSync.destroyConn();
 });
 
-window.addEventListener('offline', () => {
-  p2pSync.destroyConn();
+// Handle visibility change
+
+// Handle visibility change
+document.addEventListener('visibilitychange', () => {
+  const sceneState = p2pSync.getSceneState();
+  if (!sceneState) return;
+
+  if (document.hidden) {
+    // Tab is hidden, store the current state
+    const currentState = sceneState.getSerializableState();
+    localStorage.setItem('lastKnownState', JSON.stringify(currentState));
+  } else {
+    // Tab is visible again, check if we need to reconnect
+    const lastKnownState = localStorage.getItem('lastKnownState');
+    if (lastKnownState) {
+      const state = JSON.parse(lastKnownState);
+      sceneState.syncWithPeer(state);
+    }
+  }
 });
 
 console.log('P2PSync and UI integration initialized');
+
+export { p2pSync };

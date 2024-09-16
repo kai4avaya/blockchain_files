@@ -1,6 +1,7 @@
 import { reconstructScene } from "../../ui/graph_v2/create";
 import indexDBOverlay from '../local/file_worker';
-import { P2PSync } from '../../network/peer2peer';
+// import { P2PSync } from '../../network/peer2peer_simple';
+import { p2pSync } from '../../network/peer2peer_simple';
 const loginName = localStorage.getItem("login_block") || "no_login";
 
 interface ObjectState {
@@ -39,11 +40,14 @@ class SceneState {
     this.savedObjects = new Set();
     this.broadcastChannel = new BroadcastChannel('sceneStateChannel');
     this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
-    this.p2pSync = P2PSync.getInstance(this);
+    // this.p2pSync = P2PSync.getInstance(this);
+    this.p2pSync = p2pSync;
+    this.p2pSync.setSceneState(this);
   }
   
   private broadcastUpdate(states: ObjectState[]) {
     this.broadcastChannel.postMessage(states);
+    console.log("I AM SENDING OVER states", states)
     this.p2pSync.broadcastUpdate(states);
   }
   
@@ -85,20 +89,21 @@ class SceneState {
     }
   }
 
+ 
   getInitializedObjects(): ObjectState[] {
     return this.getSerializableState();
   }
 
   syncWithPeer(peerObjects: ObjectState[]): void {
-    peerObjects.forEach(peerObject => {
+    if (!peerObjects || !peerObjects.length) return;
+    peerObjects.forEach((peerObject) => {
       const existingObject = this.objects.get(peerObject.uuid);
       if (!existingObject || this.isNewerState(peerObject, existingObject)) {
-        this.mergeUpdate(peerObject);
+        this.mergeUpdate(peerObject, { fromPeer: true });
       }
     });
     this.reconstructScene();
   }
-
   private loadState(storedState: ObjectState[]): void {
     storedState.forEach(state => this.objects.set(state.uuid, state));
     this.reconstructScene();
@@ -108,7 +113,10 @@ class SceneState {
     reconstructScene(Array.from(this.objects.values()));
   }
   
-  updateObject(objectState: Partial<ObjectState> & { uuid: string }): void {
+  updateObject(
+    objectState: Partial<ObjectState> & { uuid: string },
+    options?: { fromPeer?: boolean }
+  ): void {
     const existingState = this.objects.get(objectState.uuid);
 
     if (existingState) {
@@ -201,29 +209,12 @@ class SceneState {
     return true;
   }
   
-  // mergeUpdate(incomingState: ObjectState): void {
-  //   const existingState = this.objects.get(incomingState.uuid);
-
-  //   if (!existingState || this.isNewerState(incomingState, existingState)) {
-  //     if (incomingState.isDeleted) {
-  //       // If the incoming state is marked as deleted and it's newer, keep it in the objects map
-  //       // but mark it as deleted
-  //       this.objects.set(incomingState.uuid, incomingState);
-  //     } else {
-  //       // Normal update for non-deleted objects
-  //       this.objects.set(incomingState.uuid, {
-  //         ...existingState,
-  //         ...incomingState,
-  //       });
-  //     }
-  //     this.updatedObjects.add(incomingState.uuid);
-  //     this.scheduleSave();
-  //     this.reconstructScene();
-  //   }
-  // }
 
   
-  mergeUpdate(incomingState: ObjectState): void {
+mergeUpdate(
+  incomingState: ObjectState,
+  options?: { fromPeer?: boolean }
+): void {
     const existingState = this.objects.get(incomingState.uuid);
 
     if (!existingState || this.isNewerState(incomingState, existingState)) {
@@ -271,25 +262,6 @@ class SceneState {
     }
   }
 
-  // deleteObject(uuid: string): void {
-  //   const state = this.objects.get(uuid);
-  //   if (state) {
-  //     const updatedState = {
-  //       ...state,
-  //       isDeleted: true,
-  //       version: state.version + 1,
-  //       versionNonce: this.generateVersionNonce(),
-  //       lastEditedBy: this.userId
-  //     };
-  //     this.mergeUpdate(updatedState);
-  //     this.updatedObjects.add(uuid);
-  //   }
-  // }
-
-  // getSerializableState(): ObjectState[] {
-  //   console.log("Array.from(this.objects.values()", Array.from(this.objects.values()))
-  //   return Array.from(this.objects.values());
-  // }
   getSerializableState(): ObjectState[] {
     return Array.from(this.objects.values()).filter(state => !state.isDeleted);
   }
@@ -304,7 +276,7 @@ class SceneState {
 
   
 
-  private async saveStateToDB() {
+  private async saveStateToDB( options?: { fromPeer?: boolean }) {
     try {
       const updatedStates = Array.from(this.updatedObjects)
         .map(uuid => this.objects.get(uuid))
@@ -327,7 +299,10 @@ class SceneState {
           return state;
         });
   
-        this.broadcastUpdate(dataToSave);
+        // this.broadcastUpdate(dataToSave);
+        if (!options?.fromPeer) {
+          this.broadcastUpdate(dataToSave);
+        }
         await indexDBOverlay.saveData(this.STORAGE_KEY, dataToSave);
         
         updatedStates.forEach(state => {

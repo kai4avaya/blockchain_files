@@ -5,7 +5,7 @@ import { getObjectUnderPointer } from './ui/graph_v2/move';
 import { initializeFileSystem, getFileSystem } from './memory/collaboration/file_colab';
 import { sceneState } from './memory/collaboration/scene_colab';
 import { scene, nonBloomScene, initializeGraph } from './ui/graph_v2/create';
-import { P2PSync } from './network/peer2peer_simple'; // Import the P2PSync class
+// import { P2PSync } from './network/peer2peer_simple'; // Import the P2PSync class
 
 const userId = "kai";
 localStorage.setItem("login_block", userId);
@@ -25,34 +25,33 @@ async function main() {
   await initializeGraph();
   await sceneState.initialize(scene, nonBloomScene);
 
-  const p2pSync = P2PSync.getInstance();
-  p2pSync.initialize(userId, sceneState);
-
+ 
+  // Initialize P2PSync with the userId
   // Set up P2P UI elements
-  setupP2PUI(p2pSync);
 
   // Add event listeners after initialization
   addEventListeners();
 }
 
-function setupP2PUI(p2pSync) {
-  const peerIdInput = document.getElementById('peerIdInput');
-  const connectButton = document.getElementById('connectButton');
-  const statusDiv = document.getElementById('status');
 
-  if (connectButton) {
-    connectButton.addEventListener('click', () => {
-      const peerId = peerIdInput.value.trim();
-      if (peerId) {
-        p2pSync.connectToSpecificPeer(peerId);
-        if (statusDiv) statusDiv.textContent = `Attempting to connect to peer: ${peerId}`;
-        peerIdInput.value = ''; // Clear the input after connecting
-      } else {
-        if (statusDiv) statusDiv.textContent = 'Please enter a peer ID to connect.';
-      }
-    });
-  }
-}
+// function setupP2PUI(p2pSync) {
+//   const peerIdInput = document.getElementById('peerIdInput');
+//   const connectButton = document.getElementById('connectButton');
+//   const statusDiv = document.getElementById('status');
+
+//   if (connectButton) {
+//     connectButton.addEventListener('click', () => {
+//       const peerId = peerIdInput.value.trim();
+//       if (peerId) {
+//         p2pSync.connectToSpecificPeer(peerId);
+//         if (statusDiv) statusDiv.textContent = `Attempting to connect to peer: ${peerId}`;
+//         peerIdInput.value = ''; // Clear the input after connecting
+//       } else {
+//         if (statusDiv) statusDiv.textContent = 'Please enter a peer ID to connect.';
+//       }
+//     });
+//   }
+// }
 
 function addEventListeners() {
   let pointerDownTime = null;
