@@ -56,7 +56,6 @@ export function convertToThreeJSFormat(data: any) {
     delete result.id;
   }
 
-  console.log("result in convert to js AFTER NOT A DISASTER convertToJs", result)
 
   return result;
 }

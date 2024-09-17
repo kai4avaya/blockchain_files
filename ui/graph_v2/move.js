@@ -7,7 +7,8 @@ import {
   randomColorGenerator,
   removeGhostCube,
   createGhostCube,
-  render
+  render,
+  resizeCubeToFitSpheres
 } from "./create.js";
 import { createSceneSnapshot, getObjectById, getCubeContainingSphere, findSpheresInCube} from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
@@ -576,11 +577,11 @@ function getRandomOffset(cubeSize) {
 
 async function onPointerUp(event) {
   console.log("tell me about DRAGG", isDragging)
+  const { controls, scene, nonBloomScene, ghostCube } = share3dDat();
+
   if (isDragging) {
-    const { controls, scene, nonBloomScene, ghostCube } = share3dDat();
 
     isDragging = false;
-    controls.enabled = true;
 
     if (selectedSphere) {
       const sphereRadius = selectedSphere.scale.x / 2 || selectedSphere.geometry.parameters.radius;
@@ -633,6 +634,8 @@ async function onPointerUp(event) {
         });
       }
     } else if (selectedObject && selectedObject.wireframeCube) {
+      resizeCubeToFitSpheres(selectedObject.wireframeCube);
+      resizeCubeToFitSpheres(selectedObject.solidCube);
       saveObjectChanges(selectedObject.wireframeCube);
       saveObjectChanges(selectedObject.solidCube);
 
@@ -652,18 +655,11 @@ async function onPointerUp(event) {
       // resizeCubeToFitSpheres(selectedObject.wireframeCube);
     }
 
-  //  // Reset variables
-  //  isDragging = false;
-  //  isClicking = false;
-  //  selectedSphere = null;
-  //  selectedObject = null;
-  //  currentSnapshot = null;
-  //   removeGhostCube();
-  //   resetCubeHighlight();
 
     event.target.releasePointerCapture(event.pointerId);
     markNeedsRender();
   }
+  controls.enabled = true;
      // Reset variables
      isDragging = false;
      isClicking = false;

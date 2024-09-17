@@ -8,12 +8,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
 import { makeObjectWritable, convertToThreeJSFormat } from "../../utils/utils";
 import { createSceneSnapshot, findSpheresInCube } from "./snapshot.js";
-
-
-import { Frustum, Matrix4 } from 'three';
-const frustum = new Frustum();
-const projScreenMatrix = new Matrix4();
-
+// import { sceneState } from "../../memory/collaboration/scene_colab";
 
 const BLOOM_SCENE = 1;
 const bloomLayer = new THREE.Layers();
@@ -433,8 +428,7 @@ export function createSphere(convertedData) {
 
   // Create sphere using the global geometry and updated material
   const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-  const composer = new EffectComposer(renderer);
-  const renderPass = new RenderPass(scene, camera);
+
   // Make entire object writable
   makeObjectWritable(sphere);
 
@@ -477,44 +471,27 @@ finalComposer.addPass(new RenderPass(scene, camera)); // Add a render pass for t
 finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom scene
 finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
 
+/**
+ * Renders the scene with bloom and non-bloom effects.
+ */
 export function render() {
-  console.time('Total Render');
+  // Clear the renderer
+  renderer.setRenderTarget(null); // Set the render target to null (render to screen)
+  renderer.clear(); // Clear the render target
 
-  console.time('Update Frustum');
-  projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-  frustum.setFromProjectionMatrix(projScreenMatrix);
-  console.timeEnd('Update Frustum');
+  // Render the bloom scene
+  scene.traverse(darkenNonBloomed); // Traverse the scene and darken non-bloomed objects
+  bloomComposer.render(); // Render the bloom scene using the bloom composer
+  scene.traverse(restoreMaterial); // Traverse the scene and restore original materials
 
-  console.time('Bloom Scene');
-  scene.traverse(object => {
-    if (object.isMesh) {
-      if (frustum.intersectsObject(object)) {
-        darkenNonBloomed(object);
-      } else {
-        object.visible = false;
-      }
-    }
-  });
-  bloomComposer.render();
-  scene.traverse(restoreMaterial);
-  console.timeEnd('Bloom Scene');
+  renderer.setRenderTarget(nonBloomRT); // Set the render target to the non-bloom render target
+  renderer.clear(); // Clear the render target
+  renderer.render(nonBloomScene, camera); // Render the non-bloom scene to the render target
 
-  console.time('Non-Bloom Scene');
-  nonBloomScene.traverse(object => {
-    if (object.isMesh) {
-      object.visible = frustum.intersectsObject(object);
-    }
-  });
-  renderer.setRenderTarget(nonBloomRT);
-  renderer.clear();
-  renderer.render(nonBloomScene, camera);
-  console.timeEnd('Non-Bloom Scene');
-
-  console.time('Final Compose');
-  finalComposer.render();
-  console.timeEnd('Final Compose');
-
-  console.timeEnd('Total Render');
+  // Render the final combined scene
+  finalComposer.render(); // Render the final combined scene using the final composer
+  // Clean up
+  nonBloomRT.dispose(); // Dispose of the non-bloom render target
 }
 
 function darkenNonBloomed(obj) {

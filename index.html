@@ -327,6 +327,15 @@
     canvas {
   pointer-events: auto;
 }
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999; /* Ensure it's below the popup */
+}
         
     </style>
     <script type="x-shader/x-vertex" id="vertexshader">
@@ -397,6 +406,8 @@
 </div>
 
     <div id="popup"></div>
+    <div id="overlay" class="overlay" style="display: none;"></div>
+
     <button id="toggleButton">Chat</button>
     <div class="slideout" id="chatSlideout">
       <div id="editor-container"></div>

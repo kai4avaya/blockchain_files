@@ -1,10 +1,10 @@
 import { editor } from './quillEditor.js';
 import userActionStore from './memory/stores/userActionStore';
-import { showPopup } from './ui/popup.js';
+import { showPopup,closePopup } from './ui/popup.js';
 import { getObjectUnderPointer } from './ui/graph_v2/move';
 import { initializeFileSystem, getFileSystem } from './memory/collaboration/file_colab';
 import { sceneState } from './memory/collaboration/scene_colab';
-import { initializeGraph, share3dDat } from './ui/graph_v2/create';
+import { scene, nonBloomScene, initializeGraph, share3dDat } from './ui/graph_v2/create';
 // import { P2PSync } from './network/peer2peer_simple'; // Import the P2PSync class
 
 const userId = "kai";
@@ -60,8 +60,13 @@ function handleQuickClick(event) {
 
     if (fileMetadata) {
       showPopup(fileMetadata, event.clientX, event.clientY);
-    } 
-}
+    } else {
+      console.log('File metadata not found for nodeId:', nodeId);
+      closePopup();
+    }
+  } else {
+    closePopup();
+  }
 }
 
 function addEventListeners(canvas) {
