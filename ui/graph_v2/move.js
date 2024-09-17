@@ -142,21 +142,19 @@ function highlightCube(cube) {
   // render();
   markNeedsRender();
 }
-
-
-export function getObjectUnderPointer(event) {
+export function getObjectUnderPointer(event, objectType = '') {
   const { camera, scene, nonBloomScene, renderer } = share3dDat();
-
-  // // Update mouse position
-  // mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  // mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   const canvas = renderer.domElement;
   const rect = canvas.getBoundingClientRect();
 
   // Calculate mouse position relative to the canvas
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  const mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  );
+
   // Cast a ray from the camera to the mouse position
+  const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(mouse, camera);
 
   // Check for intersections in both scenes
@@ -165,11 +163,32 @@ export function getObjectUnderPointer(event) {
     true
   );
 
-  if (intersects.length > 0) {
-    return intersects[0].object; // Return the first intersected object
+  console.log("Number of intersects:", intersects.length);
+
+  if (intersects.length === 0) return null;
+
+  if (objectType) {
+    // Look for a specific object type
+    const found = intersects.find(intersect => {
+      if (objectType.toLowerCase() === 'sphere') {
+        return intersect.object.geometry instanceof THREE.IcosahedronGeometry ||
+               intersect.object.geometry instanceof THREE.SphereGeometry;
+      }
+      return intersect.object.type === objectType;
+    });
+
+    if (found) {
+      console.log(`Found ${objectType}:`, found.object);
+      return found.object;
+    } else {
+      console.log(`No ${objectType} found under pointer.`);
+      return null;
+    }
   }
 
-  return null; // Return null if no object is found
+  // If no specific object type is requested, return the first intersected object
+  console.log("Returning first intersected object:", intersects[0].object);
+  return intersects[0].object;
 }
 
 export function moveSphere(event, sphere, intersectPointIn = null) {
@@ -326,14 +345,11 @@ async function handleFileDrop_sphere(event) {
         lastEditedBy: loginName,
       });
 
-      // if (intersect.object.geometry.type === "IcosahedronGeometry") {
         if (firstSphereIntersect) {
-        // const intersectedSphere = intersect.object;
         const intersectedSphere = firstSphereIntersect.object;
 
         // Check if there's already a cube over this sphere
         const existingCube = getCubeContainingSphere(intersectedSphere);
-
 
         if (!existingCube) {
           
@@ -341,7 +357,7 @@ async function handleFileDrop_sphere(event) {
           createdShapes.push(createdSphere);
 
           // Create cube with a size relative to the sphere
-          const cubeSize = size * RESCALEFACTOR * SCALEFACTOR; // Adjust this factor as needed
+          const cubeSize = size// * RESCALEFACTOR * SCALEFACTOR; // Adjust this factor as needed
           const cubeData = convertToThreeJSFormat({
             ...sphereData,
             size: cubeSize,
@@ -634,6 +650,7 @@ async function onPointerUp(event) {
         });
       }
     } else if (selectedObject && selectedObject.wireframeCube) {
+      console.log("I AM TIGGER MAKE MOO onpointerup")
       resizeCubeToFitSpheres(selectedObject.wireframeCube);
       resizeCubeToFitSpheres(selectedObject.solidCube);
       saveObjectChanges(selectedObject.wireframeCube);
@@ -651,8 +668,6 @@ async function onPointerUp(event) {
           }
         });
       }
-
-      // resizeCubeToFitSpheres(selectedObject.wireframeCube);
     }
 
 

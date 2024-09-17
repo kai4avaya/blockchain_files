@@ -51,7 +51,7 @@ async function main() {
 
 
 function handleQuickClick(event) {
-  const selectedObject = getObjectUnderPointer(event);
+  const selectedObject = getObjectUnderPointer(event, "sphere");
 
   if (selectedObject) {
     const nodeId = selectedObject.userData.id;
