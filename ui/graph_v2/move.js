@@ -8,7 +8,7 @@ import {
   removeGhostCube,
   createGhostCube,
   render,
-  resizeCubeToFitSpheres
+  resizeCubeToFitSpheres,
 } from "./create.js";
 import { createSceneSnapshot, getObjectById, getCubeContainingSphere, findSpheresInCube} from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
@@ -163,8 +163,6 @@ export function getObjectUnderPointer(event, objectType = '') {
     true
   );
 
-  console.log("Number of intersects:", intersects.length);
-
   if (intersects.length === 0) return null;
 
   if (objectType) {
@@ -178,16 +176,13 @@ export function getObjectUnderPointer(event, objectType = '') {
     });
 
     if (found) {
-      console.log(`Found ${objectType}:`, found.object);
       return found.object;
     } else {
-      console.log(`No ${objectType} found under pointer.`);
       return null;
     }
   }
 
   // If no specific object type is requested, return the first intersected object
-  console.log("Returning first intersected object:", intersects[0].object);
   return intersects[0].object;
 }
 
@@ -553,7 +548,6 @@ export function onPointerDown(event) {
     selectedSphere = sphereIntersect.object;
     selectedObject = selectedSphere;
     sphereIntersect.object.layers.toggle(BLOOM_SCENE);
-    console.log("turned on BLOOM willy boon! ", sphereIntersect.object.layers)
     isClicking = true; // Indicate that an object was clicked
   } else if (intersectsNonBloom?.length > 0) {
     const selectedCube = getCubeUnderPointer(event, intersectsNonBloom);
@@ -592,7 +586,6 @@ function getRandomOffset(cubeSize) {
 
 
 async function onPointerUp(event) {
-  console.log("tell me about DRAGG", isDragging)
   const { controls, scene, nonBloomScene, ghostCube } = share3dDat();
 
   if (isDragging) {
@@ -640,8 +633,10 @@ async function onPointerUp(event) {
         }
       } else {
         const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
+        // const cubesToDelete = removeEmptyCubeForSphere(selectedSphere);
+        
         saveObjectChanges(selectedSphere);
-        cubesToDelete.forEach((cube) => {
+        cubesToDelete?.forEach((cube) => {
           if (!cube.wireframe) return;
           cube.wireframe.isDeleted = true;
           cube.solid.isDeleted = true;
@@ -650,7 +645,6 @@ async function onPointerUp(event) {
         });
       }
     } else if (selectedObject && selectedObject.wireframeCube) {
-      console.log("I AM TIGGER MAKE MOO onpointerup")
       resizeCubeToFitSpheres(selectedObject.wireframeCube);
       resizeCubeToFitSpheres(selectedObject.solidCube);
       saveObjectChanges(selectedObject.wireframeCube);

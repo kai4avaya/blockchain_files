@@ -7,7 +7,7 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
 import { makeObjectWritable, convertToThreeJSFormat } from "../../utils/utils";
-import { createSceneSnapshot, findSpheresInCube } from "./snapshot.js";
+import { createSceneSnapshot, findSpheresInCube, getCubeContainingSphere } from "./snapshot.js";
 
 
 import { Frustum, Matrix4 } from 'three';
@@ -63,6 +63,9 @@ controls.minDistance = 1;
 controls.maxDistance = 100;
 let needsRender = false;
 let renderCount = 0;
+
+// At the top of your file
+let ghostCube = null;
 
 const renderScene = new RenderPass(scene, camera);
 // const nonBloomScene = new THREE.Scene();
@@ -575,73 +578,132 @@ export function share3dDat() {
     ghostCube: typeof ghostCube !== "undefined" ? ghostCube : null,
   };
 }
-export function removeEmptyCubes(scene, nonBloomScene) {
-  // Create a snapshot of the current scene
-  const snapshot = createSceneSnapshot([scene, nonBloomScene]);
+// export function removeEmptyCubes(scene, nonBloomScene) {
+//   // Create a snapshot of the current scene
+//   const snapshot = createSceneSnapshot([scene, nonBloomScene]);
 
-  // Array to store cubes that need to be removed
+//   // Array to store cubes that need to be removed
+//   const cubesToRemove = [];
+//   const removedCubes = [];
+
+//   console.log("i am snapshot to remove", snapshot)
+//   // Check each cube in the snapshot
+//   snapshot.boxes.forEach((box) => {
+//     const containedSpheres = snapshot.containment[box.id];
+
+//     // If the cube contains no spheres, add it to the removal list
+//     if (!containedSpheres || containedSpheres.length <= 1) {
+//       cubesToRemove.push(box);
+//     }
+//   });
+
+//   // Remove the empty cubes from the scenes
+//   cubesToRemove.forEach((box) => {
+//     if (box.wireframe) {
+//       nonBloomScene.remove(box.wireframe);
+//       box.wireframe.geometry.dispose();
+//       box.wireframe.material.dispose();
+//     }
+//     if (box.solid) {
+//       nonBloomScene.remove(box.solid);
+//       box.solid.geometry.dispose();
+//       box.solid.material.dispose();
+//     }
+
+//     // Remove from the snapshot as well
+//     const boxIndex = snapshot.boxes.findIndex((b) => b.id === box.id);
+//     if (boxIndex !== -1) {
+//       snapshot.boxes.splice(boxIndex, 1);
+//     }
+//     delete snapshot.containment[box.id];
+
+//     // Add to the removedCubes array
+//     removedCubes.push(box);
+//   });
+
+//   markNeedsRender();
+//   // Return the removed cubes
+//   return removedCubes;
+// }
+
+export function removeEmptyCubes(scene, nonBloomScene) {
+  const snapshot = createSceneSnapshot([scene, nonBloomScene]);
   const cubesToRemove = [];
   const removedCubes = [];
 
-  // Check each cube in the snapshot
-  snapshot.boxes.forEach((box) => {
-    const containedSpheres = snapshot.containment[box.id];
+  console.log("Initial snapshot:", JSON.parse(JSON.stringify(snapshot)));
 
-    // If the cube contains no spheres, add it to the removal list
-    if (!containedSpheres || containedSpheres.length <= 1) {
+  // Identify cubes to remove
+  snapshot.boxes.forEach((box) => {
+    const boxId = box.wireframe.userData.id;
+    const containedSpheres = snapshot.containment[boxId];
+
+    if (!containedSpheres || containedSpheres.length < 2) {
       cubesToRemove.push(box);
     }
   });
 
-  // Remove the empty cubes from the scenes
+  console.log("Cubes to remove:", cubesToRemove);
+
+  // Remove the identified cubes
   cubesToRemove.forEach((box) => {
+    const boxId = box.wireframe.userData.id;
+
+    // Remove wireframe
     if (box.wireframe) {
+      console.log(`Removing wireframe cube: ${boxId}`);
       nonBloomScene.remove(box.wireframe);
       box.wireframe.geometry.dispose();
       box.wireframe.material.dispose();
     }
+
+    // Remove solid
     if (box.solid) {
+      console.log(`Removing solid cube: ${boxId}`);
       nonBloomScene.remove(box.solid);
       box.solid.geometry.dispose();
       box.solid.material.dispose();
     }
 
-    // Remove from the snapshot as well
-    const boxIndex = snapshot.boxes.findIndex((b) => b.id === box.id);
+    // Remove from the snapshot
+    const boxIndex = snapshot.boxes.findIndex((b) => b.wireframe.userData.id === boxId);
     if (boxIndex !== -1) {
       snapshot.boxes.splice(boxIndex, 1);
     }
-    delete snapshot.containment[box.id];
+    delete snapshot.containment[boxId];
 
-    // Add to the removedCubes array
     removedCubes.push(box);
   });
 
+  console.log("i is snapshot! after REMOVE", snapshot)
+  // Remove any cubes not present in the containment list
+  snapshot.boxes.forEach((box) => {
+    const boxId = box.wireframe.userData.id;
+    if (!snapshot.containment.hasOwnProperty(boxId)) {
+      console.log(`Removing cube not in containment: ${boxId}`);
+      nonBloomScene.remove(box.wireframe);
+      nonBloomScene.remove(box.solid);
+      box.wireframe.geometry.dispose();
+      box.wireframe.material.dispose();
+      box.solid.geometry.dispose();
+      box.solid.material.dispose();
+      removedCubes.push(box);
+    }
+  });
+
+  console.log("Final snapshot:", JSON.parse(JSON.stringify(snapshot)));
+  console.log("Removed cubes:", removedCubes);
+
+  // Ensure immediate update
+  nonBloomScene.updateMatrixWorld(true);
   markNeedsRender();
-  // Return the removed cubes
+  
+  // Force an immediate render
+  // const { renderer, camera } = share3dDat();
+  // renderer.render(nonBloomScene, camera);
+
   return removedCubes;
 }
-
-// At the top of your file
-let ghostCube = null;
-
-// export function createGhostCube(position, size) {
-//   if (ghostCube) return; // Prevent multiple ghost cubes
-
-//   const geometry = new THREE.BoxGeometry(size, size, size);
-//   const material = new THREE.MeshBasicMaterial({
-//     color: 0xffffff,
-//     opacity: 0.5,
-//     transparent: true,
-//   });
-
-//   ghostCube = new THREE.Mesh(geometry, material);
-//   ghostCube.position.copy(position);
-
-//   const { scene } = share3dDat();
-//   scene.add(ghostCube);
-//   markNeedsRender();
-// }
 
 export function createGhostCube(position, size, existingCube = null) {
   if (ghostCube) return; // Prevent multiple ghost cubes
@@ -682,12 +744,14 @@ export function reconstructScene(snapshot) {
   snapshot.forEach((objectState) => {
     const existingObject = scene.getObjectByProperty('uuid', objectState.uuid) || 
                              nonBloomScene.getObjectByProperty('uuid', objectState.uuid);
-      if (existingObject) {
+     if (objectState.isDeleted) {
+      console.log("Removing deleting reconstruct object", objectState)
+                  removeObject(existingObject);
+                            }
+     else if (existingObject) {
         objectState.isUpdated && updateObjectProperties(existingObject, objectState);
       } 
-      else if (objectState.isDeleted) {
-        removeObject(existingObject);
-      } else {
+     else {
         createObject(objectState);
       }
   });
