@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { reconstructScene } from "../../ui/graph_v2/create";
 import indexDBOverlay from '../local/file_worker';
 // import { P2PSync } from '../../network/peer2peer_simple';
@@ -279,8 +280,12 @@ mergeUpdate(
   private async saveStateToDB( options?: { fromPeer?: boolean }) {
     try {
       const updatedStates = Array.from(this.updatedObjects)
+        // .map(uuid => this.objects.get(uuid))
+        // .filter(state => state !== undefined);
         .map(uuid => this.objects.get(uuid))
-        .filter(state => state !== undefined);
+        .filter(state => state !== undefined)
+        // .map(state => makeSerializable(state));  // Use the serialization function here
+      
       
       if (updatedStates.length > 0) {
         const existingData = await indexDBOverlay.getData(this.STORAGE_KEY);
@@ -432,4 +437,36 @@ export function saveObjectChanges(objectData) {
     lastEditedBy: objectData.loginName || loginName,
   };
   sceneState.updateObject(commonData);
+}
+
+
+function makeSerializable(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(makeSerializable);
+  }
+
+  const serialized = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'function') {
+      continue; // Skip functions
+    }
+
+    if (value instanceof THREE.Vector3 || value instanceof THREE.Euler || value instanceof THREE.Quaternion) {
+      serialized[key] = value.toArray();
+    } else if (value instanceof THREE.Color) {
+      serialized[key] = value.getHex();
+    } else if (typeof value === 'object' && value !== null) {
+      // serialized[key] = makeSerializable(value);
+      serialized[key] = value
+    } else {
+      serialized[key] = value;
+    }
+  }
+
+  return serialized;
 }

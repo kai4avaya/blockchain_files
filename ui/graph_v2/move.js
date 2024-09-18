@@ -7,8 +7,8 @@ import {
   randomColorGenerator,
   removeGhostCube,
   createGhostCube,
+  hideObject,
   render,
-  resizeCubeToFitSpheres,
 } from "./create.js";
 import { createSceneSnapshot, getObjectById, getCubeContainingSphere, findSpheresInCube} from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
@@ -606,7 +606,8 @@ async function onPointerUp(event) {
           const offset = getRandomOffset(cubeSize, sphereRadius);
           selectedSphere.position.copy(cubePosition.clone().add(offset));
 
-          saveObjectChanges(selectedSphere);
+
+          // saveObjectChanges(selectedSphere);
           // resizeCubeToFitSpheres(existingCube);
         } else {
           const cubeSize = sphereRadius * RESCALEFACTOR;
@@ -631,22 +632,29 @@ async function onPointerUp(event) {
           saveObjectChanges(createdCube.wireframeCube);
           saveObjectChanges(createdCube.solidCube);
         }
-      } else {
-        const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
-        // const cubesToDelete = removeEmptyCubeForSphere(selectedSphere);
+      } 
+      // else {
+      //   // const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
+      //   // // const cubesToDelete = removeEmptyCubeForSphere(selectedSphere);
         
-        saveObjectChanges(selectedSphere);
-        cubesToDelete?.forEach((cube) => {
-          if (!cube.wireframe) return;
-          cube.wireframe.isDeleted = true;
-          cube.solid.isDeleted = true;
-          saveObjectChanges(cube.wireframe);
-          saveObjectChanges(cube.solid);
-        });
-      }
-    } else if (selectedObject && selectedObject.wireframeCube) {
-      resizeCubeToFitSpheres(selectedObject.wireframeCube);
-      resizeCubeToFitSpheres(selectedObject.solidCube);
+      //   // // saveObjectChanges(selectedSphere);
+      //   // cubesToDelete?.forEach((cube) => {
+      //   //   if (!cube.wireframe) return;
+      //   //   cube.wireframe.isDeleted = true;
+      //   //   cube.solid.isDeleted = true;
+      //   //   saveObjectChanges(cube.wireframe);
+      //   //   saveObjectChanges(cube.solid);
+      //   // });
+      //   // cleanupOldCubes()
+      // }
+      saveObjectChanges(selectedSphere);
+
+    } else if (selectedObject && selectedObject.wireframeCube) {  // dragging cube
+      // cleanupOldCubes()
+      // resizeCubeToFitSpheres(selectedObject.wireframeCube);
+      // resizeCubeToFitSpheres(selectedObject.solidCube);
+
+      console.log("selectedObject: onpointerup", selectedObject);
       saveObjectChanges(selectedObject.wireframeCube);
       saveObjectChanges(selectedObject.solidCube);
 
@@ -677,6 +685,8 @@ async function onPointerUp(event) {
      currentSnapshot = null;
       removeGhostCube();
       resetCubeHighlight();
+      cleanupOldCubes()
+    
 }
 
 
@@ -788,6 +798,27 @@ const onPointerMove = (event) => {
     markNeedsRender();
   }
 };
+
+function cleanupOldCubes(){
+  const { scene, nonBloomScene } = share3dDat();
+  const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
+  // const cubesToDelete = removeEmptyCubeForSphere(selectedSphere);
+  
+  // saveObjectChanges(selectedSphere);
+  cubesToDelete?.forEach((cube) => {
+
+    console.log("i attempt to delete", cube.wireframe, cube.solid)
+    if (!cube.wireframe) return;
+    cube.wireframe.isDeleted = true;
+    cube.solid.isDeleted = true;
+
+    saveObjectChanges(cube.wireframe);
+    saveObjectChanges(cube.solid);
+
+    // hideObject(cube.wireframe,  scene, nonBloomScene);
+    // hideObject(cube.solid, scene, nonBloomScene);
+  });
+}
 
 function setupPointerEvents() {
   const { renderer } = share3dDat(); // Access the renderer to get the canvas

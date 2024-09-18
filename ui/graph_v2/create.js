@@ -348,6 +348,7 @@ export function createWireframeCube(convertedData) {
   nonBloomScene.add(solidCube);
 
 
+  console.log("I have created", wireframeCube, solidCube)
   return { wireframeCube, solidCube };
 }
 
@@ -475,20 +476,53 @@ finalComposer.addPass(new RenderPass(scene, camera)); // Add a render pass for t
 finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom scene
 finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
 
-export function render() {
+// export function render() {
 
+//   projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+//   frustum.setFromProjectionMatrix(projScreenMatrix);
+
+//   scene.traverse(object => {
+//     if (object.isMesh) {
+//       if (frustum.intersectsObject(object)) {
+//         darkenNonBloomed(object);
+//       } else {
+//         object.visible = false;
+//       }
+//     }
+//   });
+//   bloomComposer.render();
+//   scene.traverse(restoreMaterial);
+
+//   nonBloomScene.traverse(object => {
+//     if (object.isMesh) {
+//       object.visible = frustum.intersectsObject(object);
+//     }
+//   });
+//   renderer.setRenderTarget(nonBloomRT);
+//   renderer.clear();
+//   renderer.render(nonBloomScene, camera);
+
+//   finalComposer.render();
+
+// }
+
+export function render() {
   projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   frustum.setFromProjectionMatrix(projScreenMatrix);
 
   scene.traverse(object => {
     if (object.isMesh) {
-      if (frustum.intersectsObject(object)) {
-        darkenNonBloomed(object);
-      } else {
-        object.visible = false;
+      const isVisible = frustum.intersectsObject(object);
+      object.visible = isVisible;
+
+      if (isVisible) {
+        if (!object.layers.test(bloomLayer)) {
+          darkenNonBloomed(object);
+        }
       }
     }
   });
+
   bloomComposer.render();
   scene.traverse(restoreMaterial);
 
@@ -497,12 +531,12 @@ export function render() {
       object.visible = frustum.intersectsObject(object);
     }
   });
+
   renderer.setRenderTarget(nonBloomRT);
   renderer.clear();
   renderer.render(nonBloomScene, camera);
 
   finalComposer.render();
-
 }
 
 function darkenNonBloomed(obj) {
@@ -631,7 +665,6 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   const cubesToRemove = [];
   const removedCubes = [];
 
-  console.log("Initial snapshot:", JSON.parse(JSON.stringify(snapshot)));
 
   // Identify cubes to remove
   snapshot.boxes.forEach((box) => {
@@ -681,17 +714,19 @@ export function removeEmptyCubes(scene, nonBloomScene) {
     const boxId = box.wireframe.userData.id;
     if (!snapshot.containment.hasOwnProperty(boxId)) {
       console.log(`Removing cube not in containment: ${boxId}`);
-      nonBloomScene.remove(box.wireframe);
-      nonBloomScene.remove(box.solid);
-      box.wireframe.geometry.dispose();
-      box.wireframe.material.dispose();
-      box.solid.geometry.dispose();
-      box.solid.material.dispose();
+      // nonBloomScene.remove(box.wireframe);
+      // nonBloomScene.remove(box.solid);
+      // box.wireframe.geometry.dispose();
+      // box.wireframe.material.dispose();
+      // box.solid.geometry.dispose();
+      // box.solid.material.dispose();
+      // hideObject(box.wireframe,scene, nonBloomScene);
+      // hideObject(box.solid,scene, nonBloomScene);
       removedCubes.push(box);
     }
   });
 
-  console.log("Final snapshot:", JSON.parse(JSON.stringify(snapshot)));
+  // console.log("Final snapshot:", JSON.parse(JSON.stringify(snapshot)));
   console.log("Removed cubes:", removedCubes);
 
   // Ensure immediate update
@@ -745,7 +780,6 @@ export function reconstructScene(snapshot) {
     const existingObject = scene.getObjectByProperty('uuid', objectState.uuid) || 
                              nonBloomScene.getObjectByProperty('uuid', objectState.uuid);
      if (objectState.isDeleted) {
-      console.log("Removing deleting reconstruct object", objectState)
                   removeObject(existingObject);
                             }
      else if (existingObject) {
@@ -769,9 +803,9 @@ function updateObjectProperties(object, objectState) {
   if (objectState.version !== undefined) object.version = objectState.version;
 
   // Update size for cubes
-  if ((object.shape === "wireframeCube" || object.shape === "solidCube") && objectState.size !== undefined) {
-    object.scale.setScalar(objectState.size);
-  }
+  // if ((object.shape === "wireframeCube" || object.shape === "solidCube") && objectState.size !== undefined) {
+  //   object.scale.setScalar(objectState.size);
+  // }
 }
 
 function createObject(objectState) {
@@ -793,6 +827,35 @@ function removeObject(entry) {
 
   if (entry.object.material) entry.object.material.dispose();
   if (entry.object.geometry) entry.object.geometry.dispose();
+}
+
+export function hideObject(object, scene, nonBloomScene) {
+  // Function to recursively hide an object and its children
+  function hideRecursively(obj) {
+    obj.visible = false;
+    if (obj.children) {
+      obj.children.forEach(child => hideRecursively(child));
+    }
+  }
+
+  // Hide the object
+  hideRecursively(object);
+
+  // Remove the object from the scenes, but keep a reference
+  scene.remove(object);
+  nonBloomScene.remove(object);
+
+  // Store the original parent and scene information
+  object.userData.originalParent = object.parent;
+  object.userData.originalScene = scene;
+  object.userData.originalNonBloomScene = nonBloomScene;
+
+  // Force update of the scene graph
+  scene.updateMatrixWorld(true);
+  nonBloomScene.updateMatrixWorld(true);
+
+  // Mark the scene for re-render
+  markNeedsRender();
 }
 
 function createCubeWrapper(objectState) {
@@ -1159,4 +1222,20 @@ export function createMiniMap(scene, nonBloomScene, camera, renderer) {
 
   // Return the update function
   return updateMiniMap;
+}
+
+
+const deletedObjects = new Set();
+
+export function markObjectAsDeleted(uuid) {
+  deletedObjects.add(uuid);
+}
+
+export function isObjectDeleted(uuid) {
+  return deletedObjects.has(uuid);
+}
+
+export function cleanupDeletedObjects() {
+  // This function should be called periodically to remove old entries
+  // For now, we'll keep all entries, but you might want to implement a cleanup strategy later
 }
