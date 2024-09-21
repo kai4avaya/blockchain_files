@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { reconstructScene } from "../../ui/graph_v2/create";
 import indexDBOverlay from '../local/file_worker';
-// import { P2PSync } from '../../network/peer2peer_simple';
 import { p2pSync } from '../../network/peer2peer_simple';
 const loginName = localStorage.getItem("login_block") || "no_login";
 
@@ -71,6 +70,7 @@ class SceneState {
     if (!SceneState.instance) {
       SceneState.instance = new SceneState();
     }
+    // this.p2pSync.setSceneState(SceneState.instance);
     return SceneState.instance;
   }
 
@@ -95,14 +95,38 @@ class SceneState {
     return this.getSerializableState();
   }
 
+  setupP2PSync(): void {
+    p2pSync.setSceneState(this);
+    console.log('P2PSync set up in SceneState');
+  }
+
+  // syncWithPeer(peerObjects: ObjectState[]): void {
+  //   console.log("I am peer objects", peerObjects)
+  //   if (!peerObjects || !peerObjects.length) return;
+  //   peerObjects.forEach((peerObject) => {
+  //     const existingObject = this.objects.get(peerObject.uuid);
+  //     if (!existingObject || this.isNewerState(peerObject, existingObject)) {
+  //       this.mergeUpdate(peerObject, { fromPeer: true });
+  //     }
+  //   });
+  //   this.reconstructScene();
+  // }
   syncWithPeer(peerObjects: ObjectState[]): void {
-    if (!peerObjects || !peerObjects.length) return;
+    console.log("Entering syncWithPeer method");
+    console.log("Received peer objects:", peerObjects);
+    if (!peerObjects || !peerObjects.length) {
+      console.log("No peer objects to sync");
+      return;
+    }
     peerObjects.forEach((peerObject) => {
+      console.log("Processing peer object:", peerObject);
       const existingObject = this.objects.get(peerObject.uuid);
       if (!existingObject || this.isNewerState(peerObject, existingObject)) {
+        console.log("Merging update for object:", peerObject.uuid);
         this.mergeUpdate(peerObject, { fromPeer: true });
       }
     });
+    console.log("Reconstructing scene");
     this.reconstructScene();
   }
   private loadState(storedState: ObjectState[]): void {
@@ -211,6 +235,13 @@ class SceneState {
   }
   
 
+  getCurrentState(): ObjectState[] {
+    console.log("Getting current state");
+    const currentState = this.getSerializableState();
+    console.log("Current state:", currentState);
+    return currentState;
+  }
+
   
 mergeUpdate(
   incomingState: ObjectState,
@@ -304,10 +335,14 @@ mergeUpdate(
           return state;
         });
   
-        // this.broadcastUpdate(dataToSave);
-        if (!options?.fromPeer) {
+        if(this.p2pSync.isConnected() && !options?.fromPeer) {
+          console.log("sending my state to peer ", dataToSave)
           this.broadcastUpdate(dataToSave);
         }
+        // this.broadcastUpdate(dataToSave);
+        // if (!options?.fromPeer) {
+        //   this.broadcastUpdate(dataToSave);
+        // }
         await indexDBOverlay.saveData(this.STORAGE_KEY, dataToSave);
         
         updatedStates.forEach(state => {
@@ -321,79 +356,7 @@ mergeUpdate(
       console.error('Error saving state to IndexedDB:', error);
     }
   }
-  // private async saveStateToDB() {
-  //   try {
-  //     const updatedStates = Array.from(this.updatedObjects)
-  //       .map(uuid => this.objects.get(uuid))
-  //       .filter(state => state !== undefined);
-      
-  //     if (updatedStates.length > 0) {
-  //       // Fetch existing data from IndexedDB
-  //       const existingData = await indexDBOverlay.getData(this.STORAGE_KEY);
-  //       const existingMap = new Map(existingData.map(item => [item.uuid, item]));
-  
-  //       // Prepare data to be saved
-  //       const dataToSave = updatedStates.map(state => {
-  //         if (state) {
-  //           const existingState = existingMap.get(state.uuid);
-  //           if (existingState) {
-  //             // If the state already exists in IndexedDB, update it
-  //             return {
-  //               ...existingState,
-  //               ...state,
-  //               version: (existingState.version || 0) + 1
-  //             };
-  //           } else {
-  //             // If it's a new state, add it
-  //             return {
-  //               ...state,
-  //               version: 1
-  //             };
-  //           }
-  //         }
-  //         return state;
-  //       });
-  
-  //       this.broadcastUpdate(dataToSave);
 
-  //       await indexDBOverlay.saveData(this.STORAGE_KEY, dataToSave);
-        
-  //       updatedStates.forEach(state => {
-  //         if (state) {
-  //           this.savedObjects.add(state.uuid);
-  //         }
-  //       });
-  //     }
-  //     this.updatedObjects.clear();
-  //   } catch (error) {
-  //     console.error('Error saving state to IndexedDB:', error);
-  //   }
-  // }
-  // private async saveStateToDB() {
-  //   try {
-  //     const updatedStates = Array.from(this.updatedObjects)
-  //       .map(uuid => this.objects.get(uuid))
-  //       .filter(state => state !== undefined && (!this.savedObjects.has(state.uuid) || this.hasChanged(this.objects.get(state.uuid)!, state!)));
-      
-  //       console.log("updatedStates", updatedStates)
-  //     if (updatedStates.length > 0) {
-  //       await indexDBOverlay.saveData(this.STORAGE_KEY, updatedStates);
-  //       updatedStates.forEach(state => {
-  //         if (state) {
-  //           this.savedObjects.add(state.uuid);
-  //         }
-  //       });
-  //     }
-  //     this.updatedObjects.clear();
-  //   } catch (error) {
-  //     console.error('Error saving state to IndexedDB:', error);
-  //   }
-  // }
-
-  // private broadcastUpdate(state: ObjectState) {
-  //   // Implement your broadcast logic here
-  //   // For example: socket.emit('objectUpdate', state);
-  // }
 
   private generateVersionNonce(): number {
     return Math.floor(Math.random() * 1000000);
@@ -402,7 +365,7 @@ mergeUpdate(
 
 export const sceneState = SceneState.getInstance();
 // const p2pSync = new P2PSync(sceneState);
-
+sceneState.setupP2PSync(); 
 
 
 export function saveObjectChanges(objectData) {

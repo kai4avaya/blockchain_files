@@ -1,5 +1,5 @@
 import { Peer, DataConnection } from 'peerjs';
-
+// import { sceneState } from '../memory/collaboration/scene_colab';
 interface SceneState {
   getSerializableState: () => any;
   syncWithPeer: (state: any) => void;
@@ -27,8 +27,8 @@ class P2PSync {
   }
 
  
-  initialize(userId: string, sceneState: SceneState): void {
-    this.sceneState = sceneState;
+  initialize(userId: string): void {
+    // this.sceneState = sceneState;
     this.loadKnownPeers();
 
     const storedPeerId = localStorage.getItem('myPeerId');
@@ -106,6 +106,17 @@ class P2PSync {
     });
   }
 
+  isConnected(): boolean {
+    return this.connections.size > 0;
+  }
+
+  private clearReconnectTimer(peerId: string): void {
+    const timer = this.reconnectTimers.get(peerId);
+    if (timer) {
+      clearTimeout(timer);
+      this.reconnectTimers.delete(peerId);
+    }
+  }
 
   private handleConnection(conn: DataConnection): void {
     console.log('Handling connection for peer:', conn.peer);
@@ -113,27 +124,28 @@ class P2PSync {
     updateStatus(`Connected to peer: ${conn.peer}`);
     this.saveKnownPeer(conn.peer);
 
-    if (this.sceneState) {
-      const currentState = this.sceneState.getSerializableState();
-      conn.send({ type: 'full_state', data: currentState });
-    }
+    // Send current state immediately after connection
+    this.sendCurrentState(conn);
 
     conn.on('data', (data: { type: string; data: any }) => {
-      if (!this.sceneState) return;
-    
-      if (data.type === 'full_state') {
+      if (data.type === 'request_current_state') {
+        this.sendCurrentState(conn);
+      } else if (data.type === 'full_state') {
         console.log('Received full state from peer. Syncing...');
+        console.log('Full state data:', data.data);
         this.sceneState.syncWithPeer(data.data);
-      } else if (data.type === 'update') {
-        if (Array.isArray(data.data)) {
-          data.data.forEach((objectState) =>
-            this.sceneState!.updateObject(objectState, { fromPeer: true })
-          );
-        } else {
-          this.sceneState.updateObject(data.data, { fromPeer: true });
-        }
+    } else if (data.type === 'update') {
+      if (Array.isArray(data.data)) {
+        data.data.forEach((objectState) =>
+          this.sceneState!.updateObject(objectState, { fromPeer: true })
+        );
+      } else {
+        this.sceneState.updateObject(data.data, { fromPeer: true });
       }
-    });
+    }
+  });
+
+  conn.send({ type: 'request_current_state' });
 
     conn.on('close', () => {
       console.log(`Connection closed with peer: ${conn.peer}`);
@@ -147,6 +159,13 @@ class P2PSync {
       updateStatus(`Connection error with peer ${conn.peer}: ${err.message}`);
       this.scheduleReconnect(conn.peer);
     });
+  }
+
+  
+  private sendCurrentState(conn: DataConnection): void {
+    const currentState = this.sceneState.getCurrentState();
+    console.log('Sending current state to peer:', currentState);
+    conn.send({ type: 'full_state', data: currentState });
   }
 
   
@@ -243,6 +262,8 @@ class P2PSync {
     }
   }
 }
+let isInitialized = false;
+
 const p2pSync = P2PSync.getInstance();
 
 // DOM elements
@@ -266,15 +287,16 @@ if (storedPeerId && userIdInput) {
 
 // Initialize P2PSync when user enters their ID or when the page loads with a stored ID
 function initializeP2PSync() {
+  if (isInitialized) {
+    console.log('P2PSync already initialized. Skipping.');
+    return;
+  }
+
   const userId = userIdInput?.value.trim();
   if (userId) {
-    const mockSceneState: SceneState = {
-      getSerializableState: () => ({ /* mock state */ }),
-      syncWithPeer: (state) => console.log('Syncing with peer state:', state),
-      updateObject: (objectState) => console.log('Updating object:', objectState),
-    };
-    p2pSync.initialize(userId, mockSceneState);
+    p2pSync.initialize(userId);
     updateStatus(`Initializing with user ID: ${userId}`);
+    isInitialized = true;
   }
 }
 
@@ -299,8 +321,6 @@ connectButton?.addEventListener('click', () => {
 window.addEventListener('beforeunload', () => {
   p2pSync.destroyConn();
 });
-
-// Handle visibility change
 
 // Handle visibility change
 document.addEventListener('visibilitychange', () => {

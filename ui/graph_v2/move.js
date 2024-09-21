@@ -58,7 +58,6 @@ function getCubeUnderPointer(event, intersects) {
   if (intersects.length > 0) {
     currentSnapshot = createSceneSnapshot([scene, nonBloomScene]);
 
-    console.log("I am currentSnapshot", currentSnapshot);
 
     for (const intersectedObject of intersects) {
       let matchingBox = currentSnapshot.boxes.find(
@@ -654,7 +653,6 @@ async function onPointerUp(event) {
       // resizeCubeToFitSpheres(selectedObject.wireframeCube);
       // resizeCubeToFitSpheres(selectedObject.solidCube);
 
-      console.log("selectedObject: onpointerup", selectedObject);
       saveObjectChanges(selectedObject.wireframeCube);
       saveObjectChanges(selectedObject.solidCube);
 
@@ -807,7 +805,6 @@ function cleanupOldCubes(){
   // saveObjectChanges(selectedSphere);
   cubesToDelete?.forEach((cube) => {
 
-    console.log("i attempt to delete", cube.wireframe, cube.solid)
     if (!cube.wireframe) return;
     cube.wireframe.isDeleted = true;
     cube.solid.isDeleted = true;

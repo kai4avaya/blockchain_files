@@ -676,7 +676,6 @@ export function removeEmptyCubes(scene, nonBloomScene) {
     }
   });
 
-  console.log("Cubes to remove:", cubesToRemove);
 
   // Remove the identified cubes
   cubesToRemove.forEach((box) => {
@@ -684,7 +683,6 @@ export function removeEmptyCubes(scene, nonBloomScene) {
 
     // Remove wireframe
     if (box.wireframe) {
-      console.log(`Removing wireframe cube: ${boxId}`);
       nonBloomScene.remove(box.wireframe);
       box.wireframe.geometry.dispose();
       box.wireframe.material.dispose();
@@ -692,7 +690,6 @@ export function removeEmptyCubes(scene, nonBloomScene) {
 
     // Remove solid
     if (box.solid) {
-      console.log(`Removing solid cube: ${boxId}`);
       nonBloomScene.remove(box.solid);
       box.solid.geometry.dispose();
       box.solid.material.dispose();
@@ -708,12 +705,10 @@ export function removeEmptyCubes(scene, nonBloomScene) {
     removedCubes.push(box);
   });
 
-  console.log("i is snapshot! after REMOVE", snapshot)
   // Remove any cubes not present in the containment list
   snapshot.boxes.forEach((box) => {
     const boxId = box.wireframe.userData.id;
     if (!snapshot.containment.hasOwnProperty(boxId)) {
-      console.log(`Removing cube not in containment: ${boxId}`);
       // nonBloomScene.remove(box.wireframe);
       // nonBloomScene.remove(box.solid);
       // box.wireframe.geometry.dispose();
@@ -727,7 +722,6 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   });
 
   // console.log("Final snapshot:", JSON.parse(JSON.stringify(snapshot)));
-  console.log("Removed cubes:", removedCubes);
 
   // Ensure immediate update
   nonBloomScene.updateMatrixWorld(true);
