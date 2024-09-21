@@ -78,7 +78,6 @@ function addEventListeners(canvas) {
     startX = event.clientX;
     startY = event.clientY;
     isDragging = false;
-    console.log(`Pointer down at: ${pointerDownTime} | Position: (${startX}, ${startY})`);
     userActionStore.setMouseDown(userId, true, event.clientX, event.clientY, event.target);
   }, { capture: true });
 
@@ -89,18 +88,14 @@ function addEventListeners(canvas) {
 
     const pointerUpTime = Date.now();
     const clickDuration = pointerUpTime - pointerDownTime;
-    console.log(`Pointer up at: ${pointerUpTime} | Duration: ${clickDuration}ms | isDragging: ${isDragging}`);
 
     userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target);
 
     if (!isDragging && clickDuration <= CLICK_DURATION_THRESHOLD) {
-      console.log('Quick click detected');
       handleQuickClick(event);
     } else {
       if (isDragging) {
-        console.log('Drag detected, not showing popup');
       } else {
-        console.log('Long click detected, not showing popup');
       }
     }
 

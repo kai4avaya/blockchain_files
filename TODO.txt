@@ -1,20 +1,40 @@
-move is not saving positions in scene_colab
+cursoe showing for two users or more
 
-i like this color for wireframe cubes it's a whitish color. 11913426
+- bug
+- somewhere i remove the cube in the scene
+ - then something is being updated in scene_colab without a record of delete
+  - then it updates the scene in reconstruct and diffs the actual scene vs. new scene coming from scene_colab
+    - and recreates this cube
+
+refactor
+ - always save last updated scene from reconstruct
+   - seperate out the reconstruct creation and updating
+ - onpointerup
+  - we should call a diffing algo it will take the current scene objects and compare to last reconstruct 
+   - then it will call scene_colab save (then we recall reconstruct at that point and this will do the actual changing of items?)
 
 
+SC --> reconstruct --> save snapshot --> current scene updated (with moved objects)
+onPointerUp --> diffing algo --> update each change in scene colab --> SC .... (above chain)
+  - note onPointerUp will not directly lead to any scene changes this is passed to reconsturct 
+    which will always be in charge of updating objects (besides the move)
+
+principle
+- only save on onpointerup
+- only update scene directly on reconstruct and on move (this also saves the current state)
+- save uses a diffing algo to determine the difference between previous state and most current state 
 
 
-FEATURES
-- if file is in space then we should be able to click directory view to go to that file....
-- i need to fix if only one file in island we need to remove cubes 
-- if i drag a node over another node that's already in space (both) then it should create cube
-- if i drag a node over another node, and it gets green it should suck it into the cube .... 
-- when i drag a file over a sphere i should have some indication that a node is being hovered over...
-- speed up dragging of nodes.... 
+NEXT fix
+reduce double updates 
+- each update update will have a version number increment by 1
+we only update the version number on pointer up
+we need to ensure each object has a version number increment that represents what scene it's part of .... 
 
 
-- simple click should not cause an update... need apply quick click across apply
-- some files not showing up
-- popover not showing up
-- cursor?
+combine sceneVersion 
+with simpler scene save 
+note since we update by object we will need to account for this in the onpointerup
+
+i think the logic of scene version should be in scene_colab.... and if a peer updates but their verson of the scene is a lot lower,
+then we need to only add their objects that are not in the scene otherwise we will ignore their objects that have a lower scene number 

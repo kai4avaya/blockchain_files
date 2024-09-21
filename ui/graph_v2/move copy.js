@@ -14,7 +14,7 @@ import { createSceneSnapshot, getObjectById, getCubeContainingSphere, findSphere
 import { handleFileDrop } from "../../memory/fileHandler.js";
 import * as THREE from "three";
 import {convertToThreeJSFormat } from "../../utils/utils";
-import { diffSceneChanges } from "../../memory/collaboration/scene_colab";
+import { saveObjectChanges } from "../../memory/collaboration/scene_colab";
 
 let isDragging = false;
 let isClicking = false;
@@ -383,13 +383,13 @@ async function handleFileDrop_sphere(event) {
   }
 
   // Save changes for created shapes
-  // createdShapes.forEach((shape) => {
-  //   Object.values(shape).forEach((item) => {
-  //     if (item && typeof item === "object" && "uuid" in item) {
-  //       saveObjectChanges(item);
-  //     }
-  //   });
-  // });
+  createdShapes.forEach((shape) => {
+    Object.values(shape).forEach((item) => {
+      if (item && typeof item === "object" && "uuid" in item) {
+        saveObjectChanges(item);
+      }
+    });
+  });
 
   // Reset cube highlighting after drop
   if (CUBEINTERSECTED) {
@@ -399,7 +399,13 @@ async function handleFileDrop_sphere(event) {
 }
 
 
+function getSize(intersect, scale = 1) {
+  const boundingBox = new THREE.Box3().setFromObject(intersect.object);
+  const size = new THREE.Vector3();
+  boundingBox.getSize(size);
 
+  return Math.max(size.x, size.y, size.z) * scale;
+}
 
 function resetCubeColor(cube) {
   if (cube && cube.originalMaterial) {
@@ -515,7 +521,7 @@ function getObjectType(object) {
 
 
 export function onPointerDown(event) {
-  const { mouse, raycaster, renderer, scene, nonBloomScene, camera, controls} = share3dDat();
+  const { mouse, raycaster, renderer, scene, nonBloomScene, camera, controls } = share3dDat();
   const canvas = renderer.domElement;
   const rect = canvas.getBoundingClientRect();
 
@@ -560,7 +566,6 @@ export function onPointerDown(event) {
     isDragging = false
   }
 
-
   event.target.setPointerCapture(event.pointerId);
   markNeedsRender();
 }
@@ -580,7 +585,7 @@ function getRandomOffset(cubeSize) {
 
 
 async function onPointerUp(event) {
-  const { controls, scene, nonBloomScene, ghostCube,sceneSnapshot } = share3dDat();
+  const { controls, scene, nonBloomScene, ghostCube } = share3dDat();
 
   if (isDragging) {
 
@@ -617,14 +622,14 @@ async function onPointerUp(event) {
             userData: { id: `cube_${Date.now()}` },
             lastEditedBy: loginName,
           });
-          const _ = createWireframeCube(cubeData);
+          const createdCube = createWireframeCube(cubeData);
 
           const offset = getRandomOffset(cubeSize, sphereRadius);
           selectedSphere.position.copy(cubePosition.clone().add(offset));
 
-          // saveObjectChanges(selectedSphere);
-          // saveObjectChanges(createdCube.wireframeCube);
-          // saveObjectChanges(createdCube.solidCube);
+          saveObjectChanges(selectedSphere);
+          saveObjectChanges(createdCube.wireframeCube);
+          saveObjectChanges(createdCube.solidCube);
         }
       } 
       // else {
@@ -641,34 +646,33 @@ async function onPointerUp(event) {
       //   // });
       //   // cleanupOldCubes()
       // }
-      // saveObjectChanges(selectedSphere);
+      saveObjectChanges(selectedSphere);
 
     } else if (selectedObject && selectedObject.wireframeCube) {  // dragging cube
       // cleanupOldCubes()
       // resizeCubeToFitSpheres(selectedObject.wireframeCube);
       // resizeCubeToFitSpheres(selectedObject.solidCube);
 
-      // saveObjectChanges(selectedObject.wireframeCube);
-      // saveObjectChanges(selectedObject.solidCube);
+      saveObjectChanges(selectedObject.wireframeCube);
+      saveObjectChanges(selectedObject.solidCube);
 
-      // if (selectedObject.containedSpheres) {
-      //   selectedObject.containedSpheres.forEach((sphereData) => {
-      //     if (sphereData.object) {
-      //       const updatedPosition = sphereData.object.position.clone();
-      //       const updatedSphereData = {
-      //         ...sphereData.object,
-      //         position: updatedPosition.toArray(),
-      //       };
-      //       saveObjectChanges(updatedSphereData);
-      //     }
-      //   });
-      // }
+      if (selectedObject.containedSpheres) {
+        selectedObject.containedSpheres.forEach((sphereData) => {
+          if (sphereData.object) {
+            const updatedPosition = sphereData.object.position.clone();
+            const updatedSphereData = {
+              ...sphereData.object,
+              position: updatedPosition.toArray(),
+            };
+            saveObjectChanges(updatedSphereData);
+          }
+        });
+      }
     }
 
 
     event.target.releasePointerCapture(event.pointerId);
     markNeedsRender();
-    diffSceneChanges(scene, nonBloomScene, sceneSnapshot);
   }
   controls.enabled = true;
      // Reset variables
@@ -827,8 +831,8 @@ function cleanupOldCubes(){
     cube.wireframe.isDeleted = true;
     cube.solid.isDeleted = true;
 
-    // saveObjectChanges(cube.wireframe);
-    // saveObjectChanges(cube.solid);
+    saveObjectChanges(cube.wireframe);
+    saveObjectChanges(cube.solid);
   });
 }
 

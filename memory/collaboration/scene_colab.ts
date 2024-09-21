@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import { reconstructScene } from "../../ui/graph_v2/create";
 import indexDBOverlay from '../local/file_worker';
 import { p2pSync } from '../../network/peer2peer_simple';
@@ -11,6 +10,7 @@ interface ObjectState {
   position: number[];
   rotation: number[];
   scale: number[];
+  sceneVersion: number;
   version: number;
   versionNonce: number;
   lastEditedBy: string;
@@ -32,6 +32,7 @@ class SceneState {
   private saveTimeout: NodeJS.Timeout | null = null;
   private broadcastChannel: BroadcastChannel;
   private p2pSync: P2PSync;
+  public sceneVersion: number = 0;
 
 
   private constructor() {
@@ -172,16 +173,14 @@ class SceneState {
     }
   }
 
+
   private handleDeletion(state: ObjectState): void {
     this.mergeUpdate(state);
     this.updatedObjects.add(state.uuid);
-
-    // If it's a cube, also delete its counterpart
     if (state.shape === 'wireframeCube' || state.shape === 'solidCube') {
       const counterpartUuid = state.shape === 'wireframeCube' 
         ? state.uuid + '-solid' 
         : state.uuid.replace('-solid', '');
-      
       const counterpartState = this.objects.get(counterpartUuid);
       if (counterpartState) {
         const updatedCounterpartState = {
@@ -195,6 +194,7 @@ class SceneState {
       }
     }
   }
+  
 
   private updateCubeCounterpart(state: ObjectState): void {
     const counterpartUuid = state.shape === 'wireframeCube' 
@@ -243,27 +243,48 @@ class SceneState {
   }
 
   
-mergeUpdate(
-  incomingState: ObjectState,
-  options?: { fromPeer?: boolean }
-): void {
-    const existingState = this.objects.get(incomingState.uuid);
-
-    if (!existingState || this.isNewerState(incomingState, existingState)) {
-      // If the object is already marked as deleted, keep it deleted
-      const isDeleted = existingState?.isDeleted || incomingState.isDeleted;
-      
-      this.objects.set(incomingState.uuid, {
-        ...existingState,
-        ...incomingState,
-        isDeleted, // Ensure isDeleted flag is preserved
-      });
-      
-      this.updatedObjects.add(incomingState.uuid);
-      this.scheduleSave();
-      this.reconstructScene();
-    }
+  private getNextSceneVersion(): number {
+    const maxSceneVersion = Math.max(...Array.from(this.objects.values()).map(obj => obj.sceneVersion));
+    this.sceneVersion = maxSceneVersion + 1;
+    return this.sceneVersion;
   }
+
+// mergeUpdate(incomingState, options) {
+//   const existingState = this.objects.get(incomingState.uuid);
+//   if (!existingState || this.isNewerState(incomingState, existingState)) {
+//     // Use the isDeleted flag from the incoming state if it's newer
+//     const isDeleted = incomingState.isDeleted;
+//     this.objects.set(incomingState.uuid, {
+//       ...existingState,
+//       ...incomingState,
+//       isDeleted,
+//     });
+//     this.updatedObjects.add(incomingState.uuid);
+//     this.scheduleSave();
+//     this.reconstructScene();
+//   }
+// }
+
+mergeUpdate(incomingState: ObjectState, options?: { fromPeer?: boolean }): void {
+  const existingState = this.objects.get(incomingState.uuid);
+  if (!existingState || this.isNewerState(incomingState, existingState)) {
+    // Use the isDeleted flag from the incoming state if it's newer
+    const isDeleted = incomingState.isDeleted;
+    const nextSceneVersion = this.getNextSceneVersion();
+    
+    this.objects.set(incomingState.uuid, {
+      ...existingState,
+      ...incomingState,
+      isDeleted,
+      sceneVersion: nextSceneVersion,
+    });
+    
+    this.updatedObjects.add(incomingState.uuid);
+    this.scheduleSave();
+    this.reconstructScene();
+  }
+}
+
 
   private createObject(state: ObjectState): void {
     const newState = {
@@ -278,10 +299,16 @@ mergeUpdate(
   }
 
 
+  // private isNewerState(incoming: ObjectState, existing: ObjectState): boolean {
+  //   return incoming.version > existing.version ||
+  //          (incoming.version === existing.version && incoming.versionNonce < existing.versionNonce);
+  // }
+
   private isNewerState(incoming: ObjectState, existing: ObjectState): boolean {
     return incoming.version > existing.version ||
            (incoming.version === existing.version && incoming.versionNonce < existing.versionNonce);
   }
+  
 
   deleteObject(uuid: string): void {
     const state = this.objects.get(uuid);
@@ -302,61 +329,40 @@ mergeUpdate(
     if (this.saveTimeout) {
       clearTimeout(this.saveTimeout);
     }
-    this.saveTimeout = setTimeout(() => this.saveStateToDB(), 1000);
+    // Remove the delay by setting the timeout to 0
+    this.saveTimeout = setTimeout(() => this.saveStateToDB(), 0);
   }
-
-
   
 
-  private async saveStateToDB( options?: { fromPeer?: boolean }) {
+  private async saveStateToDB(options) {
     try {
       const updatedStates = Array.from(this.updatedObjects)
-        // .map(uuid => this.objects.get(uuid))
-        // .filter(state => state !== undefined);
         .map(uuid => this.objects.get(uuid))
-        .filter(state => state !== undefined)
-        // .map(state => makeSerializable(state));  // Use the serialization function here
-      
-      
+        .filter(state => state !== undefined);
       if (updatedStates.length > 0) {
         const existingData = await indexDBOverlay.getData(this.STORAGE_KEY);
         const existingMap = new Map(existingData.map(item => [item.uuid, item]));
-  
         const dataToSave = updatedStates.map(state => {
-          if (state) {
-            const existingState = existingMap.get(state.uuid);
-            return {
-              ...existingState,
-              ...state,
-              isDeleted: state.isDeleted || existingState?.isDeleted, // Preserve isDeleted flag
-              version: (existingState?.version || 0) + 1
-            };
-          }
-          return state;
+          const existingState = existingMap.get(state.uuid);
+          return {
+            ...state,
+            version: state.version, // Use the version from the state
+            isDeleted: state.isDeleted, // Ensure isDeleted is taken from the current state
+          };
         });
-  
+        // Broadcast updates if necessary
         if(this.p2pSync.isConnected() && !options?.fromPeer) {
-          console.log("sending my state to peer ", dataToSave)
           this.broadcastUpdate(dataToSave);
         }
-        // this.broadcastUpdate(dataToSave);
-        // if (!options?.fromPeer) {
-        //   this.broadcastUpdate(dataToSave);
-        // }
         await indexDBOverlay.saveData(this.STORAGE_KEY, dataToSave);
-        
-        updatedStates.forEach(state => {
-          if (state) {
-            this.savedObjects.add(state.uuid);
-          }
-        });
+        updatedStates.forEach(state => this.savedObjects.add(state.uuid));
       }
       this.updatedObjects.clear();
     } catch (error) {
       console.error('Error saving state to IndexedDB:', error);
     }
   }
-
+  
 
   private generateVersionNonce(): number {
     return Math.floor(Math.random() * 1000000);
@@ -392,8 +398,9 @@ export function saveObjectChanges(objectData) {
     position: convertToArray(objectData.position),
     rotation: convertToArray(objectData.rotation),
     scale: convertToArray(objectData.scale),
-    version: objectData.version + 1,
-    versionNonce: objectData.versionNonce,
+    version: (objectData.version || 0) + 1,
+    sceneVersion: (objectData.sceneVersion || 0) + 1,
+    versionNonce: objectData.versionNonce || this.generateVersionNonce(),
     size: objectData.size,
     isDeleted: objectData.isDeleted || false,
     color: convertColor(objectData.material?.color || objectData.color),
@@ -402,34 +409,64 @@ export function saveObjectChanges(objectData) {
   sceneState.updateObject(commonData);
 }
 
+export function diffSceneChanges(scene, nonBloomScene, previousSnapShot) {
+  const changedObjects = [];
+  const currentSnapshot = {};
 
-function makeSerializable(obj) {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
+  // Function to process objects in a scene
+  function processSceneObjects(sceneToProcess) {
+    sceneToProcess.traverse((object) => {
+      if (object.isMesh && (object.shape === 'sphere' || object.shape.includes('Cube'))) {
+        const uuid = object.uuid;
+        const simplifiedObject = {
+          position: object.position.clone(),
+          rotation: object.rotation.clone(),
+          scale: object.scale.clone(),
+          color: object.material?.color?.clone(),
+          isDeleted: object.isDeleted || false,
+          // Add other relevant properties
+        };
+
+        currentSnapshot[uuid] = simplifiedObject;
+
+        const prevObject = previousSnapShot[uuid];
+        if (!prevObject) {
+          // New object
+          changedObjects.push(object);
+        } else if (!areObjectsEqual(simplifiedObject, prevObject)) {
+          // Object has changed
+          changedObjects.push(object);
+        }
+      }
+    });
   }
 
-  if (Array.isArray(obj)) {
-    return obj.map(makeSerializable);
-  }
+  // Process objects in both scenes
+  processSceneObjects(scene);
+  processSceneObjects(nonBloomScene);
 
-  const serialized = {};
 
-  for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'function') {
-      continue; // Skip functions
-    }
+  // Update changed objects
+  changedObjects.forEach((object) => {
+    saveObjectChanges(object);
+    console.log("............................", "diffSceneChanges", JSON.stringify(object));
+  });
 
-    if (value instanceof THREE.Vector3 || value instanceof THREE.Euler || value instanceof THREE.Quaternion) {
-      serialized[key] = value.toArray();
-    } else if (value instanceof THREE.Color) {
-      serialized[key] = value.getHex();
-    } else if (typeof value === 'object' && value !== null) {
-      // serialized[key] = makeSerializable(value);
-      serialized[key] = value
-    } else {
-      serialized[key] = value;
-    }
-  }
+  // Update the scene snapshot after processing
+  // sceneSnapshot = currentSnapshot;
+}
 
-  return serialized;
+function areObjectsEqual(obj1, obj2) {
+  // Compare position
+  if (!obj1.position.equals(obj2.position)) return false;
+  // Compare rotation
+  if (!obj1.rotation.equals(obj2.rotation)) return false;
+  // Compare scale
+  if (!obj1.scale.equals(obj2.scale)) return false;
+  // Compare color (if applicable)
+  if (obj1.color && obj2.color && !obj1.color.equals(obj2.color)) return false;
+  if (obj1.isDeleted !== obj2.isDeleted) return false;
+
+
+  return true;
 }

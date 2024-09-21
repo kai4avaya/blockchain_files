@@ -423,7 +423,6 @@ controls.addEventListener("change", () => {
 
 // Define global variables for geometry and material
 const sphereGeometry = new THREE.IcosahedronGeometry(1, 15);
-// const sphereGeometry = new THREE.SphereGeometry(1, 16, 12); // Less detailed sphere
 let sphereMaterial;
 
 export function createSphere(convertedData) {
@@ -460,9 +459,7 @@ export function createSphere(convertedData) {
 
   // Store the original size as a separate property
   sphere.originalSize = convertedData.size;
- // Compute and store the bounding sphere
- sphere.geometry.computeBoundingSphere();
- sphere.boundingSphere = new THREE.Sphere().copy(sphere.geometry.boundingSphere);
+
   scene.add(sphere);
 
   if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
@@ -513,64 +510,17 @@ finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bl
 
 // }
 
-// export function render() {
-//   projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-//   frustum.setFromProjectionMatrix(projScreenMatrix);
-
-//   scene.traverse(object => {
-//     if (object.isMesh) {
-//       const isVisible = frustum.intersectsObject(object);
-//       object.visible = isVisible;
-
-//       if (isVisible) {
-//         if (!object.layers.test(bloomLayer)) {
-//           darkenNonBloomed(object);
-//         }
-//       }
-//     }
-//   });
-
-//   bloomComposer.render();
-//   scene.traverse(restoreMaterial);
-
-//   nonBloomScene.traverse(object => {
-//     if (object.isMesh) {
-//       object.visible = frustum.intersectsObject(object);
-//     }
-//   });
-
-//   renderer.setRenderTarget(nonBloomRT);
-//   renderer.clear();
-//   renderer.render(nonBloomScene, camera);
-
-//   finalComposer.render();
-// }
-
-// render!
-// Update the render function to use bounding spheres for frustum culling
 export function render() {
   projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   frustum.setFromProjectionMatrix(projScreenMatrix);
 
   scene.traverse(object => {
     if (object.isMesh) {
-      if (object.geometry && object.geometry.boundingSphere) {
-        // Update the object's bounding sphere
-        if (!object.boundingSphere) {
-          object.boundingSphere = new THREE.Sphere();
-        }
-        object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
-        
-        const isVisible = frustum.intersectsSphere(object.boundingSphere);
-        object.visible = isVisible;
+      const isVisible = frustum.intersectsObject(object);
+      object.visible = isVisible;
 
-        if (isVisible && !object.layers.test(bloomLayer)) {
-          darkenNonBloomed(object);
-        }
-      } else {
-        // Fallback to using intersectsObject if boundingSphere is not available
-        object.visible = frustum.intersectsObject(object);
-        if (object.visible && !object.layers.test(bloomLayer)) {
+      if (isVisible) {
+        if (!object.layers.test(bloomLayer)) {
           darkenNonBloomed(object);
         }
       }
@@ -582,18 +532,7 @@ export function render() {
 
   nonBloomScene.traverse(object => {
     if (object.isMesh) {
-      if (object.geometry && object.geometry.boundingSphere) {
-        // Update the object's bounding sphere
-        if (!object.boundingSphere) {
-          object.boundingSphere = new THREE.Sphere();
-        }
-        object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
-        
-        object.visible = frustum.intersectsSphere(object.boundingSphere);
-      } else {
-        // Fallback to using intersectsObject if boundingSphere is not available
-        object.visible = frustum.intersectsObject(object);
-      }
+      object.visible = frustum.intersectsObject(object);
     }
   });
 
@@ -603,7 +542,6 @@ export function render() {
 
   finalComposer.render();
 }
-
 
 function darkenNonBloomed(obj) {
   if (obj.isMesh && !bloomLayer.test(obj.layers)) {
@@ -676,7 +614,6 @@ export function share3dDat() {
     cubes: typeof cubes !== "undefined" ? cubes : null,
     controls: typeof controls !== "undefined" ? controls : null,
     ghostCube: typeof ghostCube !== "undefined" ? ghostCube : null,
-    sceneSnapshot: typeof sceneSnapshot !== "undefined" ? sceneSnapshot : null,
   };
 }
 // export function removeEmptyCubes(scene, nonBloomScene) {
@@ -840,33 +777,6 @@ export function removeGhostCube() {
 //   markNeedsRender();
 // }
 
-let sceneSnapshot = {};
-
-function saveSceneSnapshot() {
-  sceneSnapshot = {};
-  const { scene, nonBloomScene } = share3dDat();
-
-  // Function to capture simplified objects
-  function captureObjects(sceneToCapture) {
-    sceneToCapture.traverse((object) => {
-      if (object.isMesh && (object.shape === 'sphere' || object.shape.includes('Cube'))) {
-        sceneSnapshot[object.uuid] = {
-          position: object.position.clone(),
-          rotation: object.rotation.clone(),
-          scale: object.scale.clone(),
-          color: object.material?.color?.clone(),
-          isDeleted: object.isDeleted || false,
-          // Add other relevant properties if needed
-        };
-      }
-    });
-  }
-
-  // Capture objects from both scenes
-  captureObjects(scene);
-  captureObjects(nonBloomScene);
-}
-
 export function reconstructScene(snapshot) {
   console.log("Reconstructing scene with snapshot:", snapshot);
 
@@ -903,8 +813,6 @@ export function reconstructScene(snapshot) {
     }
   });
   markNeedsRender();
-  saveSceneSnapshot() 
-  console.log("............. saveSceneSnapshot", sceneSnapshot);
 }
 
 
