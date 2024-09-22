@@ -12,7 +12,7 @@ import {
   createSceneSnapshot,
   getObjectById,
   getCubeContainingSphere,
-  findSpheresInCube,
+  // findSpheresInCube,
 } from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
 import * as THREE from "three";
@@ -20,7 +20,7 @@ import { convertToThreeJSFormat } from "../../utils/utils";
 import { diffSceneChanges } from "../../memory/collaboration/scene_colab";
 
 let isDragging = false;
-let isClicking = false;
+// let isClicking = false;
 let selectedSphere = null;
 let CUBEINTERSECTED;
 // const cubeGroups = new Map(); // Map of cube UUIDs to arrays of spheres inside them
@@ -28,10 +28,10 @@ let selectedObject = null;
 let currentSnapshot = null;
 const BLOOM_SCENE = 1;
 let isFileDragging = false;
-const SCALEFACTOR = 0.05;
+// const SCALEFACTOR = 0.05;
 const RESCALEFACTOR = 10;
 let initialPointerPosition = { x: 0, y: 0 };
-let initialPointerTime = 0;
+// let initialPointerTime = 0;
 const DRAG_THRESHOLD = 5; // Adjust this value as needed
 
 const raycaster = new THREE.Raycaster();
@@ -268,7 +268,7 @@ export function checkIntersections(raycaster, scenes) {
 function handleFileDragOver(
   event,
   allIntersectsN = undefined,
-  foundSpheres = undefined
+  // foundSpheres = undefined
 ) {
   const { camera, scene, nonBloomScene, renderer } = share3dDat();
   const canvas = renderer.domElement;
@@ -297,7 +297,7 @@ function handleFileDragOver(
 
     createGhostCube(intersectedSphere.position, cubeSize, containingCube);
   } else {
-    // removeGhostCube();
+    removeGhostCube();
   }
 
   if (solidCubeIntersect) {
@@ -320,7 +320,9 @@ function resetCubeHighlight() {
   }
 }
 
-async function handleFileDrop_sphere(event) {
+// async function handleFileDrop_sphere(event) {
+   function handleFileDrop_sphere(event) {
+
   isFileDragging = false;
   resetCubeHighlight();
   const { camera, scene, nonBloomScene, renderer } = share3dDat();
@@ -348,7 +350,7 @@ async function handleFileDrop_sphere(event) {
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
     const size = normalizeSize(file.size);
-    const fileIds = await handleFileDrop(event);
+    const fileIds = handleFileDrop(event);
 
     if (allIntersects.length > 0) {
       const intersect = allIntersects[0];
@@ -423,7 +425,6 @@ async function handleFileDrop_sphere(event) {
     CUBEINTERSECTED = null;
   }
 
-  await onPointerUp(event);
 }
 
 function resetCubeColor(cube) {
@@ -452,11 +453,11 @@ function setupDragAndDrop() {
     }
   });
 
-  canvas.addEventListener("drop", async (event) => {
+  canvas.addEventListener("drop", (event) => {
     event.preventDefault();
-    await handleFileDrop_sphere(event);
+    handleFileDrop_sphere(event);
     removeGhostCube();
-    await onPointerUp(event);
+    onPointerUp(event);
   });
 
   canvas.addEventListener("dragleave", (event) => {
@@ -556,9 +557,9 @@ export function onPointerDown(event) {
 
   // Record initial pointer position and time
   initialPointerPosition = { x: event.clientX, y: event.clientY };
-  initialPointerTime = Date.now();
+  // initialPointerTime = Date.now();
   isDragging = false; // Reset isDragging
-  isClicking = false; // Add this line
+  // isClicking = false; // Add this line
 
   const sphereIntersect = intersectsBloom.find(
     (intersect) => getObjectType(intersect.object) === "Sphere"
@@ -569,13 +570,13 @@ export function onPointerDown(event) {
     selectedSphere = sphereIntersect.object;
     selectedObject = selectedSphere;
     sphereIntersect.object.layers.toggle(BLOOM_SCENE);
-    isClicking = true; // Indicate that an object was clicked
+    // isClicking = true; // Indicate that an object was clicked
   } else if (intersectsNonBloom?.length > 0) {
     const selectedCube = getCubeUnderPointer(event, intersectsNonBloom);
     if (selectedCube) {
       controls.enabled = false; // Disable controls
       selectedObject = selectedCube;
-      isClicking = true; // Indicate that an object was clicked
+      // isClicking = true; // Indicate that an object was clicked
 
       // Initialize the previousIntersectPoint for cube dragging
       plane.setFromNormalAndCoplanarPoint(
@@ -667,7 +668,7 @@ async function onPointerUp(event) {
   controls.enabled = true;
   // Reset variables
   isDragging = false;
-  isClicking = false;
+  // isClicking = false;
   selectedSphere = null;
   selectedObject = null;
   currentSnapshot = null;
@@ -684,7 +685,7 @@ const onPointerMove = (event) => {
 
   if (distanceMoved > DRAG_THRESHOLD) {
     isDragging = true;
-    isClicking = false; // No longer a click, it's a drag
+    // isClicking = false; // No longer a click, it's a drag
     controls.enabled = false; // Disable controls during drag
   }
 
@@ -719,7 +720,7 @@ const onPointerMove = (event) => {
         // Create ghost cube, passing the existing cube if found
         createGhostCube(intersectedSphere.position, cubeSize, containingCube);
       } else {
-        // removeGhostCube();
+        removeGhostCube();
       }
     } else if (selectedObject) {
       // Existing code for dragging cubes

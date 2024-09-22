@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import { reconstructScene } from "../../ui/graph_v2/create";
 import indexDBOverlay from '../local/file_worker';
 import { p2pSync } from '../../network/peer2peer_simple';
@@ -37,7 +36,6 @@ class SceneState {
   public sceneVersion: number = 0;
   private updateQueue: ObjectState[] = [];
   private isProcessingQueue: boolean = false;
-  private scenes: THREE.Scene[] = [];
 
   private constructor() {
     this.objects = new Map();
@@ -55,18 +53,6 @@ class SceneState {
     this.p2pSync.broadcastUpdate(states);
   }
   
-  // addScene(scene: THREE.Scene) {
-  //   this.scenes.push(scene);
-  // }
-   replaceScenes(newScenes: THREE.Scene[]) {
-    this.scenes = newScenes;
-  }
-
-  // Method to get the scenes array
-  getScenes(): THREE.Scene[] {
-    return this.scenes;
-  }
-
   private handleBroadcastMessage(event: MessageEvent) {
     const incomingState = event.data as ObjectState;
     this.mergeUpdate(incomingState);
@@ -149,51 +135,16 @@ class SceneState {
     reconstructScene(Array.from(this.objects.values()));
   }
   
-  // updateObject(
-  //   objectState: Partial<ObjectState> & { uuid: string },
-  //   options?: { fromPeer?: boolean }
-  // ): void {
-  //   const existingState = this.objects.get(objectState.uuid);
-
-  //   console.log("i am existingState", existingState)
-  // console.log("i am existingState uuid:", existingState?.uuid);
-  // console.log("i am incoming object uuid:", objectState.uuid);
-
-  //   if (existingState) {
-  //     if (this.hasChanged(existingState, objectState)) {
-  //       const updatedState = {
-  //         ...existingState,
-  //         ...objectState,
-  //         isUpdated: true,
-  //         versionNonce: generateVersionNonce(),
-  //       };
-
-  //       // Handle deletion
-  //       if (updatedState.isDeleted) {
-  //         this.handleDeletion(updatedState);
-  //       } else {
-  //         this.mergeUpdate(updatedState);
-  //         this.updatedObjects.add(updatedState.uuid);
-
-  //         // Handle cube counterpart update
-  //         if (updatedState.shape === 'wireframeCube' || updatedState.shape === 'solidCube') {
-  //           this.updateCubeCounterpart(updatedState);
-  //         }
-  //       }
-  //     }
-  //   } else {
-  //     this.createObject(objectState as ObjectState);
-  //     this.updatedObjects.add(objectState.uuid);
-  //   }
-  // }
-
-
   updateObject(
     objectState: Partial<ObjectState> & { uuid: string },
-    options?: { fromPeer?: boolean; deferReconstruct?: boolean }
+    options?: { fromPeer?: boolean }
   ): void {
     const existingState = this.objects.get(objectState.uuid);
-  
+
+    console.log("i am existingState", existingState)
+  console.log("i am existingState uuid:", existingState?.uuid);
+  console.log("i am incoming object uuid:", objectState.uuid);
+
     if (existingState) {
       if (this.hasChanged(existingState, objectState)) {
         const updatedState = {
@@ -202,36 +153,29 @@ class SceneState {
           isUpdated: true,
           versionNonce: generateVersionNonce(),
         };
-  
+
         // Handle deletion
         if (updatedState.isDeleted) {
-          this.handleDeletion(updatedState, options);
+          this.handleDeletion(updatedState);
         } else {
-          this.mergeUpdate(updatedState, options);
+          this.mergeUpdate(updatedState);
           this.updatedObjects.add(updatedState.uuid);
-  
+
           // Handle cube counterpart update
-          if (
-            updatedState.shape === 'wireframeCube' ||
-            updatedState.shape === 'solidCube'
-          ) {
-            this.updateCubeCounterpart(updatedState, options);
+          if (updatedState.shape === 'wireframeCube' || updatedState.shape === 'solidCube') {
+            this.updateCubeCounterpart(updatedState);
           }
         }
       }
     } else {
-      this.createObject(objectState as ObjectState, options);
+      this.createObject(objectState as ObjectState);
       this.updatedObjects.add(objectState.uuid);
     }
   }
-  
 
 
-  // private handleDeletion(state: ObjectState): void {
-  //   this.mergeUpdate(state);
-  //   this.updatedObjects.add(state.uuid);
-  private handleDeletion(state: ObjectState, options?: { deferReconstruct?: boolean }): void {
-    this.mergeUpdate(state, options);
+  private handleDeletion(state: ObjectState): void {
+    this.mergeUpdate(state);
     this.updatedObjects.add(state.uuid);
     if (state.shape === 'wireframeCube' || state.shape === 'solidCube') {
       const counterpartUuid = state.shape === 'wireframeCube' 
@@ -252,40 +196,25 @@ class SceneState {
   }
   
 
-  // private updateCubeCounterpart(state: ObjectState): void {
-    private updateCubeCounterpart(state: ObjectState, options?: { deferReconstruct?: boolean }): void {
+  private updateCubeCounterpart(state: ObjectState): void {
     const counterpartUuid = state.shape === 'wireframeCube' 
       ? state.uuid + '-solid' 
       : state.uuid.replace('-solid', '');
     
     const counterpartState = this.objects.get(counterpartUuid);
-  //   if (counterpartState) {
-  //     const updatedCounterpartState = {
-  //       ...counterpartState,
-  //       position: state.position,
-  //       rotation: state.rotation,
-  //       scale: state.scale,
-  //       version: counterpartState.version + 1,
-  //       versionNonce: generateVersionNonce(),
-  //     };
-  //     this.mergeUpdate(updatedCounterpartState);
-  //     this.updatedObjects.add(counterpartUuid);
-  //   }
-  // }
-
-  if (counterpartState) {
-    const updatedCounterpartState = {
-      ...counterpartState,
-      position: state.position,
-      rotation: state.rotation,
-      scale: state.scale,
-      version: counterpartState.version + 1,
-      versionNonce: generateVersionNonce(),
-    };
-    this.mergeUpdate(updatedCounterpartState, options);
-    this.updatedObjects.add(counterpartUuid);
+    if (counterpartState) {
+      const updatedCounterpartState = {
+        ...counterpartState,
+        position: state.position,
+        rotation: state.rotation,
+        scale: state.scale,
+        version: counterpartState.version + 1,
+        versionNonce: generateVersionNonce(),
+      };
+      this.mergeUpdate(updatedCounterpartState);
+      this.updatedObjects.add(counterpartUuid);
+    }
   }
-}
 
 
   private hasChanged(existing: ObjectState, incoming: Partial<ObjectState>): boolean {
@@ -318,68 +247,29 @@ class SceneState {
     return this.sceneVersion;
   }
 
-// mergeUpdate(incomingState: ObjectState, options?: { fromPeer?: boolean }): void {
-//   const existingState = this.objects.get(incomingState.uuid);
-//   if (!existingState || this.isNewerState(incomingState, existingState)) {
-//     // Use the isDeleted flag from the incoming state if it's newer
-//     const isDeleted = incomingState.isDeleted;
-//     const nextSceneVersion = this.getNextSceneVersion();
-    
-//     this.objects.set(incomingState.uuid, {
-//       ...existingState,
-//       ...incomingState,
-//       isDeleted,
-//       sceneVersion: nextSceneVersion,
-//     });
-    
-//     this.updatedObjects.add(incomingState.uuid);
-//     // this.scheduleSave();
-//     this.enqueueUpdate(incomingState);
-//     this.reconstructScene();
-//   }
-// }
-
-mergeUpdate(
-  incomingState: ObjectState,
-  options?: { fromPeer?: boolean; deferReconstruct?: boolean }
-): void {
+mergeUpdate(incomingState: ObjectState, options?: { fromPeer?: boolean }): void {
   const existingState = this.objects.get(incomingState.uuid);
   if (!existingState || this.isNewerState(incomingState, existingState)) {
     // Use the isDeleted flag from the incoming state if it's newer
     const isDeleted = incomingState.isDeleted;
     const nextSceneVersion = this.getNextSceneVersion();
-
+    
     this.objects.set(incomingState.uuid, {
-      ...(existingState || {}),
+      ...existingState,
       ...incomingState,
       isDeleted,
       sceneVersion: nextSceneVersion,
     });
-
+    
     this.updatedObjects.add(incomingState.uuid);
+    // this.scheduleSave();
     this.enqueueUpdate(incomingState);
-
-    // Conditionally reconstruct the scene
-    if (!options?.deferReconstruct) {
-      this.reconstructScene();
-    }
+    this.reconstructScene();
   }
 }
 
 
-  // private createObject(state: ObjectState): void {
-  //   const newState = {
-  //     ...state,
-  //   };
-  //   this.objects.set(newState.uuid, newState);
-  //   if (!this.savedObjects.has(newState.uuid)) {
-  //     this.updatedObjects.add(newState.uuid);
-  //   }
-  //   this.scheduleSave();
-  //   this.reconstructScene();
-  // }
-
-  private createObject(state: ObjectState, options?: { deferReconstruct?: boolean }): void {
+  private createObject(state: ObjectState): void {
     const newState = {
       ...state,
     };
@@ -388,11 +278,15 @@ mergeUpdate(
       this.updatedObjects.add(newState.uuid);
     }
     this.scheduleSave();
-    if (!options?.deferReconstruct) {
-      this.reconstructScene();
-    }
+    this.reconstructScene();
   }
-  
+
+
+  // private isNewerState(incoming: ObjectState, existing: ObjectState): boolean {
+  //   return incoming.version > existing.version ||
+  //          (incoming.version === existing.version && incoming.versionNonce < existing.versionNonce);
+  // }
+
   private isNewerState(incoming: ObjectState, existing: ObjectState): boolean {
     return incoming.version > existing.version ||
            (incoming.version === existing.version && incoming.versionNonce < existing.versionNonce);
@@ -489,7 +383,7 @@ export const sceneState = SceneState.getInstance();
 sceneState.setupP2PSync(); 
 
 
-export function saveObjectChanges(objectData, options?: { deferReconstruct?: boolean }) {
+export function saveObjectChanges(objectData) {
   console.log("saveObjectChanges", objectData);
   if (!objectData) return;
 
@@ -521,83 +415,23 @@ export function saveObjectChanges(objectData, options?: { deferReconstruct?: boo
     color: convertColor(objectData.material?.color || objectData.color),
     lastEditedBy: objectData.loginName || loginName,
   };
-  sceneState.updateObject(commonData, options);
+  sceneState.updateObject(commonData);
 }
-
-// export function diffSceneChanges(scene, nonBloomScene, previousSnapShot) {
-//   const changedObjects = [];
-//   const currentSnapshot = {};
-
-//   // Function to process objects in a scene
-//   function processSceneObjects(sceneToProcess) {
-//     sceneToProcess.traverse((object) => {
-
-//       if(object.shape){
-//       // if ((object.isMesh && (object.shape === 'sphere' || object.shape.includes('Cube') )) || object.isLineSegments) {
-
-//       console.log("i am object in  AFTER I DO THAT DIFF! diff", object);
-//       console.log("isDelete?", object.isDeleted)
-//       console.log("createdby", object.lastEditedBy)
-
-//         const uuid = object.uuid;
-//         const simplifiedObject = {
-//           position: object.position.clone(),
-//           rotation: object.rotation.clone(),
-//           scale: object.scale.clone(),
-//           color: object.material?.color?.clone(),
-//           isDeleted: object.isDeleted || false,
-//           // Add other relevant properties
-//         };
-
-//         currentSnapshot[uuid] = simplifiedObject;
-
-//         const prevObject = previousSnapShot[uuid];
-//         if (!prevObject) {
-//           // New object
-//           changedObjects.push(object);
-//         } else if (!areObjectsEqual(simplifiedObject, prevObject)) {
-//           // Object has changed
-//           changedObjects.push(object);
-//         }
-//       }
-//     });
-//   }
-
-//   // Process objects in both scenes
-//   processSceneObjects(scene);
-//   processSceneObjects(nonBloomScene);
-
-
-//   // Update changed objects
-//   changedObjects.forEach((object) => {
-//     saveObjectChanges(object);
-//   });
-
-//   // Update the scene snapshot after processing
-//   // sceneSnapshot = currentSnapshot;
-// }
 
 export function diffSceneChanges(scene, nonBloomScene, previousSnapShot) {
   const changedObjects = [];
   const currentSnapshot = {};
 
-  // sceneState.addScene(scene)
-  // sceneState.addScene(nonBloomScene)
-  sceneState.replaceScenes([scene,nonBloomScene])  // GOING TO NEED IN PEER 2 PEER to use this a way to get previousSnapshot, which will be the scene im connecting to current object state... 
-
   // Function to process objects in a scene
   function processSceneObjects(sceneToProcess) {
     sceneToProcess.traverse((object) => {
-      if (object.shape) {
 
+      if(object.shape){
+      // if ((object.isMesh && (object.shape === 'sphere' || object.shape.includes('Cube') )) || object.isLineSegments) {
 
-        console.log("00000000000000000000000000000000000000000000000000000000000")
-        console.log("i am object in  AFTER I DO THAT DIFF! diff", object.shape);
-
-
-        console.log("i am object in  AFTER I DO THAT DIFF! diff", object);
-        console.log("isDelete?", object.isDeleted)
-        console.log("createdby", object.lastEditedBy)
+      console.log("i am object in  AFTER I DO THAT DIFF! diff", object);
+      console.log("isDelete?", object.isDeleted)
+      console.log("createdby", object.lastEditedBy)
 
         const uuid = object.uuid;
         const simplifiedObject = {
@@ -608,12 +442,6 @@ export function diffSceneChanges(scene, nonBloomScene, previousSnapShot) {
           isDeleted: object.isDeleted || false,
           // Add other relevant properties
         };
-
-        console.log("i am similifiedObject", simplifiedObject);
-
-        console.log("00000000000000000000000000000000000000000000000000000000000")
-
-
 
         currentSnapshot[uuid] = simplifiedObject;
 
@@ -633,18 +461,15 @@ export function diffSceneChanges(scene, nonBloomScene, previousSnapShot) {
   processSceneObjects(scene);
   processSceneObjects(nonBloomScene);
 
-  // Update changed objects with deferred reconstruction
-  changedObjects.forEach((object) => {
-    saveObjectChanges(object, { deferReconstruct: true });
-  });
 
-  // After all updates, reconstruct the scene once
-  sceneState.reconstructScene();
+  // Update changed objects
+  changedObjects.forEach((object) => {
+    saveObjectChanges(object);
+  });
 
   // Update the scene snapshot after processing
   // sceneSnapshot = currentSnapshot;
 }
-
 
 function areObjectsEqual(obj1, obj2) {
   // Compare position

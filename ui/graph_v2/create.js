@@ -7,7 +7,7 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
 import { makeObjectWritable, convertToThreeJSFormat } from "../../utils/utils";
-import { createSceneSnapshot, findSpheresInCube, getCubeContainingSphere } from "./snapshot.js";
+import { createSceneSnapshot, findSpheresInCube } from "./snapshot.js";
 
 
 import { Frustum, Matrix4 } from 'three';
@@ -351,7 +351,7 @@ export function createWireframeCube(convertedData) {
   nonBloomScene.add(solidCube);
 
 
-  console.log("I have created", wireframeCube, solidCube)
+  console.log("CUBE CREATED! I have created wireframecube", wireframeCube, solidCube)
   return { wireframeCube, solidCube };
 }
 
@@ -549,11 +549,16 @@ finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bl
 // render!
 // Update the render function to use bounding spheres for frustum culling
 export function render() {
-  projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  // Increase the frustum size by scaling the projection matrix
+  const scaleFactor = 1.5; // Adjust this value as needed
+  const scaledProjectionMatrix = camera.projectionMatrix.clone().scale(new THREE.Vector3(1, 1, scaleFactor));
+  projScreenMatrix.multiplyMatrices(scaledProjectionMatrix, camera.matrixWorldInverse);
   frustum.setFromProjectionMatrix(projScreenMatrix);
 
   scene.traverse(object => {
     if (object.isMesh) {
+      let isVisible;
+      
       if (object.geometry && object.geometry.boundingSphere) {
         // Update the object's bounding sphere
         if (!object.boundingSphere) {
@@ -561,18 +566,21 @@ export function render() {
         }
         object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
         
-        const isVisible = frustum.intersectsSphere(object.boundingSphere);
-        object.visible = isVisible;
-
-        if (isVisible && !object.layers.test(bloomLayer)) {
-          darkenNonBloomed(object);
-        }
+        // Add a small buffer to the bounding sphere radius
+        const bufferFactor = 1.1; // Adjust this value as needed
+        const bufferedRadius = object.boundingSphere.radius * bufferFactor;
+        
+        isVisible = frustum.intersectsSphere(new THREE.Sphere(object.boundingSphere.center, bufferedRadius));
       } else {
-        // Fallback to using intersectsObject if boundingSphere is not available
-        object.visible = frustum.intersectsObject(object);
-        if (object.visible && !object.layers.test(bloomLayer)) {
-          darkenNonBloomed(object);
-        }
+        // For large objects like cubes, use a more lenient culling method
+        isVisible = frustum.intersectsObject(object) || 
+                    object.position.distanceTo(camera.position) < (object.geometry.boundingSphere?.radius || 100);
+      }
+      
+      object.visible = isVisible;
+
+      if (isVisible && !object.layers.test(bloomLayer)) {
+        darkenNonBloomed(object);
       }
     }
   });
@@ -749,19 +757,19 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   cubesToRemove.forEach((box) => {
     const boxId = box.wireframe.userData.id;
 
-    // Remove wireframe
-    if (box.wireframe) {
-      nonBloomScene.remove(box.wireframe);
-      box.wireframe.geometry.dispose();
-      box.wireframe.material.dispose();
-    }
+    // // Remove wireframe
+    // if (box.wireframe) {
+    //   nonBloomScene.remove(box.wireframe);
+    //   box.wireframe.geometry.dispose();
+    //   box.wireframe.material.dispose();
+    // }
 
-    // Remove solid
-    if (box.solid) {
-      nonBloomScene.remove(box.solid);
-      box.solid.geometry.dispose();
-      box.solid.material.dispose();
-    }
+    // // Remove solid
+    // if (box.solid) {
+    //   nonBloomScene.remove(box.solid);
+    //   box.solid.geometry.dispose();
+    //   box.solid.material.dispose();
+    // }
 
     // Remove from the snapshot
     const boxIndex = snapshot.boxes.findIndex((b) => b.wireframe.userData.id === boxId);
@@ -869,19 +877,8 @@ function saveSceneSnapshot() {
 }
 
 export function reconstructScene(snapshot) {
-  console.log("Reconstructing scene with snapshot:", snapshot);
+  console.log("+++++ Reconstructing scene with snapshot:", snapshot);
 
-    // Log existing objects in the scene
-    // scene.traverse((object) => {
-    //   if (object.isMesh) {
-    //     console.log(`UUID: ${object.uuid}, Type: ${object.geometry.type}`);
-    //   }
-    // });
-  
-    // nonBloomScene.traverse((object) => {
-    //     console.log(`UUID: ${object.uuid}, Type: ${JSON.stringify(object)}`);
-    // });
-  
   // Remove deleted objects from the scene
   snapshot.filter(objectState => objectState.isDeleted).forEach((objectState) => {
     const existingObject = scene.getObjectByProperty('uuid', objectState.uuid) || 
@@ -925,17 +922,62 @@ function createObject(objectState) {
   }
 }
 
-function removeObject(entry) {
-  if (!entry?.object) return;
+// function removeObject(entry) {
+//   if (!entry?.object) return;
 
-  if (entry.inScene) {
-    scene.remove(entry.object);
-  } else {
-    nonBloomScene.remove(entry.object);
+//   if (entry.inScene) {
+//     scene.remove(entry.object);
+//   } else {
+//     nonBloomScene.remove(entry.object);
+//   }
+ 
+//   if (entry.object.material) entry.object.material.dispose();
+//   if (entry.object.geometry) entry.object.geometry.dispose();
+// }
+
+function removeObject(object) {
+  if (!object) return;
+
+  // Remove from main scene
+  if (scene.getObjectByProperty('uuid', object.uuid)) {
+    scene.remove(object);
   }
 
-  if (entry.object.material) entry.object.material.dispose();
-  if (entry.object.geometry) entry.object.geometry.dispose();
+  // Remove from non-bloom scene
+  if (nonBloomScene.getObjectByProperty('uuid', object.uuid)) {
+    nonBloomScene.remove(object);
+  }
+
+  // If the object is a Line or LineSegments (for wireframe cubes)
+  if (object.isLine || object.isLineSegments) {
+    const solidCubeUuid = object.uuid + "-solid";
+    const solidCube = nonBloomScene.getObjectByProperty('uuid', solidCubeUuid);
+    if (solidCube) {
+      nonBloomScene.remove(solidCube);
+      if (solidCube.material) solidCube.material.dispose();
+      if (solidCube.geometry) solidCube.geometry.dispose();
+    }
+  }
+
+  // Dispose of materials and geometries
+  if (object.material) {
+    if (Array.isArray(object.material)) {
+      object.material.forEach(material => material.dispose());
+    } else {
+      object.material.dispose();
+    }
+  }
+  if (object.geometry) object.geometry.dispose();
+
+  // Remove from the deletedObjects set if it's there
+  deletedObjects.delete(object.uuid);
+
+  // Force an update of the scene
+  scene.updateMatrixWorld(true);
+  nonBloomScene.updateMatrixWorld(true);
+
+  // Mark for re-render
+  markNeedsRender();
 }
 
 export function hideObject(object, scene, nonBloomScene) {

@@ -5,6 +5,8 @@ import { share3dDat } from './create';
 
 
 export function createSceneSnapshot(scenes) {
+    const { ghostCube } = share3dDat(); 
+
     const snapshot = {
         objects: [],
         boxes: [],
@@ -15,6 +17,12 @@ export function createSceneSnapshot(scenes) {
 
     scenes.forEach((currentScene, sceneIndex) => {
         currentScene.traverse((object) => {
+
+            if (object === ghostCube) {
+                // Skip the ghostCube
+                return;
+              }
+
             if (isRelevantObject(object)) {
                 const objectId = getObjectId(object);
                 const objectData = {
