@@ -732,9 +732,10 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   const cubesToRemove = [];
   const removedCubes = [];
 
-
+  console.log("i am the snapshot", snapshot)
   // Identify cubes to remove
   snapshot.boxes.forEach((box) => {
+    console.log("i am box to remove", box)
     const boxId = box.wireframe.userData.id;
     const containedSpheres = snapshot.containment[boxId];
 
@@ -871,16 +872,15 @@ export function reconstructScene(snapshot) {
   console.log("Reconstructing scene with snapshot:", snapshot);
 
     // Log existing objects in the scene
-    console.log("Existing objects in the scene:");
-    scene.traverse((object) => {
-      if (object.isMesh) {
-        console.log(`UUID: ${object.uuid}, Type: ${object.geometry.type}`);
-      }
-    });
+    // scene.traverse((object) => {
+    //   if (object.isMesh) {
+    //     console.log(`UUID: ${object.uuid}, Type: ${object.geometry.type}`);
+    //   }
+    // });
   
-    nonBloomScene.traverse((object) => {
-        console.log(`UUID: ${object.uuid}, Type: ${JSON.stringify(object)}`);
-    });
+    // nonBloomScene.traverse((object) => {
+    //     console.log(`UUID: ${object.uuid}, Type: ${JSON.stringify(object)}`);
+    // });
   
   // Remove deleted objects from the scene
   snapshot.filter(objectState => objectState.isDeleted).forEach((objectState) => {
@@ -898,13 +898,11 @@ export function reconstructScene(snapshot) {
     if (existingObject) {
       objectState.isUpdated && updateObjectProperties(existingObject, objectState);
     } else {
-      console.log("this shape is being recreated because it is not an existing object:", objectState);
       createObject(objectState);
     }
   });
   markNeedsRender();
   saveSceneSnapshot() 
-  console.log("............. saveSceneSnapshot", sceneSnapshot);
 }
 
 
@@ -912,16 +910,11 @@ function updateObjectProperties(object, objectState) {
   objectState.isUpdated = false;
 
   if (objectState.position) object.position.fromArray(objectState.position);
-  // if (objectState.scale) object.scale.fromArray(objectState.scale);
   if (objectState.color !== undefined && object.material) {
     object.material.color.setHex(objectState.color);
   }
   if (objectState.version !== undefined) object.version = objectState.version;
 
-  // Update size for cubes
-  // if ((object.shape === "wireframeCube" || object.shape === "solidCube") && objectState.size !== undefined) {
-  //   object.scale.setScalar(objectState.size);
-  // }
 }
 
 function createObject(objectState) {

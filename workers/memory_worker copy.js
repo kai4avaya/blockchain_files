@@ -6,19 +6,13 @@ async function openDB(dbName, version) {
 
     request.onupgradeneeded = function (event) {
       const db = event.target.result;
+      const stores = ["directories", "files", "graph"];
       
-      // Re-create the object stores with the new keyPath
-      // First, delete existing stores if they exist
-      ['directories', 'files', 'graph'].forEach(storeName => {
-        if (db.objectStoreNames.contains(storeName)) {
-          db.deleteObjectStore(storeName);
+      stores.forEach(storeName => {
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
         }
       });
-
-      // Now create the stores with the correct keyPath
-      db.createObjectStore('directories', { keyPath: 'id' });
-      db.createObjectStore('files', { keyPath: 'id' });
-      db.createObjectStore('graph', { keyPath: 'uuid' });
     };
 
     request.onsuccess = function (event) {
@@ -32,20 +26,16 @@ async function openDB(dbName, version) {
   });
 }
 
-
 async function initializeDB(storeNames) {
   try {
-    const dbName = 'fileGraphDB';
-
-    // Open the database with a higher version to trigger onupgradeneeded
-    let db = await openDB(dbName);
-
+    let db = await openDB('fileGraphDB');
+    
     const missingStores = storeNames.filter(store => !db.objectStoreNames.contains(store));
-
+    
     if (missingStores.length > 0) {
-      const newVersion = db.version + 1;
       db.close();
-      db = await openDB(dbName, newVersion);
+      const newVersion = db.version + 1;
+      db = await openDB('fileGraphDB', newVersion);
     }
 
     return 'Database initialized successfully';

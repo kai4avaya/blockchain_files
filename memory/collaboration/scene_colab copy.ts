@@ -34,8 +34,7 @@ class SceneState {
   private broadcastChannel: BroadcastChannel;
   private p2pSync: P2PSync;
   public sceneVersion: number = 0;
-  private updateQueue: ObjectState[] = [];
-  private isProcessingQueue: boolean = false;
+
 
   private constructor() {
     this.objects = new Map();
@@ -326,39 +325,9 @@ mergeUpdate(incomingState: ObjectState, options?: { fromPeer?: boolean }): void 
       clearTimeout(this.saveTimeout);
     }
     // Remove the delay by setting the timeout to 0
-    this.saveTimeout = setTimeout(() => this.saveStateToDB(), 1000);
+    this.saveTimeout = setTimeout(() => this.saveStateToDB(), 0);
   }
   
-
-
-private enqueueUpdate(state: ObjectState) {
-  this.updateQueue.push(state);
-  this.processQueue();
-}
-private async processQueue() {
-  if (this.isProcessingQueue) return;
-  this.isProcessingQueue = true;
-
-  try {
-    while (this.updateQueue.length > 0) {
-      const state = this.updateQueue.shift();
-      await this.saveStateToDB(state);
-    }
-  } finally {
-    this.isProcessingQueue = false;
-  }
-}
-
-// private async saveStateToDBImmediate(state: ObjectState) {
-//   try {
-//     await indexDBOverlay.saveData(this.STORAGE_KEY, [state]);
-//     this.savedObjects.add(state.uuid);
-//   } catch (error) {
-//     console.error('Error saving state to IndexedDB:', error);
-//     // Optionally, re-enqueue the failed update
-//     this.updateQueue.unshift(state);
-//   }
-// }
 
   private async saveStateToDB(options) {
     try {
