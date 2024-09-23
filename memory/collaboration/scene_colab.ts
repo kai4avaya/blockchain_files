@@ -31,7 +31,7 @@ class SceneState {
   private updatedObjects: Set<string>;
   private savedObjects: Set<string>; // New set to track objects saved in IndexedDB
   private readonly STORAGE_KEY = "graph";
-  private saveTimeout: NodeJS.Timeout | null = null;
+  // private saveTimeout: NodeJS.Timeout | null = null;
   private broadcastChannel: BroadcastChannel;
   public p2pSync: P2PSync;
   public sceneVersion: number = 0;
@@ -98,7 +98,6 @@ class SceneState {
         // Add all loaded objects to savedObjects set
         storedState.forEach((state) => {
           this.savedObjects.add(state.uuid);
-          // this.p2pSync.broadcastUpdate(state);
         });
       }
     } catch (error) {
@@ -144,25 +143,30 @@ class SceneState {
       return;
     }
 
-    const updatesToApply: ObjectState[] = [];
+    // const updatesToApply: ObjectState[] = [];
 
     peerObjects.forEach((peerObject) => {
-      const existingObject = this.objects.get(peerObject.uuid);
-      if (!existingObject || this.isNewerState(peerObject, existingObject)) {
-        updatesToApply.push(peerObject);
-      }
-    });
-
-    // Batch update all objects
-    updatesToApply.forEach((objectState) => {
-      this.updateObject(objectState, {
+      // const existingObject = this.objects.get(peerObject.uuid);
+      // if (!existingObject || this.isNewerState(peerObject, existingObject)) {
+      //   updatesToApply.push(peerObject);
+      // }
+      this.updateObject(peerObject, {
         fromPeer: true,
         deferReconstruct: true,
       });
     });
 
+    // Batch update all objects
+    // updatesToApply.forEach((objectState) => {
+    //   this.updateObject(objectState, {
+    //     fromPeer: true,
+    //     deferReconstruct: true,
+    //   });
+    // });
+
     // Reconstruct the scene once after all updates
     this.reconstructScene();
+    this.saveStateToDB();
   }
 
   getSceneObjArray(): ObjectState[] {
@@ -210,9 +214,7 @@ class SceneState {
     }
   }
 
-  // private handleDeletion(state: ObjectState): void {
-  //   this.mergeUpdate(state);
-  //   this.updatedObjects.add(state.uuid);
+
   private handleDeletion(
     state: ObjectState,
     options?: { deferReconstruct?: boolean }
@@ -243,7 +245,6 @@ class SceneState {
     this.reconstructScene();
   }
 
-  // private updateCubeCounterpart(state: ObjectState): void {
   private updateCubeCounterpart(
     state: ObjectState,
     options?: { deferReconstruct?: boolean }
@@ -254,19 +255,6 @@ class SceneState {
         : state.uuid.replace("-solid", "");
 
     const counterpartState = this.objects.get(counterpartUuid);
-    //   if (counterpartState) {
-    //     const updatedCounterpartState = {
-    //       ...counterpartState,
-    //       position: state.position,
-    //       rotation: state.rotation,
-    //       scale: state.scale,
-    //       version: counterpartState.version + 1,
-    //       versionNonce: generateVersionNonce(),
-    //     };
-    //     this.mergeUpdate(updatedCounterpartState);
-    //     this.updatedObjects.add(counterpartUuid);
-    //   }
-    // }
 
     if (counterpartState) {
       const updatedCounterpartState = {
@@ -333,7 +321,7 @@ class SceneState {
       });
 
       this.updatedObjects.add(incomingState.uuid);
-      this.enqueueUpdate(incomingState, options);
+      // this.enqueueUpdate(incomingState, options);
 
       // Conditionally reconstruct the scene
       if (!options?.deferReconstruct) {
@@ -353,7 +341,8 @@ class SceneState {
     if (!this.savedObjects.has(newState.uuid)) {
       this.updatedObjects.add(newState.uuid);
     }
-    this.scheduleSave();
+    // this.scheduleSave();
+    // this.enqueueUpdate(newState, options);
     if (!options?.deferReconstruct) {
       this.reconstructScene();
     }
@@ -384,13 +373,6 @@ class SceneState {
     );
   }
 
-  private scheduleSave() {
-    if (this.saveTimeout) {
-      clearTimeout(this.saveTimeout);
-    }
-    // Remove the delay by setting the timeout to 0
-    this.saveTimeout = setTimeout(() => this.saveStateToDB(), 1000);
-  }
 
   private enqueueUpdate(
     state: ObjectState,
@@ -409,7 +391,7 @@ class SceneState {
     try {
       while (this.updateQueue.length > 0) {
         const state = this.updateQueue.shift();
-        await this.saveStateToDB(options);
+        await this.saveStateToDB();
       }
     } finally {
       this.isProcessingQueue = false;
@@ -427,7 +409,7 @@ class SceneState {
   //   }
   // }
 
-  private async saveStateToDB(options?: { fromPeer?: boolean }) {
+   async saveStateToDB() {
     try {
       const updatedStates = Array.from(this.updatedObjects)
         .map((uuid) => this.objects.get(uuid))
@@ -456,7 +438,6 @@ class SceneState {
 }
 
 export const sceneState = SceneState.getInstance();
-// const p2pSync = new P2PSync(sceneState);
 sceneState.setupP2PSync();
 
 export function saveObjectChanges(
@@ -466,36 +447,7 @@ export function saveObjectChanges(
   console.log("saveObjectChanges", objectData);
   if (!objectData) return;
 
-
   const commonData = serializeThreeObject(objectData);
-  // const convertToArray = (value) => {
-  //   if (Array.isArray(value)) return value;
-  //   if (value && typeof value.toArray === "function") return value.toArray();
-  //   return value;
-  // };
-
-  // const convertColor = (color) => {
-  //   if (typeof color === "number") return color;
-  //   if (color && typeof color.getHex === "function") return color.getHex();
-  //   return color;
-  // };
-
-  // const commonData = {
-  //   type: objectData.type,
-  //   shape: objectData.shape,
-  //   uuid: objectData.uuid,
-  //   userData: objectData.userData || {},
-  //   position: convertToArray(objectData.position),
-  //   rotation: convertToArray(objectData.rotation),
-  //   scale: convertToArray(objectData.scale),
-  //   version: (objectData.version || 0) + 1,
-  //   sceneVersion: (objectData.sceneVersion || 0) + 1,
-  //   versionNonce: objectData.versionNonce || generateVersionNonce(),
-  //   size: objectData.size,
-  //   isDeleted: objectData.isDeleted || false,
-  //   color: convertColor(objectData.material?.color || objectData.color),
-  //   lastEditedBy: objectData.loginName || loginName,
-  // };
   sceneState.updateObject(commonData, options);
 }
 
@@ -664,11 +616,16 @@ export function diffSceneChanges(
   // Broadcast the serialized changed objects
   // sceneState.broadcastUpdate(serializedChangedObjects);
 
+   // Call saveStateToDB without awaiting
+   sceneState.saveStateToDB().catch(error => 
+    console.error("Error saving state to IndexedDB:", error)
+  );
 
   if (sceneState.p2pSync.isConnected()){//&& !options?.fromPeer) {
         //   this.broadcastUpdate(dataToSave);
   // sceneState.broadcastUpdate(changedObjects);
   sceneState.broadcastUpdate(serializedChangedObjects);
+  
 
 
         }  
