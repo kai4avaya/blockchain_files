@@ -137,11 +137,15 @@ class P2PSync {
     } else if (data.type === 'update') {
       if (Array.isArray(data.data)) {
         console.log('Received update from peer. Updating objects...', data.data);
-        data.data.forEach((objectState) =>
-          this.sceneState!.updateObject(objectState, { fromPeer: true })
-        );
+        // data.data.forEach((objectState) =>
+        //   this.sceneState!.updateObject(objectState, { fromPeer: true })
+        // );
+        this.sceneState.syncWithPeer(data.data);
+
       } else {
-        this.sceneState.updateObject(data.data, { fromPeer: true });
+        // this.sceneState.updateObject(data.data, { fromPeer: true });
+        this.sceneState.syncWithPeer(data.data);
+
       }
     }
   });
