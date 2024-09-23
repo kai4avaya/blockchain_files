@@ -6,7 +6,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
-import { makeObjectWritable, convertToThreeJSFormat } from "../../utils/utils";
+import { makeObjectWritable, convertToThreeJSFormat, getCurrentTimeOfDay  } from "../../utils/utils";
 import { createSceneSnapshot, findSpheresInCube } from "./snapshot.js";
 
 
@@ -161,6 +161,19 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 // setupScene();
 let cubes = [];
+
+// Cache for geometries and materials
+const geometryCache = {
+  sphere: null,
+  cube: null
+};
+
+const materialCache = {
+  sphere: {},
+  wireframe: {},
+  solid: {}
+};
+
 const updateMiniMap = createMiniMap(scene, nonBloomScene, camera, renderer);
 
 // Add this function to your code
@@ -169,8 +182,8 @@ function addGridHelper() {
   const divisions = 100;
   const gridHelper = new THREE.GridHelper(size, divisions);
   scene.add(gridHelper);
-  
 }
+
 function createEnvironment() {
   // Create a large grid
   const gridSize = 1000;
@@ -188,6 +201,63 @@ function createEnvironment() {
   scene.add(directionalLight);
 
 }
+function setLightingBasedOnTime(scene, nonBloomScene) {
+  const timeOfDay = getCurrentTimeOfDay();
+
+  console.log("setLightingBasedOnTime" , timeOfDay);
+
+  // Remove existing lights from both scenes
+  [scene, nonBloomScene].forEach((scn) => {
+    scn.traverse((object) => {
+      if (object.isLight) {
+        scn.remove(object);
+      }
+    });
+  });
+
+  let ambientLight, directionalLight;
+
+  if (timeOfDay === 'day') {
+    // Daytime lights
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    directionalLight.position.set(1, 1, 1).normalize();
+  } else {
+    // Nighttime lights
+    ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+    directionalLight = new THREE.DirectionalLight(0x8888ff, 0.2);
+    directionalLight.position.set(1, 1, 1).normalize();
+  }
+
+  // Add lights to both scenes
+  scene.add(ambientLight);
+  scene.add(directionalLight);
+
+  // Clone the lights for the nonBloomScene
+  const ambientLightClone = ambientLight.clone();
+  const directionalLightClone = directionalLight.clone();
+
+  nonBloomScene.add(ambientLightClone);
+  nonBloomScene.add(directionalLightClone);
+}
+
+function setBackgroundBasedOnTime(scene, nonBloomScene) {
+  const timeOfDay = getCurrentTimeOfDay();
+  let bgColor;
+
+  console.log("setBackgroundBasedOnTime" , timeOfDay);
+  if (timeOfDay === 'day') {
+    bgColor = new THREE.Color(0x87CEEB); // Sky blue
+  } else {
+    bgColor = new THREE.Color(0x000000); // Black
+  }
+
+  scene.background = bgColor;
+  nonBloomScene.background = bgColor;
+  renderer.setClearColor(bgColor);
+}
+
+
 
 function loadTerrain(file, callback) {
   const xhr = new XMLHttpRequest();
@@ -406,6 +476,9 @@ function setupScene() {
   nonBloomScene.children.length = 0;
 // 
   loadCameraState();
+
+  // setLightingBasedOnTime(scene, nonBloomScene);
+  // setBackgroundBasedOnTime(scene, nonBloomScene);
 
   createEnvironment();
 

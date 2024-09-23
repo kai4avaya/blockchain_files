@@ -117,3 +117,24 @@ export function generateVersionNonce(): number {
   return Math.floor(Math.random() * 1000000);
 }
 
+
+
+export function getCurrentTimeOfDay() {
+  const now = new Date();
+  const hours = now.getHours() + now.getMinutes() / 60; // Current time in hours (0-24)
+
+  // Define day time as between 6 AM and 6 PM
+  if (hours >= 6 && hours < 18) {
+    // Calculate the progression from dawn (6 AM) to noon (12 PM) to dusk (6 PM)
+    if (hours < 12) {
+      // Dawn to noon
+      return (hours - 6) / 6; // 0 to 1
+    } else {
+      // Noon to dusk
+      return 1 - (hours - 12) / 6; // 1 to 0
+    }
+  } else {
+    // Night time
+    return 0;
+  }
+}

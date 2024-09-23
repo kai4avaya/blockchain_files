@@ -173,13 +173,22 @@ private generateUniqueId(): string {
     this.handleConnection(conn);
   }
 
-  broadcastUpdate(state: ObjectState | ObjectState[]) {
-    if (!this.peer) {
-      console.error('Peer object is undefined. Cannot broadcast update.');
-      return;
-    }
-    console.log('Broadcasting update to all connected peers. Connection count:', this.connections.size);
-    this.connections.forEach(conn => conn.send({ type: 'update', data: state }));
+  // broadcastUpdate(state: ObjectState | ObjectState[]) {
+  //   if (!this.peer) {
+  //     console.error('Peer object is undefined. Cannot broadcast update.');
+  //     return;
+  //   }
+  //   console.log('Broadcasting update to all connected peers. Connection count:', this.connections.size);
+  //   this.connections.forEach(conn => conn.send({ type: 'update', data: state }));
+  // }
+
+  broadcastUpdate(states: ObjectState[]): void {
+    console.log("Broadcasting updated states to peers:", states);
+    this.connections.forEach((conn) => {
+      if (conn.open) {
+        conn.send({ type: 'update', data: states });  // Send the entire array
+      }
+    });
   }
 
   getMyPeerId(): string {

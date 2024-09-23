@@ -136,6 +136,7 @@ class P2PSync {
         this.sceneState.syncWithPeer(data.data);
     } else if (data.type === 'update') {
       if (Array.isArray(data.data)) {
+        console.log('Received update from peer. Updating objects...', data.data);
         data.data.forEach((objectState) =>
           this.sceneState!.updateObject(objectState, { fromPeer: true })
         );
@@ -237,6 +238,7 @@ class P2PSync {
   }
 
   broadcastUpdate(state: any): void {
+    console.log("i send you my data! peer", state)
     this.connections.forEach((conn) => {
       if (conn.open) {
         conn.send({ type: 'update', data: state });
@@ -255,12 +257,7 @@ class P2PSync {
     }
   }
   
-  private updatePeerIdInput(peerId: string): void {
-    const peerIdInput = document.getElementById('peerIdInput') as HTMLInputElement;
-    if (peerIdInput) {
-      peerIdInput.value = peerId;
-    }
-  }
+
 }
 let isInitialized = false;
 
