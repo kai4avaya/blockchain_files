@@ -106,15 +106,70 @@ function getCubeUnderPointer(event, intersects) {
   return null; // Return null if no cube is found
 }
 
+
+// // Define a global drag plane (e.g., XZ-plane)
+// const globalDragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Y-up plane
+
+
+// export function dragCube() {
+//   if (!selectedObject || !selectedObject.wireframeCube) return;
+
+//   // Store the initial position of the wireframe cube
+//   const initialPosition = selectedObject.wireframeCube.position.clone();
+
+//   // Calculate the movement delta based on the change in intersect point
+//   const movementDelta = new THREE.Vector3().subVectors(
+//     intersectPoint,
+//     previousIntersectPoint
+//   );
+
+//   // Move the wireframe and solid cubes
+//   selectedObject.wireframeCube.position.add(movementDelta);
+//   selectedObject.solidCube.position.copy(selectedObject.wireframeCube.position);
+
+//   // Calculate the actual movement of the cube
+//   const actualMovement = new THREE.Vector3().subVectors(
+//     selectedObject.wireframeCube.position,
+//     initialPosition
+//   );
+
+//   // Move all spheres inside this cube
+//   selectedObject.containedSpheres.forEach((sphere) => {
+//     sphere.object.position.add(actualMovement);
+//     // Update the position in the selectedObject
+//     sphere.position = sphere.object.position.toArray();
+//   });
+
+//   // Update the previous intersect point for the next drag event
+//   previousIntersectPoint.copy(intersectPoint);
+
+//   markNeedsRender();
+// }
+
+// Define a global drag plane (e.g., XZ-plane)
+const globalDragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Y-up plane
+
 export function dragCube() {
+  const { camera, raycaster } = share3dDat();
   if (!selectedObject || !selectedObject.wireframeCube) return;
 
   // Store the initial position of the wireframe cube
   const initialPosition = selectedObject.wireframeCube.position.clone();
 
+  // Update the raycaster with the current mouse position
+  raycaster.setFromCamera(mouse, camera);
+
+  // Calculate the intersection point with the global drag plane
+  const intersectionPoint = new THREE.Vector3();
+  raycaster.ray.intersectPlane(globalDragPlane, intersectionPoint);
+
+  if (previousIntersectPoint === undefined) {
+    previousIntersectPoint = intersectionPoint.clone();
+  }
+
   // Calculate the movement delta based on the change in intersect point
   const movementDelta = new THREE.Vector3().subVectors(
-    intersectPoint,
+    intersectionPoint,
     previousIntersectPoint
   );
 
@@ -136,9 +191,12 @@ export function dragCube() {
   });
 
   // Update the previous intersect point for the next drag event
-  previousIntersectPoint.copy(intersectPoint);
+  previousIntersectPoint.copy(intersectionPoint);
 
   markNeedsRender();
+
+  // Return the actual movement for synchronization purposes
+  return actualMovement;
 }
 
 function highlightCube(cube) {

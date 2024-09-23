@@ -39,6 +39,7 @@ class SceneState {
   private isProcessingQueue: boolean = false;
   private scenes: THREE.Scene[] = [];
 
+
   private constructor() {
     this.objects = new Map();
     this.updatedObjects = new Set();
@@ -52,7 +53,7 @@ class SceneState {
 
   broadcastUpdate(states: ObjectState[]) {
     this.broadcastChannel.postMessage(states);
-    console.log("states being sent", states);
+    console.log("states being sent", states)
     this.p2pSync.broadcastUpdate(states);
   }
 
@@ -465,6 +466,7 @@ export function saveObjectChanges(
   console.log("saveObjectChanges", objectData);
   if (!objectData) return;
 
+
   const commonData = serializeThreeObject(objectData);
   // const convertToArray = (value) => {
   //   if (Array.isArray(value)) return value;
@@ -497,7 +499,8 @@ export function saveObjectChanges(
   sceneState.updateObject(commonData, options);
 }
 
-function serializeThreeObject(objectData) {
+function serializeThreeObject(objectData){
+  
   const convertToArray = (value) => {
     if (Array.isArray(value)) return value;
     if (value && typeof value.toArray === "function") return value.toArray();
@@ -657,16 +660,18 @@ export function diffSceneChanges(
     const serializedObject = serializeThreeObject(object);
     return serializedObject;
   });
-
+  
   // Broadcast the serialized changed objects
   // sceneState.broadcastUpdate(serializedChangedObjects);
 
-  if (sceneState.p2pSync.isConnected()) {
-    //&& !options?.fromPeer) {
-    //   this.broadcastUpdate(dataToSave);
-    // sceneState.broadcastUpdate(changedObjects);
-    sceneState.broadcastUpdate(serializedChangedObjects);
-  }
+
+  if (sceneState.p2pSync.isConnected()){//&& !options?.fromPeer) {
+        //   this.broadcastUpdate(dataToSave);
+  // sceneState.broadcastUpdate(changedObjects);
+  sceneState.broadcastUpdate(serializedChangedObjects);
+
+
+        }  
 
   // Update the scene snapshot after processing
   // sceneSnapshot = currentSnapshot;
