@@ -8,13 +8,14 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
 import { makeObjectWritable, convertToThreeJSFormat, getCurrentTimeOfDay  } from "../../utils/utils";
 import { createSceneSnapshot, findSpheresInCube } from "./snapshot.js";
-
+import MousePositionManager from "../../memory/collaboration/mouse_colab";
+import MouseOverlayCanvas from './MouseOverlayCanvas';
 
 import { Frustum, Matrix4 } from 'three';
 const frustum = new Frustum();
 const projScreenMatrix = new Matrix4();
 
-
+let mouseOverlay;
 const BLOOM_SCENE = 1;
 const bloomLayer = new THREE.Layers();
 bloomLayer.set(BLOOM_SCENE);
@@ -161,7 +162,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 // setupScene();
 let cubes = [];
-
+let mousePositionManager;
 // Cache for geometries and materials
 const geometryCache = {
   sphere: null,
@@ -474,13 +475,34 @@ function setupScene() {
   scene.children.length = 0;
   nonBloomScene.traverse(disposeMaterial);
   nonBloomScene.children.length = 0;
-// 
+  // const container = renderer.domElement.parentElement;
+  // mouseOverlay = new MouseOverlayCanvas(container);
   loadCameraState();
 
   // setLightingBasedOnTime(scene, nonBloomScene);
   // setBackgroundBasedOnTime(scene, nonBloomScene);
 
   createEnvironment();
+
+  const container = renderer.domElement.parentElement;
+  mouseOverlay = new MouseOverlayCanvas(container);
+
+  // Ensure the Three.js canvas and overlay canvas have the same size
+  function resizeCanvases() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    
+    renderer.setSize(width, height);
+    mouseOverlay.resizeCanvas();
+  }
+
+  window.addEventListener('resize', resizeCanvases);
+  resizeCanvases(); // Initial resize
+
+  console.log('Graph and overlay initialized');
 
   markNeedsRender();
 }
@@ -556,71 +578,6 @@ finalComposer.addPass(new RenderPass(scene, camera)); // Add a render pass for t
 finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom scene
 finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
 
-// export function render() {
-
-//   projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-//   frustum.setFromProjectionMatrix(projScreenMatrix);
-
-//   scene.traverse(object => {
-//     if (object.isMesh) {
-//       if (frustum.intersectsObject(object)) {
-//         darkenNonBloomed(object);
-//       } else {
-//         object.visible = false;
-//       }
-//     }
-//   });
-//   bloomComposer.render();
-//   scene.traverse(restoreMaterial);
-
-//   nonBloomScene.traverse(object => {
-//     if (object.isMesh) {
-//       object.visible = frustum.intersectsObject(object);
-//     }
-//   });
-//   renderer.setRenderTarget(nonBloomRT);
-//   renderer.clear();
-//   renderer.render(nonBloomScene, camera);
-
-//   finalComposer.render();
-
-// }
-
-// export function render() {
-//   projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-//   frustum.setFromProjectionMatrix(projScreenMatrix);
-
-//   scene.traverse(object => {
-//     if (object.isMesh) {
-//       const isVisible = frustum.intersectsObject(object);
-//       object.visible = isVisible;
-
-//       if (isVisible) {
-//         if (!object.layers.test(bloomLayer)) {
-//           darkenNonBloomed(object);
-//         }
-//       }
-//     }
-//   });
-
-//   bloomComposer.render();
-//   scene.traverse(restoreMaterial);
-
-//   nonBloomScene.traverse(object => {
-//     if (object.isMesh) {
-//       object.visible = frustum.intersectsObject(object);
-//     }
-//   });
-
-//   renderer.setRenderTarget(nonBloomRT);
-//   renderer.clear();
-//   renderer.render(nonBloomScene, camera);
-
-//   finalComposer.render();
-// }
-
-// render!
-// Update the render function to use bounding spheres for frustum culling
 export function render() {
   // Increase the frustum size by scaling the projection matrix
   const scaleFactor = 1.5; // Adjust this value as needed
@@ -758,55 +715,10 @@ export function share3dDat() {
     controls: typeof controls !== "undefined" ? controls : null,
     ghostCube: typeof ghostCube !== "undefined" ? ghostCube : null,
     sceneSnapshot: typeof sceneSnapshot !== "undefined" ? sceneSnapshot : null,
+    mousePositionManager: mousePositionManager, // Add this line
+    mouseOverlay: mouseOverlay,
   };
 }
-// export function removeEmptyCubes(scene, nonBloomScene) {
-//   // Create a snapshot of the current scene
-//   const snapshot = createSceneSnapshot([scene, nonBloomScene]);
-
-//   // Array to store cubes that need to be removed
-//   const cubesToRemove = [];
-//   const removedCubes = [];
-
-//   console.log("i am snapshot to remove", snapshot)
-//   // Check each cube in the snapshot
-//   snapshot.boxes.forEach((box) => {
-//     const containedSpheres = snapshot.containment[box.id];
-
-//     // If the cube contains no spheres, add it to the removal list
-//     if (!containedSpheres || containedSpheres.length <= 1) {
-//       cubesToRemove.push(box);
-//     }
-//   });
-
-//   // Remove the empty cubes from the scenes
-//   cubesToRemove.forEach((box) => {
-//     if (box.wireframe) {
-//       nonBloomScene.remove(box.wireframe);
-//       box.wireframe.geometry.dispose();
-//       box.wireframe.material.dispose();
-//     }
-//     if (box.solid) {
-//       nonBloomScene.remove(box.solid);
-//       box.solid.geometry.dispose();
-//       box.solid.material.dispose();
-//     }
-
-//     // Remove from the snapshot as well
-//     const boxIndex = snapshot.boxes.findIndex((b) => b.id === box.id);
-//     if (boxIndex !== -1) {
-//       snapshot.boxes.splice(boxIndex, 1);
-//     }
-//     delete snapshot.containment[box.id];
-
-//     // Add to the removedCubes array
-//     removedCubes.push(box);
-//   });
-
-//   markNeedsRender();
-//   // Return the removed cubes
-//   return removedCubes;
-// }
 
 export function removeEmptyCubes(scene, nonBloomScene) {
   const snapshot = createSceneSnapshot([scene, nonBloomScene]);
@@ -904,34 +816,16 @@ export function removeGhostCube() {
 }
 
 
-// export function reconstructScene(snapshot) {
-//   console.log("Reconstructing scene with snapshot:", snapshot);
-//   snapshot.forEach((objectState) => {
-//     const existingObject = scene.getObjectByProperty('uuid', objectState.uuid) || 
-//                              nonBloomScene.getObjectByProperty('uuid', objectState.uuid);
-//      if (objectState.isDeleted) {
-//                   removeObject(existingObject);
-//                             }
-//      else if (existingObject) {
-//         objectState.isUpdated && updateObjectProperties(existingObject, objectState);
-//       } 
-//      else {
-//         createObject(objectState);
-//       }
-//   });
-//   markNeedsRender();
-// }
 
 let sceneSnapshot = {};
 
 function saveSceneSnapshot() {
   sceneSnapshot = {};
-  const { scene, nonBloomScene } = share3dDat();
 
   // Function to capture simplified objects
   function captureObjects(sceneToCapture) {
     sceneToCapture.traverse((object) => {
-      if (object.isMesh && (object.shape === 'sphere' || object.shape.includes('Cube'))) {
+      if (object.shape && object.isMesh && (object.shape === 'sphere' || object.shape.includes('Cube'))) {
         sceneSnapshot[object.uuid] = {
           position: object.position.clone(),
           rotation: object.rotation.clone(),
@@ -994,19 +888,6 @@ function createObject(objectState) {
     createCubeWrapper(objectState);
   }
 }
-
-// function removeObject(entry) {
-//   if (!entry?.object) return;
-
-//   if (entry.inScene) {
-//     scene.remove(entry.object);
-//   } else {
-//     nonBloomScene.remove(entry.object);
-//   }
- 
-//   if (entry.object.material) entry.object.material.dispose();
-//   if (entry.object.geometry) entry.object.geometry.dispose();
-// }
 
 function removeObject(object) {
   if (!object) return;
@@ -1089,19 +970,6 @@ function createCubeWrapper(objectState) {
   }
 }
 
-// function createSphereWrapper(objectState) {
-//   const { sphere } = createSphere(
-//     objectState.position[0],
-//     objectState.position[1],
-//     objectState.position[2],
-//     objectState.scale[0] * 20,
-//     objectState.version,
-//     objectState.uuid,
-//     objectState.color
-//   );
-//   sphere.uuid = objectState.uuid;
-// }
-
 function createSphereWrapper(objectState) {
   const convertedData = convertToThreeJSFormat(objectState);
   const { sphere } = createSphere(convertedData);
@@ -1109,209 +977,6 @@ function createSphereWrapper(objectState) {
 }
 
 
-// // mini-map.js
-
-// export function createMiniMap(scene, nonBloomScene, camera, renderer) {
-// const mapSize = 150; // Size of the mini-map
-//   const padding = 10; // Padding from the edges of the screen
-//   const borderWidth = 2; // Width of the border
-
-//   // Create container div for border
-//   const container = document.createElement('div');
-//   container.style.position = 'absolute';
-//   container.style.right = `${padding}px`;
-//   container.style.bottom = `${padding}px`;
-//   container.style.width = `${mapSize + 2 * borderWidth}px`;
-//   container.style.height = `${mapSize + 2 * borderWidth}px`;
-//   container.style.backgroundColor = 'rgba(211, 211, 211, 0.5)'; // Light gray, semi-transparent
-//   container.style.padding = `${borderWidth}px`;
-//   document.body.appendChild(container);
-
-//   // Create canvas element
-//   const canvas = document.createElement('canvas');
-//   canvas.width = mapSize;
-//   canvas.height = mapSize;
-//   canvas.style.display = 'block'; // Removes tiny gap between canvas and border
-//   canvas.style.backgroundColor = 'rgba(0,0,0,0.5)';
-//   container.appendChild(canvas);
-
-//   const ctx = canvas.getContext('2d');
-
-//   // Create viewport indicator
-//   const viewportIndicator = document.createElement('div');
-//   viewportIndicator.style.position = 'absolute';
-//   viewportIndicator.style.border = '1px solid yellow';
-//   viewportIndicator.style.pointerEvents = 'none';
-//   document.body.appendChild(viewportIndicator);
-//   function updateMiniMap() {
-//     ctx.clearRect(0, 0, mapSize, mapSize);
-
-//     // Function to draw objects from a scene
-//     function drawSceneObjects(sceneToRender) {
-//       sceneToRender.traverse((object) => {
-//         if (object.isMesh) {
-//           let x, y, color;
-
-//           if (object.geometry.type === "IcosahedronGeometry") {
-//             // Sphere (from main scene)
-//             x = (object.position.x + 50) * (mapSize / 100);
-//             y = (object.position.z + 50) * (mapSize / 100);
-//             color = 'red';
-//           } else if (object.geometry.type === "BoxGeometry") {
-//             // Cube (from nonBloomScene)
-//             x = (object.position.x + 50) * (mapSize / 100);
-//             y = (object.position.z + 50) * (mapSize / 100);
-//             color = object.material.color.getStyle(); // Use the cube's actual color
-//           } else {
-//             return; // Skip other object types
-//           }
-
-//           ctx.fillStyle = color;
-//           ctx.beginPath();
-//           ctx.arc(x, y, 2, 0, Math.PI * 2);
-//           ctx.fill();
-//         }
-//       });
-//     }
-
-//     // Draw objects from both scenes
-//     drawSceneObjects(scene);
-//     drawSceneObjects(nonBloomScene);
-
-//     // Draw camera viewport
-//     const aspect = camera.aspect;
-//     const vFov = camera.fov * Math.PI / 180;
-//     const height = 2 * Math.tan(vFov / 2) * camera.position.y;
-//     const width = height * aspect;
-
-//     const vpX = (camera.position.x + 50) * (mapSize / 100);
-//     const vpY = (camera.position.z + 50) * (mapSize / 100);
-//     const vpWidth = width * (mapSize / 100);
-//     const vpHeight = height * (mapSize / 100);
-
-//     ctx.strokeStyle = 'green';
-//     ctx.strokeRect(vpX - vpWidth/2, vpY - vpHeight/2, vpWidth, vpHeight);
-
-//     // Update viewport indicator
-//     viewportIndicator.style.left = `${canvas.offsetLeft + vpX - vpWidth/2}px`;
-//     viewportIndicator.style.top = `${canvas.offsetTop + vpY - vpHeight/2}px`;
-//     viewportIndicator.style.width = `${vpWidth}px`;
-//     viewportIndicator.style.height = `${vpHeight}px`;
-//   }
-
-//   // Initial update
-//   updateMiniMap();
-
-//   // Return the update function so it can be called in the animation loop
-//   return updateMiniMap;
-// }
-
-// export function createMiniMap(scene, nonBloomScene, camera, renderer) {
-//   const mapSize = 150; // Size of the mini-map
-//   const padding = 10; // Padding from the edges of the screen
-//   const borderWidth = 2; // Width of the border
-
-//   // Create container div for border
-//   const container = document.createElement('div');
-//   container.style.position = 'absolute';
-//   container.style.right = `${padding}px`;
-//   container.style.bottom = `${padding}px`;
-//   container.style.width = `${mapSize + 2 * borderWidth}px`;
-//   container.style.height = `${mapSize + 2 * borderWidth}px`;
-//   container.style.backgroundColor = 'rgba(211, 211, 211, 0.5)'; // Light gray, semi-transparent
-//   container.style.padding = `${borderWidth}px`;
-//   document.body.appendChild(container);
-
-//   // Create canvas element
-//   const canvas = document.createElement('canvas');
-//   canvas.width = mapSize;
-//   canvas.height = mapSize;
-//   canvas.style.display = 'block'; // Removes tiny gap between canvas and border
-//   canvas.style.backgroundColor = 'rgba(0,0,0,0.5)';
-//   container.appendChild(canvas);
-
-//   const ctx = canvas.getContext('2d');
-
-//   function updateMiniMap() {
-//     ctx.clearRect(0, 0, mapSize, mapSize);
-
-//     // Function to draw objects from a scene
-//     function drawSceneObjects(sceneToRender) {
-//       sceneToRender.traverse((object) => {
-//         if (object.isMesh) {
-//           let x, y, color;
-
-//           if (object.geometry.type === "IcosahedronGeometry") {
-//             // Sphere (from main scene)
-//             x = (object.position.x + 50) * (mapSize / 100);
-//             y = (object.position.z + 50) * (mapSize / 100);
-//             color = 'red';
-//           } else if (object.geometry.type === "BoxGeometry") {
-//             // Cube (from nonBloomScene)
-//             x = (object.position.x + 50) * (mapSize / 100);
-//             y = (object.position.z + 50) * (mapSize / 100);
-//             color = object.material.color.getStyle(); // Use the cube's actual color
-//           } else {
-//             return; // Skip other object types
-//           }
-
-//           ctx.fillStyle = color;
-//           ctx.beginPath();
-//           ctx.arc(x, y, 2, 0, Math.PI * 2);
-//           ctx.fill();
-//         }
-//       });
-//     }
-
-//     // Draw objects from both scenes
-//     drawSceneObjects(scene);
-//     drawSceneObjects(nonBloomScene);
-
-//     // Calculate camera position on mini-map
-//     const cameraX = (camera.position.x + 50) * (mapSize / 100);
-//     const cameraZ = (camera.position.z + 50) * (mapSize / 100);
-
-//     // Calculate viewport rectangle
-//     const fov = camera.fov * Math.PI / 180;
-//     const aspectRatio = camera.aspect;
-//     const distance = Math.abs(camera.position.y); // Distance from camera to ground plane
-//     const vFov = 2 * Math.atan(Math.tan(fov / 2) / aspectRatio);
-    
-//     // Adjust for zoom
-//     const zoomFactor = 1 / camera.zoom;
-//     const viewportWidth = 2 * distance * Math.tan(fov / 2) * (mapSize / 100) * zoomFactor;
-//     const viewportHeight = 2 * distance * Math.tan(vFov / 2) * (mapSize / 100) * zoomFactor;
-
-//     // Ensure viewport doesn't exceed mini-map bounds
-//     const maxSize = mapSize * 0.9; // 90% of mini-map size
-//     const scale = Math.min(1, maxSize / Math.max(viewportWidth, viewportHeight));
-//     const scaledWidth = viewportWidth * scale;
-//     const scaledHeight = viewportHeight * scale;
-
-//     // Rotate the viewport rectangle
-//     ctx.save();
-//     ctx.translate(cameraX, cameraZ);
-//     ctx.rotate(-camera.rotation.y);
-
-//     // Draw viewport rectangle
-//     ctx.strokeStyle = 'yellow';
-//     ctx.strokeRect(-scaledWidth / 2, -scaledHeight / 2, scaledWidth, scaledHeight);
-
-//     // Draw direction indicator
-//     ctx.beginPath();
-//     ctx.moveTo(0, 0);
-//     ctx.lineTo(0, -scaledHeight / 2);
-//     ctx.stroke();
-
-//     ctx.restore();
-//   }
-
-//   // Initial update
-//   updateMiniMap();
-
-//   // Return the update function so it can be called in the animation loop
-//   return updateMiniMap;
-// }
 
 
 export function createMiniMap(scene, nonBloomScene, camera, renderer) {

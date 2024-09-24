@@ -1,9 +1,20 @@
 import { Peer, DataConnection } from 'peerjs';
 // import { sceneState } from '../memory/collaboration/scene_colab';
+import MousePositionManager from '../memory/collaboration/mouse_colab';
+
 interface SceneState {
   getSerializableState: () => any;
   syncWithPeer: (state: any) => void;
   updateObject: (objectState: any) => void;
+}
+
+interface MouseOverlayCanvas {
+  updateMousePosition: (peerId: string, x: number, y: number) => void;
+  removePeerCursor: (peerId: string) => void;
+}
+interface MousePosition {
+  x: number;
+  y: number;
 }
 
 class P2PSync {
@@ -16,6 +27,9 @@ class P2PSync {
   private heartbeatTimer: number | null = null;
   private reconnectInterval: number = 10000;
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
+  private mousePositions: Map<string, MousePosition> = new Map();
+  private mousePositionManager: MousePositionManager | null = null;
+  private mouseOverlay: MouseOverlayCanvas | null = null
 
   private constructor() {}
 
@@ -72,6 +86,42 @@ class P2PSync {
       updateStatus(`PeerJS error: ${error.type}`);
     });
   }
+  setMouseOverlay(overlay: MouseOverlayCanvas): void {
+    this.mouseOverlay = overlay;
+    console.log('MouseOverlayCanvas set in P2PSync');
+  }
+
+  setMousePositionManager(manager: MousePositionManager): void {
+    this.mousePositionManager = manager;
+    console.log('MousePositionManager set in P2PSync');
+  }
+
+  // updateMousePosition(x: number, y: number): void {
+  //   if (this.connections.size === 0 || !this.mousePositionManager) return;
+  //   if (!this.peer) return;
+
+  //   const myPeerId = this.peer.id;
+  //   this.mousePositionManager.updateMousePosition(myPeerId, x, y);
+  //   this.broadcastMousePosition(x, y);
+  //   // console.log(`Broadcasting mouse position: (${x}, ${y})`);
+  // }
+
+  updateMousePosition(x: number, y: number): void {
+    console.log("this.mouseOverlay, this.peer", this.mouseOverlay, this.peer)
+    if (this.connections.size === 0 || !this.mouseOverlay || !this.peer) return;
+
+    console.log(`Sending mouse position: (${x}, ${y})`);
+    this.broadcastMousePosition(x, y);
+  }
+
+  private broadcastMousePosition(x: number, y: number): void {
+    this.connections.forEach((conn) => {
+      if (conn.open) {
+        console.log(`Broadcasting mouse position to peer ${conn.peer}: (${x}, ${y})`);
+        conn.send({ type: 'mouse_position', data: { x, y } });
+      }
+    });
+  }
 
   setSceneState(sceneState: SceneState): void {
     this.sceneState = sceneState;
@@ -118,52 +168,113 @@ class P2PSync {
     }
   }
 
+  // private handleConnection(conn: DataConnection): void {
+  //   console.log('Handling connection for peer:', conn.peer);
+  //   this.connections.set(conn.peer, conn);
+  //   updateStatus(`Connected to peer: ${conn.peer}`);
+  //   this.saveKnownPeer(conn.peer);
+
+  //   // Send current state immediately after connection
+  //   this.sendCurrentState(conn);
+
+  //   conn.on('data', (data: { type: string; data: any }) => {
+  //     if (data.type === 'request_current_state') {
+  //       this.sendCurrentState(conn);
+  //     } else if (data.type === 'full_state') {
+  //       console.log('Received full state from peer. Syncing...');
+  //       console.log('Full state data:', data.data);
+  //       this.sceneState.syncWithPeer(data.data);
+  //   } else if (data.type === 'update') {
+  //     if (Array.isArray(data.data)) {
+  //       console.log('Received update from peer. Updating objects...', data.data);
+  //       // data.data.forEach((objectState) =>
+  //       //   this.sceneState!.updateObject(objectState, { fromPeer: true })
+  //       // );
+  //       this.sceneState.syncWithPeer(data.data);
+
+  //     } else {
+  //       // this.sceneState.updateObject(data.data, { fromPeer: true });
+  //       this.sceneState.syncWithPeer(data.data);
+
+  //     }
+  //   } else if (data.type === 'mouse_position') {
+  //     if (this.mousePositionManager) {
+  //       this.mousePositionManager.updateMousePosition(conn.peer, data.data.x, data.data.y);
+  //     }
+  //   }
+  //   this.updateConnectionStatus();
+  // });
+
+  // conn.send({ type: 'request_current_state' });
+
+  //   conn.on('close', () => {
+  //     console.log(`Connection closed with peer: ${conn.peer}`);
+  //     this.connections.delete(conn.peer);
+  //     updateStatus(`Disconnected from peer: ${conn.peer}`);
+  //     this.scheduleReconnect(conn.peer);
+  //   });
+
+  //   conn.on('error', (err) => {
+  //     console.error(`Connection error with peer ${conn.peer}:`, err);
+  //     updateStatus(`Connection error with peer ${conn.peer}: ${err.message}`);
+  //     this.scheduleReconnect(conn.peer);
+  //   });
+  // }
+
   private handleConnection(conn: DataConnection): void {
     console.log('Handling connection for peer:', conn.peer);
     this.connections.set(conn.peer, conn);
     updateStatus(`Connected to peer: ${conn.peer}`);
     this.saveKnownPeer(conn.peer);
-
+  
     // Send current state immediately after connection
     this.sendCurrentState(conn);
-
+  
     conn.on('data', (data: { type: string; data: any }) => {
-      if (data.type === 'request_current_state') {
-        this.sendCurrentState(conn);
-      } else if (data.type === 'full_state') {
-        console.log('Received full state from peer. Syncing...');
-        console.log('Full state data:', data.data);
-        this.sceneState.syncWithPeer(data.data);
-    } else if (data.type === 'update') {
-      if (Array.isArray(data.data)) {
-        console.log('Received update from peer. Updating objects...', data.data);
-        // data.data.forEach((objectState) =>
-        //   this.sceneState!.updateObject(objectState, { fromPeer: true })
-        // );
-        this.sceneState.syncWithPeer(data.data);
-
-      } else {
-        // this.sceneState.updateObject(data.data, { fromPeer: true });
-        this.sceneState.syncWithPeer(data.data);
-
+      switch (data.type) {
+        case 'request_current_state':
+          this.sendCurrentState(conn);
+          break;
+        case 'full_state':
+          console.log('Received full state from peer. Syncing...');
+          console.log('Full state data:', data.data);
+          this.sceneState?.syncWithPeer(data.data);
+          break;
+        case 'update':
+          console.log('Received update from peer. Updating objects...', data.data);
+          this.sceneState?.syncWithPeer(data.data);
+          break;
+        case 'mouse_position':
+            console.log(`Received mouse position from peer ${conn.peer}: (${data.data.x}, ${data.data.y})`);
+            if (this.mouseOverlay) {
+              this.mouseOverlay.updateMousePosition(conn.peer, data.data.x, data.data.y);
+            }
+            break;
+  
+        default:
+          console.warn(`Received unknown data type: ${data.type} from peer: ${conn.peer}`);
       }
-    }
-  });
-
-  conn.send({ type: 'request_current_state' });
-
+    });
+  
     conn.on('close', () => {
       console.log(`Connection closed with peer: ${conn.peer}`);
       this.connections.delete(conn.peer);
       updateStatus(`Disconnected from peer: ${conn.peer}`);
       this.scheduleReconnect(conn.peer);
+      this.updateConnectionStatus();
+      if (this.mouseOverlay) {
+        this.mouseOverlay.removePeerCursor(conn.peer);
+      }
+      
     });
-
+  
     conn.on('error', (err) => {
       console.error(`Connection error with peer ${conn.peer}:`, err);
       updateStatus(`Connection error with peer ${conn.peer}: ${err.message}`);
       this.scheduleReconnect(conn.peer);
     });
+  
+    this.updateConnectionStatus();
   }
 
   
@@ -171,6 +282,16 @@ class P2PSync {
     const currentState = this.sceneState.getCurrentState();
     console.log('Sending current state to peer:', currentState);
     conn.send({ type: 'full_state', data: currentState });
+  }
+
+  private updateConnectionStatus(): void {
+    const isConnected = this.connections.size > 0;
+    console.log(`Connection status updated. Connected: ${isConnected}`);
+    if (isConnected && this.mousePositionManager) {
+      this.mousePositionManager.startTracking();
+    } else if (!isConnected && this.mousePositionManager) {
+      this.mousePositionManager.stopTracking();
+    }
   }
 
   
@@ -232,6 +353,7 @@ class P2PSync {
     this.stopHeartbeat();
     this.reconnectTimers.forEach((timer) => clearTimeout(timer));
     this.reconnectTimers.clear();
+    this.updateConnectionStatus();
   }
 
   getSerializableState(): any {
@@ -252,6 +374,13 @@ class P2PSync {
 
   getSceneState(): SceneState | null {
     return this.sceneState;
+  }
+
+  getCurrentPeerId(): string | null {
+    if (this.peer) {
+      return this.peer.id;
+    }
+    return null;
   }
 
   private updateUserIdInput(peerId: string): void {
