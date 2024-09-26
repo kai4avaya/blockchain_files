@@ -27,7 +27,7 @@ class P2PSync {
   private heartbeatTimer: number | null = null;
   private reconnectInterval: number = 10000;
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
-  private mousePositions: Map<string, MousePosition> = new Map();
+  // private mousePositions: Map<string, MousePosition> = new Map();
   private mousePositionManager: MousePositionManager | null = null;
   private mouseOverlay: MouseOverlayCanvas | null = null
 
@@ -168,58 +168,6 @@ class P2PSync {
     }
   }
 
-  // private handleConnection(conn: DataConnection): void {
-  //   console.log('Handling connection for peer:', conn.peer);
-  //   this.connections.set(conn.peer, conn);
-  //   updateStatus(`Connected to peer: ${conn.peer}`);
-  //   this.saveKnownPeer(conn.peer);
-
-  //   // Send current state immediately after connection
-  //   this.sendCurrentState(conn);
-
-  //   conn.on('data', (data: { type: string; data: any }) => {
-  //     if (data.type === 'request_current_state') {
-  //       this.sendCurrentState(conn);
-  //     } else if (data.type === 'full_state') {
-  //       console.log('Received full state from peer. Syncing...');
-  //       console.log('Full state data:', data.data);
-  //       this.sceneState.syncWithPeer(data.data);
-  //   } else if (data.type === 'update') {
-  //     if (Array.isArray(data.data)) {
-  //       console.log('Received update from peer. Updating objects...', data.data);
-  //       // data.data.forEach((objectState) =>
-  //       //   this.sceneState!.updateObject(objectState, { fromPeer: true })
-  //       // );
-  //       this.sceneState.syncWithPeer(data.data);
-
-  //     } else {
-  //       // this.sceneState.updateObject(data.data, { fromPeer: true });
-  //       this.sceneState.syncWithPeer(data.data);
-
-  //     }
-  //   } else if (data.type === 'mouse_position') {
-  //     if (this.mousePositionManager) {
-  //       this.mousePositionManager.updateMousePosition(conn.peer, data.data.x, data.data.y);
-  //     }
-  //   }
-  //   this.updateConnectionStatus();
-  // });
-
-  // conn.send({ type: 'request_current_state' });
-
-  //   conn.on('close', () => {
-  //     console.log(`Connection closed with peer: ${conn.peer}`);
-  //     this.connections.delete(conn.peer);
-  //     updateStatus(`Disconnected from peer: ${conn.peer}`);
-  //     this.scheduleReconnect(conn.peer);
-  //   });
-
-  //   conn.on('error', (err) => {
-  //     console.error(`Connection error with peer ${conn.peer}:`, err);
-  //     updateStatus(`Connection error with peer ${conn.peer}: ${err.message}`);
-  //     this.scheduleReconnect(conn.peer);
-  //   });
-  // }
 
   private handleConnection(conn: DataConnection): void {
     console.log('Handling connection for peer:', conn.peer);
@@ -229,6 +177,9 @@ class P2PSync {
   
     // Send current state immediately after connection
     this.sendCurrentState(conn);
+    // Send known peers to the connected peer
+    conn.send({ type: 'known_peers', data: Array.from(this.knownPeers) });
+  
   
     conn.on('data', (data: { type: string; data: any }) => {
       switch (data.type) {
@@ -250,6 +201,9 @@ class P2PSync {
               this.mouseOverlay.updateMousePosition(conn.peer, data.data.x, data.data.y);
             }
             break;
+        case 'known_peers':
+              this.handleKnownPeers(data.data);
+              break;
   
         default:
           console.warn(`Received unknown data type: ${data.type} from peer: ${conn.peer}`);
@@ -277,6 +231,16 @@ class P2PSync {
     this.updateConnectionStatus();
   }
 
+  private handleKnownPeers(peerIds: string[]): void {
+    peerIds.forEach((peerId) => {
+      if (peerId !== this.peer.id && !this.knownPeers.has(peerId) && !this.connections.has(peerId)) {
+        console.log(`Discovered new peer from connected peer: ${peerId}`);
+        this.saveKnownPeer(peerId);
+        this.connectToSpecificPeer(peerId);
+      }
+    });
+  }
+  
   
   private sendCurrentState(conn: DataConnection): void {
     const currentState = this.sceneState.getCurrentState();
@@ -325,11 +289,16 @@ class P2PSync {
   }
 
   private saveKnownPeer(peerId: string): void {
-    this.knownPeers.add(peerId);
-    localStorage.setItem(
-      'knownPeers',
-      JSON.stringify(Array.from(this.knownPeers))
-    );
+    // this.knownPeers.add(peerId);
+    // localStorage.setItem(
+    //   'knownPeers',
+    //   JSON.stringify(Array.from(this.knownPeers))
+    // );
+
+    if (peerId !== this.peer.id) {
+      this.knownPeers.add(peerId);
+      localStorage.setItem('knownPeers', JSON.stringify(Array.from(this.knownPeers)));
+    }
   }
 
   private loadKnownPeers(): void {
