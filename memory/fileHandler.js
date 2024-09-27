@@ -1,8 +1,10 @@
 
 // import fileStore from './stores/fileStore';
-import userActionStore from './stores/userActionStore';
+// import userActionStore from './stores/userActionStore';
 import {generateUniqueId} from '../utils/utils';
 import {getFileSystem} from "./collaboration/file_colab"
+// import embeddingWorker from '../ai/embeddings.js';
+import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
 
 const loginName = localStorage.getItem("login_block") || "no_login";
 
@@ -11,31 +13,129 @@ const userId = loginName; // Placeholder for user identification
 // Queue for processing files and directories
 const processingQueue = [];
 let isProcessing = false;
-// Handle file drops
+
+async function processFile(fileEntry, id) {
+    return new Promise((resolve, reject) => {
+        fileEntry.file(async file => {
+            try {
+                const fileSystem = getFileSystem();
+                const fileMetadata = {
+                    id,
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    lastModified: file.lastModified,
+                    version: 1,
+                    versionNonce: Math.floor(Math.random() * 1000000),
+                    isDeleted: false,
+                    file: file
+                };
+
+                // Add file to file system
+                await fileSystem.addOrUpdateItem(fileMetadata, 'file');
+                addFileToTree(file);
+
+                // Generate embeddings and store in VectorDB
+                let content;
+                if (file.type === 'application/pdf') {
+                    content = await file.arrayBuffer();
+                } else {
+                    content = await file.text();
+                }
+
+                const embeddingResult = await vectorDBGateway.quickStart_single({
+                    text: content,
+                    fileId: id,
+                    fileName: file.name,
+                    fileType: file.type
+                });
+
+                // Update file metadata with VectorDB key
+                fileMetadata.vectorDbKey = embeddingResult[0].key;
+                await fileSystem.addOrUpdateItem(fileMetadata, 'file');
+
+                console.log(`Embeddings added to file ${id}`);
+                resolve();
+            } catch (error) {
+                console.error(`Error processing file ${id}:`, error);
+                reject(error);
+            }
+        }, reject);
+    });
+}
+
+async function processFiles(files) {
+    const processPromises = files.map(file => {
+        const id = generateUniqueId();
+        return processFile(file, id);
+    });
+
+    try {
+        await Promise.all(processPromises);
+        console.log('All files processed successfully');
+        refreshFileTree();
+    } catch (error) {
+        console.error('Error processing files:', error);
+    }
+}
+
+// Modify handleFileDrop to use processFiles
 export function handleFileDrop(event) {
     event.preventDefault();
     const items = event.dataTransfer.items;
-    
-    const mousePosition = userActionStore.getMousePosition(userId);
-    const uuids = []
+    const files = [];
+    const uuids = [];
+
     for (let i = 0; i < items.length; i++) {
         const item = items[i].webkitGetAsEntry();
         const uuid = generateUniqueId();
 
-
         if (item.isFile) {
-            queueItemForProcessing(() => processFile(item, mousePosition, uuid));
+            files.push(item);
+            uuids.push(uuid);
         } else if (item.isDirectory) {
-            queueItemForProcessing(() => processDirectory(item, mousePosition, uuid));
+            queueItemForProcessing(() => processDirectory(item, uuid));
+            uuids.push(uuid);
         }
-        uuids.push(uuid);
     }
+
+    if (files.length > 0) {
+        processFiles(files);
+    }
+
     if (!isProcessing) {
         processQueue();
     }
 
-    return uuids
+    return uuids;
 }
+
+// ... [rest of the code remains the same]
+
+// export function handleFileDrop(event) {
+//     event.preventDefault();
+//     const items = event.dataTransfer.items;
+    
+//     // const mousePosition = userActionStore.getMousePosition(userId);
+//     const uuids = []
+//     for (let i = 0; i < items.length; i++) {
+//         const item = items[i].webkitGetAsEntry();
+//         const uuid = generateUniqueId();
+
+
+//         if (item.isFile) {
+//             queueItemForProcessing(() => processFile(item, uuid));
+//         } else if (item.isDirectory) {
+//             queueItemForProcessing(() => processDirectory(item, uuid));
+//         }
+//         uuids.push(uuid);
+//     }
+//     if (!isProcessing) {
+//         processQueue();
+//     }
+
+//     return uuids
+// }
 
 
 
@@ -56,35 +156,86 @@ async function processQueue() {
         }
     }
     isProcessing = false;
-    // updateFileTreeUI(); // Update UI after all items are processed
 }
 
 
-function processFile(fileEntry, mousePosition, id) {
-    return new Promise((resolve, reject) => {
-        fileEntry.file(file => {
-            const fileSystem = getFileSystem();
-            const fileMetadata = {
-                id,
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                lastModified: file.lastModified,
-                version: 1,
-                versionNonce: Math.floor(Math.random() * 1000000),
-                isDeleted: false,
-                file: file
-                // Add any other necessary fields
-            };
-            fileSystem.addOrUpdateItem(fileMetadata, 'file').then(() => {
-                addFileToTree(file);
-                resolve();
-            }).catch(reject);
-        }, reject);
-    });
-}
+// function processFile(fileEntry, id) {
+//     return new Promise((resolve, reject) => {
+//         fileEntry.file(file => {
+//             const fileSystem = getFileSystem();
+//             const fileMetadata = {
+//                 id,
+//                 name: file.name,
+//                 size: file.size,
+//                 type: file.type,
+//                 lastModified: file.lastModified,
+//                 version: 1,
+//                 versionNonce: Math.floor(Math.random() * 1000000),
+//                 isDeleted: false,
+//                 file: file
+//                 // Add any other necessary fields
+//             };
+//             fileSystem.addOrUpdateItem(fileMetadata, 'file').then(() => {
+//                 addFileToTree(file);
+//                 resolve();
+//             }).catch(reject);
+//         }, reject);
+//     });
+// }
 
-function processDirectory(directoryEntry, mousePosition, id) {
+
+
+
+// function processFile(fileEntry, id) {
+//     return new Promise((resolve, reject) => {
+//         fileEntry.file(file => {
+//             const fileSystem = getFileSystem();
+//             const fileMetadata = {
+//                 id,
+//                 name: file.name,
+//                 size: file.size,
+//                 type: file.type,
+//                 lastModified: file.lastModified,
+//                 version: 1,
+//                 versionNonce: Math.floor(Math.random() * 1000000),
+//                 isDeleted: false,
+//                 file: file
+//             };
+//             fileSystem.addOrUpdateItem(fileMetadata, 'file')
+//                 .then(() => {
+//                     addFileToTree(file);
+//                     // Start the embedding process without waiting for it to complete
+//                     generateFileEmbeddings(file, id);
+//                     resolve();
+//                 })
+//                 .catch(reject);
+//         }, reject);
+//     });
+// }
+
+// function generateFileEmbeddings(file, id) {
+//     embeddingWorker.generateEmbeddings(file, id)
+//         .then(embeddings => {
+//             // Update file metadata with embeddings
+//             const fileSystem = getFileSystem();
+//             fileSystem.getItem(id, 'file').then(fileMetadata => {
+//                 if (fileMetadata) {
+//                     fileMetadata.embeddings = embeddings;
+//                     return fileSystem.addOrUpdateItem(fileMetadata, 'file');
+//                 }
+//             }).then(() => {
+//                 console.log(`Embeddings added to file ${id}`);
+//                 // You can add any additional processing or UI updates here
+//             }).catch(error => {
+//                 console.error(`Error updating file ${id} with embeddings:`, error);
+//             });
+//         })
+//         .catch(error => {
+//             console.error(`Error generating embeddings for file ${id}:`, error);
+//         });
+// }
+
+function processDirectory(directoryEntry, id) {
     return new Promise((resolve, reject) => {
         const dirReader = directoryEntry.createReader();
         const directoryMetadata = {
@@ -115,11 +266,11 @@ function processDirectory(directoryEntry, mousePosition, id) {
                     for (const entry of entries) {
                         if (entry.isFile) {
                             const fileId = generateUniqueId();
-                            queueItemForProcessing(() => processFile(entry, mousePosition, fileId));
+                            queueItemForProcessing(() => processFile(entry, fileId));
                             directoryMetadata.fileIds.push(fileId);
                         } else if (entry.isDirectory) {
                             const subFolderId = generateUniqueId();
-                            queueItemForProcessing(() => processDirectory(entry, mousePosition, subFolderId));
+                            queueItemForProcessing(() => processDirectory(entry, subFolderId));
                         }
                     }
                     readEntries();

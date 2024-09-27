@@ -1,40 +1,462 @@
-cursoe showing for two users or more
-
-- bug
-- somewhere i remove the cube in the scene
- - then something is being updated in scene_colab without a record of delete
-  - then it updates the scene in reconstruct and diffs the actual scene vs. new scene coming from scene_colab
-    - and recreates this cube
-
-refactor
- - always save last updated scene from reconstruct
-   - seperate out the reconstruct creation and updating
- - onpointerup
-  - we should call a diffing algo it will take the current scene objects and compare to last reconstruct 
-   - then it will call scene_colab save (then we recall reconstruct at that point and this will do the actual changing of items?)
+To implement a system that separates text processing from embedding generation and allows for parallel processing when possible, we can create two separate worker singletons: one for text processing and another for embedding generation. This approach will allow us to process multiple files concurrently and optimize CPU usage. Here's how we can structure this system:
 
 
-SC --> reconstruct --> save snapshot --> current scene updated (with moved objects)
-onPointerUp --> diffing algo --> update each change in scene colab --> SC .... (above chain)
-  - note onPointerUp will not directly lead to any scene changes this is passed to reconsturct 
-    which will always be in charge of updating objects (besides the move)
 
-principle
-- only save on onpointerup
-- only update scene directly on reconstruct and on move (this also saves the current state)
-- save uses a diffing algo to determine the difference between previous state and most current state 
+```javascript
+// TextProcessorWorker.js
+class TextProcessorWorker {
+    constructor() {
+        if (!TextProcessorWorker.instance) {
+            this.worker = new Worker(new URL('./text_processor_worker.js', import.meta.url), { type: 'module' });
+            this.taskQueue = [];
+            this.isProcessing = false;
+
+            this.worker.onmessage = (e) => {
+                const { type, data, fileId } = e.data;
+                if (type === 'processedText') {
+                    this.onTextProcessed(fileId, data);
+                } else if (type === 'error') {
+                    console.error('Text processing error:', data);
+                    this.onProcessingError(fileId, data);
+                }
+                this.processNextTask();
+            };
+
+            TextProcessorWorker.instance = this;
+        }
+        return TextProcessorWorker.instance;
+    }
+
+    processText(content, fileType, fileId) {
+        return new Promise((resolve, reject) => {
+            this.taskQueue.push({ content, fileType, fileId, resolve, reject });
+            if (!this.isProcessing) {
+                this.processNextTask();
+            }
+        });
+    }
+
+    processNextTask() {
+        if (this.taskQueue.length === 0) {
+            this.isProcessing = false;
+            return;
+        }
+
+        this.isProcessing = true;
+        const { content, fileType, fileId, resolve, reject } = this.taskQueue.shift();
+
+        this.worker.postMessage({
+            type: 'processText',
+            data: content,
+            fileType: fileType,
+            fileId: fileId
+        });
+
+        this.currentTask = { fileId, resolve, reject };
+    }
+
+    onTextProcessed(fileId, processedText) {
+        if (this.currentTask && this.currentTask.fileId === fileId) {
+            this.currentTask.resolve(processedText);
+            this.currentTask = null;
+        }
+    }
+
+    onProcessingError(fileId, error) {
+        if (this.currentTask && this.currentTask.fileId === fileId) {
+            this.currentTask.reject(new Error(error));
+            this.currentTask = null;
+        }
+    }
+}
+
+const textProcessorWorker = new TextProcessorWorker();
+export default textProcessorWorker;
+
+// text_processor_worker.js
+import * as pdfjsLib from 'pdfjs-dist';
+
+const stopWords = new Set(['a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he', 'in', 'is', 'it',
+                           'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will', 'with']);
+
+async function extractTextFromPDF(arrayBuffer) {
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(item => item.str).join(' ') + ' ';
+  }
+  return text;
+}
+
+function removeStopWords(text) {
+  return text.split(/\s+/)
+             .filter(word => !stopWords.has(word.toLowerCase()))
+             .join(' ');
+}
+
+function chunkText(text, chunkSize = 1000) {
+  const words = text.split(/\s+/);
+  const chunks = [];
+  for (let i = 0; i < words.length; i += chunkSize) {
+    chunks.push(words.slice(i, i + chunkSize).join(' '));
+  }
+  return chunks;
+}
+
+async function processContent(content, fileType) {
+  let text;
+  if (fileType === 'application/pdf') {
+    text = await extractTextFromPDF(content);
+  } else {
+    text = content;
+  }
+  
+  text = removeStopWords(text);
+  return chunkText(text);
+}
+
+self.onmessage = async function(e) {
+  const { type, data, fileType, fileId } = e.data;
+  if (type === 'processText') {
+    try {
+      const processedText = await processContent(data, fileType);
+      self.postMessage({ type: 'processedText', data: processedText, fileId });
+    } catch (error) {
+      self.postMessage({ type: 'error', data: error.message, fileId });
+    }
+  }
+};
+
+// EmbeddingWorker.js (updated)
+class EmbeddingWorker {
+    constructor() {
+        if (!EmbeddingWorker.instance) {
+            this.worker = new Worker(new URL('./embedding_worker.js', import.meta.url), { type: 'module' });
+            this.taskQueue = [];
+            this.isProcessing = false;
+
+            this.worker.onmessage = (e) => {
+                const { type, data, fileId } = e.data;
+                if (type === 'embeddingsResult') {
+                    this.onEmbeddingsGenerated(fileId, data);
+                } else if (type === 'error') {
+                    console.error('Embedding error:', data);
+                    this.onEmbeddingError(fileId, data);
+                }
+                this.processNextTask();
+            };
+
+            EmbeddingWorker.instance = this;
+        }
+        return EmbeddingWorker.instance;
+    }
+
+    generateEmbeddings(chunks, fileId) {
+        return new Promise((resolve, reject) => {
+            this.taskQueue.push({ chunks, fileId, resolve, reject });
+            if (!this.isProcessing) {
+                this.processNextTask();
+            }
+        });
+    }
+
+    processNextTask() {
+        if (this.taskQueue.length === 0) {
+            this.isProcessing = false;
+            return;
+        }
+
+        this.isProcessing = true;
+        const { chunks, fileId, resolve, reject } = this.taskQueue.shift();
+
+        this.worker.postMessage({
+            type: 'generateEmbeddings',
+            data: chunks,
+            fileId: fileId
+        });
+
+        this.currentTask = { fileId, resolve, reject };
+    }
+
+    onEmbeddingsGenerated(fileId, embeddings) {
+        if (this.currentTask && this.currentTask.fileId === fileId) {
+            this.currentTask.resolve(embeddings);
+            this.currentTask = null;
+        }
+    }
+
+    onEmbeddingError(fileId, error) {
+        if (this.currentTask && this.currentTask.fileId === fileId) {
+            this.currentTask.reject(new Error(error));
+            this.currentTask = null;
+        }
+    }
+}
+
+const embeddingWorker = new EmbeddingWorker();
+export default embeddingWorker;
+
+// embedding_worker.js (updated)
+import { pipeline } from '@xenova/transformers';
+
+let extractor;
+
+async function initializeExtractor() {
+  if (!extractor) {
+    extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+      quantized: false,
+      cache_dir: '/models',
+    });
+  }
+}
+
+async function generateBinaryEmbeddings(chunks) {
+  const embeddings = [];
+  for (const chunk of chunks) {
+    const output = await extractor(chunk, {
+      pooling: 'mean',
+      quantize: true,
+      precision: 'binary'
+    });
+    embeddings.push(output);
+  }
+  return embeddings;
+}
+
+self.onmessage = async function(e) {
+  const { type, data, fileId } = e.data;
+  if (type === 'generateEmbeddings') {
+    try {
+      await initializeExtractor();
+      const embeddings = await generateBinaryEmbeddings(data);
+      self.postMessage({ type: 'embeddingsResult', data: embeddings, fileId });
+    } catch (error) {
+      self.postMessage({ type: 'error', data: error.message, fileId });
+    }
+  }
+};
+
+// Main application usage
+import textProcessorWorker from './TextProcessorWorker';
+import embeddingWorker from './EmbeddingWorker';
+
+async function processFile(file, id) {
+    try {
+        let content;
+        if (file.type === 'application/pdf') {
+            content = await file.arrayBuffer();
+        } else {
+            content = await file.text();
+        }
+
+        // Process text
+        const processedText = await textProcessorWorker.processText(content, file.type, id);
+
+        // Generate embeddings
+        const embeddings = await embeddingWorker.generateEmbeddings(processedText, id);
+
+        // Process embeddings, update file system, etc.
+        return embeddings;
+    } catch (error) {
+        console.error('Error processing file:', error);
+        throw error;
+    }
+}
+
+// Function to process multiple files in parallel
+async function processFiles(files) {
+    const promises = files.map((file, index) => processFile(file, `file_${index}`));
+    return Promise.all(promises);
+}
+
+```
+
+Here's a breakdown of the implemented system:
+
+1. TextProcessorWorker:
+   - Handles text extraction from PDFs and text files.
+   - Removes stop words and chunks the text.
+   - Works in its own thread, allowing for parallel processing of multiple files.
+
+2. EmbeddingWorker:
+   - Generates binary embeddings for processed text chunks.
+   - Also works in its own thread, allowing for parallel embedding generation.
+
+3. Main Application:
+   - Coordinates between TextProcessorWorker and EmbeddingWorker.
+   - Can process multiple files concurrently.
+
+4. Parallel Processing:
+   - The `processFiles` function demonstrates how to process multiple files in parallel.
+   - Each file goes through text processing and then embedding generation sequentially, but different files can be at different stages simultaneously.
+
+5. Queue System:
+   - Both workers implement a queue system to manage tasks.
+   - This allows for efficient use of resources and prevents overwhelming the workers.
+
+To use this system:
+
+1. Set up the four files: `TextProcessorWorker.js`, `text_processor_worker.js`, `EmbeddingWorker.js`, and `embedding_worker.js`.
+2. In your main application, import and use the `textProcessorWorker` and `embeddingWorker` as shown in the example usage.
+3. Use the `processFile` function for individual files or `processFiles` for multiple files.
+
+This implementation allows for:
+- Parallel processing of multiple files.
+- Efficient use of CPU resources by separating text processing and embedding generation.
+- Scalability, as you can easily add more worker types or modify existing ones without affecting the overall structure.
+
+Remember to handle errors appropriately and consider implementing a way to track progress, especially when processing multiple large files.
 
 
-NEXT fix
-reduce double updates 
-- each update update will have a version number increment by 1
-we only update the version number on pointer up
-we need to ensure each object has a version number increment that represents what scene it's part of .... 
+KAI THEN USE VECTORDBGATEWAY:
+
+To integrate the new TextProcessorWorker and updated EmbeddingWorker into your vectorDBGateway, we'll need to modify the gateway to use both workers in sequence. Here's how we can update the vectorDBGateway to work with the new parallel processing system:
 
 
-combine sceneVersion 
-with simpler scene save 
-note since we update by object we will need to account for this in the onpointerup
 
-i think the logic of scene version should be in scene_colab.... and if a peer updates but their verson of the scene is a lot lower,
-then we need to only add their objects that are not in the scene otherwise we will ignore their objects that have a lower scene number 
+```javascript
+// vectorDBGateway.js
+import textProcessorWorker from './TextProcessorWorker';
+import embeddingWorker from './EmbeddingWorker';
+import { VectorDB, getDBDefaults, setDBDefaults } from "./vectordb";
+import { generateUniqueId } from '../utils/utils';
+
+let db;
+
+export async function initiate(dbName) {
+    setDBDefaults({ dbName: dbName });
+    db = new VectorDB({
+        vectorPath: "embedding"
+    });
+    return getDBDefaults();
+}
+
+export async function quickStart(metaData, token, isLocal = true) {
+    const { text, ...otherMetaData } = metaData;
+    const fileId = generateUniqueId();
+
+    // Process text
+    const processedChunks = await textProcessorWorker.processText(text, 'text', fileId);
+
+    // Generate embeddings
+    const embeddings = await embeddingWorker.generateEmbeddings(processedChunks, fileId);
+
+    const inMemoryRecord = [];
+
+    for (let i = 0; i < processedChunks.length; i++) {
+        const key = await db.insert({
+            embedding: embeddings[i],
+            fileId: fileId,
+            ...otherMetaData,
+            text: processedChunks[i]
+        });
+
+        inMemoryRecord.push({
+            key: key,
+            fileId: fileId,
+            ...otherMetaData,
+            text: processedChunks[i]
+        });
+    }
+
+    return inMemoryRecord;
+}
+
+export async function search(query, k = { limit: 5 }, token, isLocal = true) {
+    // Process the query text
+    const processedQuery = await textProcessorWorker.processText(query, 'text', 'query');
+
+    // Generate embedding for the processed query
+    const [queryEmbedding] = await embeddingWorker.generateEmbeddings(processedQuery, 'query');
+
+    // Perform the search using the query embedding
+    return db.query(queryEmbedding, k);
+}
+
+export async function quickStart_single(metaData, token, isLocal = true) {
+    const { text, ...otherMetaData } = metaData;
+    const fileId = generateUniqueId();
+
+    // Process text
+    const [processedText] = await textProcessorWorker.processText(text, 'text', fileId);
+
+    // Generate embedding
+    const [embedding] = await embeddingWorker.generateEmbeddings([processedText], fileId);
+
+    const key = await db.insert({
+        embedding: embedding,
+        fileId: fileId,
+        ...otherMetaData,
+        text: processedText
+    });
+
+    const inMemoryRecord = [{
+        key: key,
+        fileId: fileId,
+        ...otherMetaData,
+        text: processedText
+    }];
+
+    return inMemoryRecord;
+}
+
+export async function delete_row(key) {
+    return await db.delete(key);
+}
+
+export async function update(key, metaData, token) {
+    const { text, ...otherMetaData } = metaData;
+    const fileId = metaData.fileId || generateUniqueId();
+
+    // Process text
+    const [processedText] = await textProcessorWorker.processText(text, 'text', fileId);
+
+    // Generate embedding
+    const [embedding] = await embeddingWorker.generateEmbeddings([processedText], fileId);
+
+    return await db.update(key, {
+        embedding: embedding,
+        fileId: fileId,
+        ...otherMetaData,
+        text: processedText
+    });
+}
+
+```
+
+Here's a breakdown of the changes and how this implementation works:
+
+1. Imports:
+   - We now import both `textProcessorWorker` and `embeddingWorker` instead of just the embedding worker.
+
+2. `initiate` function:
+   - This now creates an instance of VectorDB, ensuring it's ready for use in other functions.
+
+3. `quickStart` function:
+   - First processes the text using `textProcessorWorker`.
+   - Then generates embeddings for the processed chunks using `embeddingWorker`.
+   - Inserts each chunk with its embedding into the VectorDB.
+
+4. `search` function:
+   - Processes the query text, generates an embedding for it, and then performs the search.
+
+5. `quickStart_single` function:
+   - Similar to `quickStart`, but for a single text item.
+   - Processes the text, generates an embedding, and inserts it into the VectorDB.
+
+6. `update` function:
+   - Processes the new text, generates a new embedding, and updates the entry in the VectorDB.
+
+7. Parallel Processing:
+   - While this implementation processes text and generates embeddings sequentially for each item, it allows for parallel processing of multiple files when used with multiple calls (e.g., processing multiple files simultaneously).
+
+To use this updated vectorDBGateway:
+
+1. Replace your existing vectorDBGateway.js file with this updated version.
+2. Ensure that the TextProcessorWorker and EmbeddingWorker are properly set up and imported.
+3. Make sure the VectorDB class is correctly imported and matches the interface expected by this gateway.
+4. Update any code that uses these functions to handle the returned data correctly.
+
+This implementation now correctly utilizes both the text processing and embedding generation workers, allowing for more efficient processing of files and queries. It maintains the existing functionality while leveraging the new parallel processing capabilities of the separate workers.
