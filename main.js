@@ -7,6 +7,7 @@ import { sceneState } from './memory/collaboration/scene_colab';
 import { initializeGraph, share3dDat } from './ui/graph_v2/create';
 import { p2pSync } from './network/peer2peer_simple'; // Import the P2PSync class
 import embeddingWorker from './ai/embeddings.js';
+import { initiate } from './memory/vectorDB/vectorDbGateway.js'; // Assuming your initiate function is exported
 
 
 const userId = "kai";
@@ -21,6 +22,8 @@ const p2pSync_instance = p2pSync
 
 async function main() {
   const embeddingInitPromise = initializeEmbeddingModel();
+
+  await initiate('vectorDB_new');
 
   await initializeFileSystem();
   const fileSystem = getFileSystem();
@@ -57,8 +60,6 @@ async function main() {
 
   addEventListeners(canvas);
 
-    // Wait for the embedding model to finish initializing
-    // await embeddingInitPromise;
 }
 
 
