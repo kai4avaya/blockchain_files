@@ -205,8 +205,6 @@ function createEnvironment() {
 function setLightingBasedOnTime(scene, nonBloomScene) {
   const timeOfDay = getCurrentTimeOfDay();
 
-  console.log("setLightingBasedOnTime" , timeOfDay);
-
   // Remove existing lights from both scenes
   [scene, nonBloomScene].forEach((scn) => {
     scn.traverse((object) => {
@@ -246,7 +244,6 @@ function setBackgroundBasedOnTime(scene, nonBloomScene) {
   const timeOfDay = getCurrentTimeOfDay();
   let bgColor;
 
-  console.log("setBackgroundBasedOnTime" , timeOfDay);
   if (timeOfDay === 'day') {
     bgColor = new THREE.Color(0x87CEEB); // Sky blue
   } else {
@@ -502,8 +499,6 @@ function setupScene() {
   window.addEventListener('resize', resizeCanvases);
   resizeCanvases(); // Initial resize
 
-  console.log('Graph and overlay initialized');
-
   markNeedsRender();
 }
 
@@ -725,10 +720,8 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   const cubesToRemove = [];
   const removedCubes = [];
 
-  console.log("i am the snapshot", snapshot)
   // Identify cubes to remove
   snapshot.boxes.forEach((box) => {
-    console.log("i am box to remove", box)
     const boxId = box.wireframe.userData.id;
     const containedSpheres = snapshot.containment[boxId];
 
@@ -774,11 +767,9 @@ export function removeEmptyCubes(scene, nonBloomScene) {
     }
   });
 
-  // console.log("Final snapshot:", JSON.parse(JSON.stringify(snapshot)));
   nonBloomScene.updateMatrixWorld(true);
   markNeedsRender();
 
-  console.log("removedCubes", removedCubes)
   return removedCubes;
 }
 

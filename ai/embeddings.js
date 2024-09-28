@@ -1,67 +1,79 @@
-// EmbeddingWorker.js (updated)
 class EmbeddingWorker {
     constructor() {
+        this.initializationPromise = null;
         if (!EmbeddingWorker.instance) {
-            this.worker = new Worker(new URL('./embedding_worker.js', import.meta.url), { type: 'module' });
+            this.worker = new Worker(new URL('../workers/embedding_worker.js', import.meta.url), { type: 'module' });
+            this.isReady = false;
             this.taskQueue = [];
-            this.isProcessing = false;
 
-            this.worker.onmessage = (e) => {
-                const { type, data, fileId } = e.data;
-                if (type === 'embeddingsResult') {
-                    this.onEmbeddingsGenerated(fileId, data);
-                } else if (type === 'error') {
-                    console.error('Embedding error:', data);
-                    this.onEmbeddingError(fileId, data);
-                }
-                this.processNextTask();
-            };
+            this.worker.onmessage = this.handleWorkerMessage.bind(this);
 
             EmbeddingWorker.instance = this;
         }
         return EmbeddingWorker.instance;
     }
 
-    generateEmbeddings(chunks, fileId) {
+    handleWorkerMessage(e) {
+        const { type, data, fileId } = e.data;
+        if (type === 'ready') {
+            this.isReady = true;
+            this.processQueuedTasks();
+        } else if (type === 'embeddingsResult') {
+            const task = this.taskQueue.find(t => t.fileId === fileId);
+            if (task) {
+                task.resolve(data); // Resolve with the full embeddings array
+                this.taskQueue = this.taskQueue.filter(t => t.fileId !== fileId);
+            }
+        } else if (type === 'error') {
+            const task = this.taskQueue.find(t => t.fileId === fileId);
+            if (task) {
+                task.reject(new Error(data));
+                this.taskQueue = this.taskQueue.filter(t => t.fileId !== fileId);
+            }
+        }
+    }
+    
+
+    initialize() {
+        if (!this.initializationPromise) {
+            this.initializationPromise = new Promise((resolve, reject) => {
+                this.worker.postMessage({ type: 'initialize' });
+                const handleInitMessage = (e) => {
+                    if (e.data.type === 'ready') {
+                        this.isReady = true;
+                        this.worker.removeEventListener('message', handleInitMessage);
+                        resolve();
+                    } else if (e.data.type === 'error') {
+                        this.worker.removeEventListener('message', handleInitMessage);
+                        reject(new Error(e.data.data));
+                    }
+                };
+                this.worker.addEventListener('message', handleInitMessage);
+            });
+        }
+        return this.initializationPromise;
+    }
+
+    generateEmbeddings(text, fileId) {
+        console.log("i am text in embeddingworker", text, typeof text)
         return new Promise((resolve, reject) => {
-            this.taskQueue.push({ chunks, fileId, resolve, reject });
-            if (!this.isProcessing) {
-                this.processNextTask();
+            this.taskQueue.push({ text, fileId, resolve, reject });
+            if (this.isReady) {
+                this.processQueuedTasks();
             }
         });
     }
-
-    processNextTask() {
-        if (this.taskQueue.length === 0) {
-            this.isProcessing = false;
-            return;
-        }
-
-        this.isProcessing = true;
-        const { chunks, fileId, resolve, reject } = this.taskQueue.shift();
-
-        this.worker.postMessage({
-            type: 'generateEmbeddings',
-            data: chunks,
-            fileId: fileId
-        });
-
-        this.currentTask = { fileId, resolve, reject };
-    }
-
-    onEmbeddingsGenerated(fileId, embeddings) {
-        if (this.currentTask && this.currentTask.fileId === fileId) {
-            this.currentTask.resolve(embeddings);
-            this.currentTask = null;
+    processQueuedTasks() {
+        while (this.taskQueue.length > 0) {
+            const task = this.taskQueue.shift(); // Remove the task from the queue
+            this.worker.postMessage({
+                type: 'generateEmbeddings',
+                data: task.text,
+                fileId: task.fileId
+            });
         }
     }
-
-    onEmbeddingError(fileId, error) {
-        if (this.currentTask && this.currentTask.fileId === fileId) {
-            this.currentTask.reject(new Error(error));
-            this.currentTask = null;
-        }
-    }
+    
 }
 
 const embeddingWorker = new EmbeddingWorker();

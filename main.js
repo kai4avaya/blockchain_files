@@ -6,7 +6,8 @@ import { initializeFileSystem, getFileSystem } from './memory/collaboration/file
 import { sceneState } from './memory/collaboration/scene_colab';
 import { initializeGraph, share3dDat } from './ui/graph_v2/create';
 import { p2pSync } from './network/peer2peer_simple'; // Import the P2PSync class
-// import MousePositionManager  from "./memory/collaboration/mouse_colab";
+import embeddingWorker from './ai/embeddings.js';
+
 
 const userId = "kai";
 localStorage.setItem("login_block", userId);
@@ -19,6 +20,8 @@ const p2pSync_instance = p2pSync
 
 
 async function main() {
+  const embeddingInitPromise = initializeEmbeddingModel();
+
   await initializeFileSystem();
   const fileSystem = getFileSystem();
 
@@ -52,9 +55,10 @@ async function main() {
 
   p2pSync_instance.setMouseOverlay(mouseOverlay);
 
-  // Add event listeners after initialization
   addEventListeners(canvas);
-  // addEventListeners(renderer.domElement, mouseOverlay);
+
+    // Wait for the embedding model to finish initializing
+    // await embeddingInitPromise;
 }
 
 
@@ -149,4 +153,15 @@ function addEventListeners(canvas) {
 main().catch(error => {
   console.error("Error in main function:", error);
 });
+
+
+async function initializeEmbeddingModel() {
+  try {
+    await embeddingWorker.initialize();
+    console.log('Embedding worker initialized successfully');
+    // Continue with your app initialization
+} catch (error) {
+    console.error('Failed to initialize embedding worker:', error);
+}
+}
 

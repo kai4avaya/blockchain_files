@@ -1,8 +1,8 @@
 // vectorDBGateway.js
-import textProcessorWorker from './TextProcessorWorker';
-import embeddingWorker from './EmbeddingWorker';
+import textProcessorWorker from '../../ai/processText';
+import embeddingWorker from '../../ai/embeddings';
 import { VectorDB, getDBDefaults, setDBDefaults } from "./vectordb";
-import { generateUniqueId } from '../utils/utils';
+import { generateUniqueId } from '../../utils/utils';
 
 let db;
 
@@ -13,8 +13,7 @@ export async function initiate(dbName) {
     });
     return getDBDefaults();
 }
-
-export async function quickStart(metaData, token, isLocal = true) {
+export async function quickStart(metaData) {
     const { text, ...otherMetaData } = metaData;
     const fileId = generateUniqueId();
 
@@ -56,15 +55,19 @@ export async function search(query, k = { limit: 5 }, token, isLocal = true) {
     return db.query(queryEmbedding, k);
 }
 
-export async function quickStart_single(metaData, token, isLocal = true) {
+export async function quickStart_single(metaData) {
     const { text, ...otherMetaData } = metaData;
-    const fileId = generateUniqueId();
+    const fileId = metaData.fileId;
 
     // Process text
     const [processedText] = await textProcessorWorker.processText(text, 'text', fileId);
 
+    console.log("processedText", processedText);
+
     // Generate embedding
     const [embedding] = await embeddingWorker.generateEmbeddings([processedText], fileId);
+
+    console.log("embedding", embedding);
 
     const key = await db.insert({
         embedding: embedding,
@@ -87,7 +90,7 @@ export async function delete_row(key) {
     return await db.delete(key);
 }
 
-export async function update(key, metaData, token) {
+export async function update(key, metaData) {
     const { text, ...otherMetaData } = metaData;
     const fileId = metaData.fileId || generateUniqueId();
 

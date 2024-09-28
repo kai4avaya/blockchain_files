@@ -6,11 +6,8 @@ import {getFileSystem} from "./collaboration/file_colab"
 // import embeddingWorker from '../ai/embeddings.js';
 import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
 
-const loginName = localStorage.getItem("login_block") || "no_login";
 
 const fileTree = document.getElementById('fileTree');
-const userId = loginName; // Placeholder for user identification
-// Queue for processing files and directories
 const processingQueue = [];
 let isProcessing = false;
 
@@ -20,6 +17,7 @@ async function processFile(fileEntry, id) {
             try {
                 const fileSystem = getFileSystem();
                 const fileMetadata = {
+
                     id,
                     name: file.name,
                     size: file.size,
@@ -43,7 +41,7 @@ async function processFile(fileEntry, id) {
                     content = await file.text();
                 }
 
-                const embeddingResult = await vectorDBGateway.quickStart_single({
+                const embeddingResult = await vectorDBGateway.quickStart({
                     text: content,
                     fileId: id,
                     fileName: file.name,

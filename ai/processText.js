@@ -2,7 +2,7 @@
 class TextProcessorWorker {
     constructor() {
         if (!TextProcessorWorker.instance) {
-            this.worker = new Worker(new URL('./text_processor_worker.js', import.meta.url), { type: 'module' });
+            this.worker = new Worker(new URL('../workers/text_processor_worker.js', import.meta.url), { type: 'module' });
             this.taskQueue = [];
             this.isProcessing = false;
 
