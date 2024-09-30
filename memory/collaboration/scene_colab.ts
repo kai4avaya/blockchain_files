@@ -53,7 +53,6 @@ class SceneState {
 
   broadcastUpdate(states: ObjectState[]) {
     this.broadcastChannel.postMessage(states);
-    console.log("states being sent", states)
     this.p2pSync.broadcastUpdate(states);
   }
 
@@ -554,14 +553,7 @@ export function diffSceneChanges(
   function processSceneObjects(sceneToProcess) {
     sceneToProcess.traverse((object) => {
       if (object.shape) {
-        console.log(
-          "00000000000000000000000000000000000000000000000000000000000"
-        );
-        console.log("i am object in  AFTER I DO THAT DIFF! diff", object.shape);
-
-        console.log("i am object in  AFTER I DO THAT DIFF! diff", object);
-        console.log("isDelete?", object.isDeleted);
-        console.log("createdby", object.lastEditedBy);
+        
 
         const uuid = object.uuid;
         const simplifiedObject = {
@@ -572,12 +564,6 @@ export function diffSceneChanges(
           isDeleted: object.isDeleted || false,
           // Add other relevant properties
         };
-
-        console.log("i am similifiedObject", simplifiedObject);
-
-        console.log(
-          "00000000000000000000000000000000000000000000000000000000000"
-        );
 
         currentSnapshot[uuid] = simplifiedObject;
 

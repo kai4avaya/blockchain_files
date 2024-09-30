@@ -6,11 +6,14 @@ import * as ort from 'onnxruntime-web';
 ort.env.wasm.wasmPaths = "/onnxruntime-web/dist/esm/"
 ort.env.wasm.logLevel = 'verbose';
 self.addEventListener("message", async (event) => {
+    console.log("GIZZARD WAS HERE")
   let pipeline = await PipelineSingleton.getInstance((x) => {
     // We also add a progress callback to the pipeline so that we can
     // track model loading.
     self.postMessage(x);
   });
+
+  console.time('Embedding Generation Time');
 
   let output = await pipeline(event.data.text, {
     pooling: "mean",
@@ -25,6 +28,8 @@ self.addEventListener("message", async (event) => {
       });
     },
   });
+
+  console.timeEnd('Embedding Generation Time');
 
   // Send the output back to the main thread
   self.postMessage({
@@ -80,7 +85,10 @@ self.addEventListener("message", async (event) => {
   let session = await ort.InferenceSession.create(model, opt);
   console.log("session.inputNames", session.inputNames);
   console.log("session.outputNames", session.outputNames);
+  console.log("Session created successfully");
 
+  // Start timing the embedding generation using performance.now()
+  const startTime = performance.now();
   let encoder_outputs = await encoderForward(session, model_inputs);
   console.log("encoder_outputs=", encoder_outputs);
 
@@ -89,5 +97,13 @@ self.addEventListener("message", async (event) => {
   result = mean_pooling(result, model_inputs.attention_mask);
   //normalize === true
   result = result.normalize(2, -1);
+
+   // End timing
+   const endTime = performance.now();
+   const duration = endTime - startTime;
+   console.log(`NEW Embedding Generation Time: ${duration.toFixed(2)} ms`);
+
+
+
   console.log("WebGPU result=", JSON.stringify(result, null, 2));
 });

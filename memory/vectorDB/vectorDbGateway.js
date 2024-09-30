@@ -20,8 +20,13 @@ export async function quickStart(metaData) {
     // Process text
     const processedChunks = await textProcessorWorker.processText(text, 'text', fileId);
 
+    console.log("I AM TURD POOL!", fileId)
     // Generate embeddings
+    console.time('OLD Embedding Generation');
+
     const embeddings = await embeddingWorker.generateEmbeddings(processedChunks, fileId);
+    console.timeEnd('OLD Embedding Generation');
+    console.log("i am durdur")
 
     const inMemoryRecord = [];
 

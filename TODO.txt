@@ -460,3 +460,12 @@ To use this updated vectorDBGateway:
 4. Update any code that uses these functions to handle the returned data correctly.
 
 This implementation now correctly utilizes both the text processing and embedding generation workers, allowing for more efficient processing of files and queries. It maintains the existing functionality while leveraging the new parallel processing capabilities of the separate workers.
+
+
+---------------
+
+strategies for embedding efficinecy
+summarize files only key words
+3/10 size ideal
+  thne embedding
+  

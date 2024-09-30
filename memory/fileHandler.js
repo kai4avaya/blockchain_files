@@ -12,6 +12,8 @@ const processingQueue = [];
 let isProcessing = false;
 
 async function processFile(fileEntry, id) {
+
+    console.log("i am processing File", fileEntry)
     return new Promise((resolve, reject) => {
         fileEntry.file(async file => {
             try {

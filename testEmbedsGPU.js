@@ -1,5 +1,12 @@
-// feature-extraction-worker.js
 
+// 1. Understand the Workflow
+// Your embedding generation involves several steps:
+
+// Loading the Tokenizer and Model: This includes fetching and initializing the tokenizer and model.
+// Tokenization: Processing the input text into tokens.
+// Inference: Running the model to generate embeddings.
+// Post-processing: Pooling and normalizing the embeddings.
+// You want to time only steps 3 and 4.
 // import * as ort from 'onnxruntime-web';
 // import * as ort from "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/esm/ort.webgpu.min.js";
 import {pipeline, AutoTokenizer, AutoModel, Tensor, mean_pooling, env } from '@xenova/transformers';
@@ -48,7 +55,7 @@ function pathJoin(...parts) {
 export class PipelineSingleton {
     static task = 'feature-extraction';
     static model_name_or_path = 'Xenova/all-MiniLM-L6-v2';
-    static quantized = false;
+    static quantized = true;
     static tokenizer = null;
     static model_buffer = null;
     static instance = null;
@@ -263,6 +270,19 @@ export async function extractFeatures(text) {
           }
         }
       };
+
+      const wasmOpt = {
+        executionProviders: ['wasm'],
+        graphOptimizationLevel: 'all',
+        enableCpuMemArena: true,
+        enableMemPattern: true,
+        executionMode: 'sequential',
+        extra: {
+            session: {
+                use_ort_model_bytes_directly: '1',
+            }
+        }
+    };
   
       let session;
       try {
@@ -271,21 +291,27 @@ export async function extractFeatures(text) {
       } catch (webGpuError) {
         console.warn("WebGPU initialization failed, falling back to CPU:", webGpuError);
         try {
-          console.log("Trying CPU backend...");
-          session = await ort.InferenceSession.create(modelBuffer, cpuOpt);
-        } catch (cpuError) {
-          console.error("CPU initialization also failed:", cpuError);
-          throw new Error("Failed to initialize any backend.");
-        }
+            console.log("Trying WASM backend...");
+            session = await ort.InferenceSession.create(modelBuffer, wasmOpt);
+          } catch (cpuError) {
+            console.log("CPU initialization also failed:", cpuError);
+                try {
+                console.log("Trying CPU backend...");
+                session = await ort.InferenceSession.create(modelBuffer, cpuOpt);
+                } catch (cpuError) {
+                console.error("CPU initialization also failed:", cpuError);
+                throw new Error("Failed to initialize any backend.");
+                }
+            }
       }
   
       console.log("Session created successfully");
-  
+      console.time('NEW Embedding Generation Time');
       let encoder_outputs = await encoderForward(session, model_inputs);
       let result = encoder_outputs.last_hidden_state ?? encoder_outputs.logits;
       result = mean_pooling(result, model_inputs.attention_mask);
       result = result.normalize(2, -1);
-  
+      console.timeEnd('NEW Embedding Generation Time');
       return result.data;
     } catch (error) {
       console.error('Error in extractFeatures:', error);

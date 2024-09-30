@@ -28,360 +28,98 @@ const p2pSync_instance = p2pSync
 // main.js
 
 // Create a new Web Worker
-const worker = new Worker('./testEmbedsGPU_worker.js', { type: 'module' });
+// const worker = new Worker('./testEmbedsGPU_worker.js', { type: 'module' });
 
-// Listen for messages from the worker
-worker.addEventListener('message', (event) => {
-  const data = event.data;
+// // Listen for messages from the worker
+// worker.addEventListener('message', (event) => {
+//   const data = event.data;
 
-  if (data.status === 'update') {
-    // Handle progress updates
-    console.log('Progress update:', data.output);
-  } else if (data.status === 'complete') {
-    // Handle completion
-    console.log('Feature extraction complete:', data.output);
-    // You can parse the output if necessary
-    const features = JSON.parse(data.output);
-    console.log('Extracted features:', features);
-  } else if (data.status === 'error') {
-    // Handle errors
-    console.error('Error from worker:', data.message);
-  } else {
-    // Handle other messages
-    console.log('Message from worker:', data);
-  }
-});
+//   if (data.status === 'update') {
+//     // Handle progress updates
+//     console.log('Progress update:', data.output);
+//   } else if (data.status === 'complete') {
+//     // Handle completion
+//     console.timeEnd("NERD TIME")
+//     console.log('Feature extraction complete:', data.output);
+//     // You can parse the output if necessary
+//     const features = JSON.parse(data.output);
+//     console.log('Extracted features:', features);
+//   } else if (data.status === 'error') {
+//     // Handle errors
+//     console.error('Error from worker:', data.message);
+//   } else {
+//     // Handle other messages
+//     console.log('Message from worker:', data);
+//   }
+// });
 
-// Send a sample text to the worker
-const sampleText = `This is a sample text for feature extraction.;
-Skip to Main Content
+// // Send a sample text to the worker
+// const sampleText = `Hi Bisrat and Hagos,
+// It was a pleasure to meet Haben. The​ purpose ​of this email is to summarize our meeting and describe next steps.
 
-Search
-Sign In
-Home  Education Sector  Educator Developer Blog  Use WebGPU + ONNX Runtime Web + Transformer.js to build RAG applications by Phi-3-mini
-Back to Blog Newer ArticleOlder Article 
-Use WebGPU + ONNX Runtime Web + Transformer.js to build RAG applications by Phi-3-mini
-By
-kinfey
-Kinfey Lo
-Published Jul 15 2024 12:00 PM  4,438 Views
-play
-undefined
-Phi-3-mini is deployed in different edge devices, such as iPhone/Android, AIPC/Copilot+PC, as well as cloud and IoT, citing the cross-platform and flexibility of SLM. If you want to follow these deployment methods, you can follow the content of the Phi-3 Cookbook. In model reference, computing power is essential. Through the quantized model, SLM can be deployed and run on a GPU or a traditional CPU. In this topic, we will focus on the model reference of WebGPU.
+// INTEREST WEB
+// Throughout our meeting, we used a number of visual diagramming practices to get to know each other. First, ​Haben created an interest web chart:
 
-What's WebGPU？
-“WebGPU is a JavaScript API provided by a web browser that enables webpage scripts to efficiently utilize a device's graphics processing unit. This is achieved with the underlying Vulkan, Metal, or Direct3D 12 system APIs. On relevant devices, WebGPU is intended to supersede the older WebGL standard.” - Wikipedia
 
-WebGPU allows developers to leverage the power of modern GPUs to implement web-based graphics and general computing applications on all platforms and devices, including desktops, mobile devices, and VR/AR headsets. WebGPU not only has rich prospects in front-end applications, but is also an important scenario in the field of machine learning. For example, the familiar tensorflow.js uses WebGPU to run machine learning/deep learning acceleration.
+// image.png
+// Haben described:
 
-Required environment
-Support Google Chrome 113+, Microsoft Edge 113+, Safari 18 (macOS 15), Firefox Nightly
+//     ​How he loves sports
+//     He clearly benefits from moving his body throughout the day
+//     I imagine sports helps him focus
+//     We discussed his midfielder position in soccer
+//     His interest in Euro Football.
+//     Haben also likes music. He is learning the piano and finds Winter Wind (Chopin) calming).
+//     Haben also likes reading -- including Harry Potter
+//     He likes to draw
+//     I noticed that Haben benefited from continual guidance through prompts to encourage him to add more details.
+//     It is also clear that when given too many options, it was hard for Haben focus on the sequence that would allow him to complete the steps
+//     However, once he understood the prompt, he was able to think deeply about his interests
 
-Enable WebGPU
+// ACADEMICS 
+// We used a flow chart to map out how ​Haben approaches academic work and the challenges that come up (we named the challenges 'glitches'). We considered the idea of a system and how that enables each part to depend on another part to accomplish a big goal.
 
-Perform the following operations in the Chrome / Microsoft Edge address bar
-The chrome://flags/#enable-unsafe-webgpu flag must be enabled (not enable-webgpu-developer-features). Linux experimental support also requires launching the browser with --enable-features=Vulkan.
+// image.png
+// Haben described how work is disseminated at BK Tech and how he generally approaches this (shown in the flow chart above):
 
-Safari 18 (macOS 15) is enabled by default
+//     Assignments discussed in class
+//     The teachers will generally handout worksheets
+//     ​Place handouts in bag
+//     Bring them home to complete them
+//     Turn them back in at school
 
-Firefox Nightly Enter about:config in the address bar and set dom.webgpu.enabled to true
+// Haben described the challenges (aka glitches) that interrupt his flow (in the graph above these are represented as Glitches).
+//  - He sometimes forgets assignments at school
+//  - He gets stuck with homework because he does not understand them
+// MINDFULNESS
+// Haben and I discussed executive functions skills. We related this to mindfulness and looked at how a big process can be broken into smaller steps.
+// We practiced mindfulness together. I described mindfulness as bringing awareness to the present moment. We imagined mindfulness ​by exploring how focusing on the senses allowed Haben to come back to the present moment. We brought attention to the body -- for example noticing all the sounds in the room, experiencing different physical sensations etc.
 
-Use js script to check whether WebGPU is supported
+// AIMS
+// ​Haben made a list of areas he'd like to focus on with a coach:
 
-if (!navigator.gpu) {
-  throw new Error("WebGPU not supported on this browser.");
-}
 
-Why should Phi-3-mini run on WebGPU
-We hope that the application scenarios are cross-platform, not just running on a single terminal. For example, the browser, as a cross-platform Internet access tool, can quickly expand our application scenarios. For Phi-3-mini, a quantized ONNX-enabled WebGPU model has been released, which can quickly build WebApp applications through NodeJS and ONNX Rutime Web. By combining WebGPU we can build Copilot applications very simply.
+// image.png
 
-Learn about ONNX Runtime Web
-ONNX Runtime Web enables you to run and deploy machine learning models in your web application using JavaScript APIs and libraries. This page outlines the general flow through the development process. You can also integrate machine learning into the server side of your web application with ONNX Runtime using other language libraries, depending on your application development environment.
+// Haben described:
 
-Starting with ONNX Runtime 1.17, ONNX Runtime Web supports WebGPU acceleration, combining the quantized Phi-3-mini-4k-instruct-onnx-web model and Tranformer.js to build a Web-based Copilot application.
+//     ​He wants to get better at organization
+//     Over his overall executive function skills
+//     We also discussed procrastination. Getting started on his work and staying more on task.
 
-Transformer.js
-Transformers.js is designed to be functionally equivalent to Hugging Face’s transformers python library, meaning you can run the same pretrained models using a very similar API. These models support common tasks in different modalities, such as:
-
-Natural Language Processing: text classification, named entity recognition, question answering, language modeling, summarization, translation, multiple choice, and text generation.
-Computer Vision: image classification, object detection, and segmentation.
-Audio: automatic speech recognition and audio classification.
-Multimodal: zero-shot image classification.
+// NEXT STEPS
+// It was a pleasure to work with ​Haben (and to reconnect, Bisrat and to meet you Hagos!). Haben should talk with you about how the meeting went. This work is best if the student feels some agency in making the decision to work with a coach.
  
-Transformers.js uses ONNX Runtime to run models in the browser. The best part about it, is that you can easily convert your pretrained PyTorch, TensorFlow, or JAX models to ONNX using Optimum.
+// The next steps: If ​Haben is open to working with a coach: please let me know - we're happy to set something up. Generally, we'd aim to meet with Haben once a week (remotely I assume).
 
-Transformers.js has supported numerous models across Natural Language Processing, Vision, Audio, Tabular and Multimodal domains.
+// Thank you so much for taking the time to meet me. I'm glad I got to meet Haben.
 
-Build Phi-3-mini-4k-instruct-onnx-web RAG WebApp application
-RAG applications are the most popular scenarios for generative artificial intelligence. This example hopes to integrate Phi-3-mini-4k-instruct-onnx-web and jina-embeddings-v2-base-en vector models to build WebApp applications to build solutions in multiple terminals plan.
+// Warmly,
+// Kai
+// `
+// console.time("NERD TIME")
 
-thumbnail image 1 of blog post titled 
-	
-	
-	 
-	
-	
-	
-				
-		
-			
-				
-						
-							Use WebGPU + ONNX Runtime Web + Transformer.js to build RAG applications by Phi-3-mini
-							
-						
-					
-			
-		
-	
-			
-	
-	
-	
-	
-	
-
-A. Create the Phi3SLM class
-
-Using ONNX Runtime Web as the backend of Phi-3-mini-4k-instruct-onnx-web, I built phi3_slm.js with reference to llm.js. If you want to know the complete code, please visit https://github.com/microsoft/Phi-3CookBook/tree/main/code/08.RAG/rag_webgpu_chat. The following are some relevant points.
-
-What is set here is the location of the model when Transformer.js calls the model, and whether access to the remote model is allowed.
-
-    constructor() {
-
-        env.localModelPath = 'models';
-        env.allowRemoteModels = 0; // disable remote models
-        env.allowLocalModels = 1; // enable local models
-
-    }
-
-
-ONNX Runtime Web Setting
-The standard ONNX Runtime Web library includes the following WebAssembly binary files:
-
-SIMD: whether the Single Instruction, Multiple Data (SIMD) feature is supported.
-
-Multi-threading: whether the WebAssembly multi-threading feature is supported.
-
-JSEP: whether the JavaScript Execution Provider (JSEP) feature is enabled. This feature powers the WebGPU and WebNN execution providers.
-
-Training: whether the training feature is enabled.
-
-When using WebGPU or WebNN execution provider, the ort-wasm-simd-threaded.jsep.wasm file is used.
-
-So add the following content to phi3_slm.js
-
-
-ort.env.wasm.numThreads = 1;
-ort.env.wasm.simd = true;
-ort.env.wasm.wasmPaths = document.location.pathname.replace('index.html', '') + 'dist/';
-
-
-And set it in webpack.config.js
-
-
-    plugins: [
-        // Copy .wasm files to dist folder
-        new CopyWebpackPlugin({
-            patterns: [
-                {
-                    from: 'node_modules/onnxruntime-web/dist/*.jsep.*',
-                    to: 'dist/[name][ext]'
-                },
-            ],
-        })
-    ],
-
-To use WebGPU we need to set it in the ORT session
-like
-
-
-const session = await ort.InferenceSession.create(modelPath, { ..., executionProviders: ['webgpu'] });
-
-
-For other text generation, please refer to async generate(tokens, callback, options)
-
-B. Create RAG class
-
-Calling the jina-embeddings-v2-base-en model through Transformer.js is consistent with Python use, but there are a few things to note.
-
-jina-embeddings-v2-base-en It is recommended to use the model of https://huggingface.co/Xenova/jina-embeddings-v2-base-en, which will have better performance after adjustment.
-
-Because a vector database is not used, the vector similarity calculation method is used directly to complete the embeding work. This is also the most original method.
-
-
-async getEmbeddings(query,kbContents) { 
-
-    const question = query;
-
-    let sim_result = [];
-
-    for(const content of kbContents) {
-            const output = await this.extractor([question, content], { pooling: 'mean' });
-            const sim = cos_sim(output[0].data, output[1].data);
-            sim_result.push({ content, sim });
-    }
-
-    sim_result.sort((a, b) => b.sim - a.sim);
-
-    var answer = '';
-
-    console.log(sim_result);
-
-    answer = sim_result[0].content;
-
-    return answer;
-}
-
-
-Please place jina-embeddings-v2-base-en in models and phi-3 mini in the directory of models
-thumbnail image 2 of blog post titled 
-	
-	
-	 
-	
-	
-	
-				
-		
-			
-				
-						
-							Use WebGPU + ONNX Runtime Web + Transformer.js to build RAG applications by Phi-3-mini
-							
-						
-					
-			
-		
-	
-			
-	
-	
-	
-	
-	
-
-C. Running
-
-thumbnail image 3 of blog post titled 
-	
-	
-	 
-	
-	
-	
-				
-		
-			
-				
-						
-							Use WebGPU + ONNX Runtime Web + Transformer.js to build RAG applications by Phi-3-mini
-							
-						
-					
-			
-		
-	
-			
-	
-	
-	
-	
-	
-
-This application implements the RAG function by uploading markdown documents. We can see that it has good performance and effects in content generation.
-
-If you wish to run the example you can visit this link Sample Code
-
-Resources
-Learning Phi-3-mini-4k-instruct-onnx-web https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx-web
-
-Learning ONNX Runtime Web https://onnxruntime.ai/docs/tutorials/web/
-
-Learning WebGPU https://www.w3.org/TR/webgpu/
-
-Reading Enjoy the Power of Phi-3 with ONNX Runtime on your device https://huggingface.co/blog/Emma-N/enjoy-the-power-of-phi-3-with-onnx-runtime
-
-Official E2E samples https://github.com/microsoft/onnxruntime-inference-examples/tree/main/js/chat
-
- 
-You must be a registered user to add a comment. If you've already registered, sign in. Otherwise, register and sign in.
-
-Comment
-Co-Authors
-kinfey
-kinfey
-Version history
-Last update:	‎Jul 16 2024 02:38 AM
-Updated by:	Lee_Stott
-Labels
-Node.js
-5
-ONNX
-9
-Phi-3
-14
-WebGPU
-1
-Share
-Skip to Primary Navigation
-What's new
-Surface Pro 9
-Surface Laptop 5
-Surface Studio 2+
-Surface Laptop Go 2
-Surface Laptop Studio
-Surface Duo 2
-Microsoft 365
-Windows 11 apps
-Microsoft Store
-Account profile
-Download Center
-Microsoft Store support
-Returns
-Order tracking
-Virtual workshops and training
-Microsoft Store Promise
-Flexible Payments
-Education
-Microsoft in education
-Devices for education
-Microsoft Teams for Education
-Microsoft 365 Education
-Education consultation appointment
-Educator training and development
-Deals for students and parents
-Azure for students
-Business
-Microsoft Cloud
-Microsoft Security
-Dynamics 365
-Microsoft 365
-Microsoft Power Platform
-Microsoft Teams
-Microsoft Industry
-Small Business
-Developer & IT
-Azure
-Developer Center
-Documentation
-Microsoft Learn
-Microsoft Tech Community
-Azure Marketplace
-AppSource
-Visual Studio
-Company
-Careers
-About Microsoft
-Company news
-Privacy at Microsoft
-Investors
-Diversity and inclusion
-Accessibility
-Sustainability
- Your Privacy Choices
-Sitemap Contact Microsoft Privacy Manage cookies Terms of use Trademarks Safety & eco About our ads © Microsoft 2024`
-worker.postMessage({ text: sampleText });
+// worker.postMessage({ text: sampleText });
 
 
 
