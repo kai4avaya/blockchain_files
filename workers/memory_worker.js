@@ -33,6 +33,90 @@ async function openDB(dbName, version) {
 }
 
 
+
+async function openDB_new(dbName, version, storeConfigs=storeConfigs) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, version);
+
+    request.onupgradeneeded = function (event) {
+      const db = event.target.result;
+      
+      // Delete existing stores if they exist
+      Array.from(db.objectStoreNames).forEach(storeName => {
+        db.deleteObjectStore(storeName);
+      });
+
+      // Create new stores based on the provided configurations
+      storeConfigs.forEach(config => {
+        const store = db.createObjectStore(config.name, { keyPath: config.keyPath });
+        
+        // Add indexes if specified
+        if (config.indexes) {
+          config.indexes.forEach(index => {
+            store.createIndex(index.name, index.keyPath, index.options);
+          });
+        }
+      });
+    };
+
+    request.onsuccess = function (event) {
+      dbInstance = event.target.result;
+      resolve(dbInstance);
+    };
+
+    request.onerror = function (event) {
+      reject(new Error(`Error opening IndexedDB: ${event.target.error.message}`));
+    };
+  });
+}
+
+async function initializeDB_new(dbName, storeConfigs) {
+  try {
+    // Open the database with version 1
+    let db = await openDB(dbName, 1, storeConfigs);
+
+    // Check if all required stores exist
+    const missingStores = storeConfigs.filter(config => 
+      !db.objectStoreNames.contains(config.name)
+    );
+
+    // If there are missing stores, upgrade the database
+    if (missingStores.length > 0) {
+      const newVersion = db.version + 1;
+      db.close();
+      db = await openDB(dbName, newVersion, storeConfigs);
+    }
+
+    return 'Database initialized successfully';
+  } catch (error) {
+    console.error('Error initializing database:', error);
+    throw error;
+  }
+}
+
+// Example usage
+const storeConfigs = [
+  { 
+    name: 'directories', 
+    keyPath: 'id',
+    indexes: [
+      { name: 'nameIndex', keyPath: 'name', options: { unique: false } }
+    ]
+  },
+  { 
+    name: 'files', 
+    keyPath: 'id',
+    indexes: [
+      { name: 'nameIndex', keyPath: 'name', options: { unique: false } },
+      { name: 'typeIndex', keyPath: 'type', options: { unique: false } }
+    ]
+  },
+  { 
+    name: 'graph', 
+    keyPath: 'uuid'
+  }
+];
+
 async function initializeDB(storeNames) {
   try {
     const dbName = 'fileGraphDB';

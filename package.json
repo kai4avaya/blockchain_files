@@ -15,6 +15,7 @@
     "@visualsource/selective-unrealbloompass": "^1.0.1",
     "@vitejs/plugin-react": "^4.3.1",
     "@xenova/transformers": "^2.14.2",
+    "compromise": "^14.14.0",
     "d3": "^7.9.0",
     "d3-force-3d": "^3.0.5",
     "graphql": "^16.9.0",
