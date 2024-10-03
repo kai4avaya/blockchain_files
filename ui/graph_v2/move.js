@@ -410,6 +410,8 @@ function resetCubeHighlight() {
     const size = normalizeSize(file.size);
     const fileIds = handleFileDrop(event);
 
+    console.log("SPHERE CREATED", fileIds);
+
     if (allIntersects.length > 0) {
       const intersect = allIntersects[0];
       const dropPosition = intersect.point;
@@ -467,15 +469,6 @@ function resetCubeHighlight() {
       createdShapes.push(createSphere(dataObject));
     }
   }
-
-  // Save changes for created shapes
-  // createdShapes.forEach((shape) => {
-  //   Object.values(shape).forEach((item) => {
-  //     if (item && typeof item === "object" && "uuid" in item) {
-  //       saveObjectChanges(item);
-  //     }
-  //   });
-  // });
 
   // Reset cube highlighting after drop
   if (CUBEINTERSECTED) {

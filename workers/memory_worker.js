@@ -1,3 +1,4 @@
+// memory_worker.js
 let dbInstance = null;
 
 async function openDB(dbName, version) {

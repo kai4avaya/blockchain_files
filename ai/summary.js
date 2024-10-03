@@ -1,61 +1,34 @@
-// const worker = new Worker('../worker/summary_worker.js');
-
-// export function summarizeText(text_to_summarize, fileId, fileName) {
-//     worker.onmessage = function(e) {
-//     const { summary, keywords } = e.data;
-//     console.log('Summary:', summary);
-//     console.log('Keywords:', keywords);
-//     };
-//     worker.postMessage({ text: text_to_summarize });
-// }
-
-
-
-const summaryWorker = new Worker('../workers/summary_worker.js');
+const summaryWorker = new Worker(new URL('../workers/summary_worker.js', import.meta.url), { type: 'module' });
 const dbWorker = new Worker('../workers/memory_worker.js');
 
-const SUMMARY_DB_NAME = 'summaryAndTopicsDB';  // New database name
-
 export function summarizeText(text_to_summarize, fileId, fileName) {
-    summaryWorker.onmessage = function(e) {
-        const { summary, keywords } = e.data;
-        console.log('Summary:', summary);
-        console.log('Keywords:', keywords);
-
-        // Save summary to IndexedDB using the dbWorker
-        dbWorker.postMessage({
-            id: 'saveSummary',
-            action: 'saveData',
-            data: {
-                storeName: 'summaries',
-                data: {
-                    id: fileId,
-                    fileName: fileName,
-                    summary: summary,
-                    timestamp: Date.now()
-                },
-                dbName: SUMMARY_DB_NAME
+    return new Promise((resolve, reject) => {
+        
+        const messageHandler = function(e) {
+            
+            if (e.data.error) {
+                console.error("Worker error:", e.data.error);
+                summaryWorker.removeEventListener('message', messageHandler);
+                reject(new Error(e.data.error));
+                return;
             }
-        });
+            
+            const { summary, keywords } = e.data;
 
-        // Save keywords to IndexedDB using the dbWorker
-        dbWorker.postMessage({
-            id: 'saveKeywords',
-            action: 'saveData',
-            data: {
-                storeName: 'topics',
-                data: {
-                    id: fileId,
-                    fileName: fileName,
-                    keywords: keywords,
-                    timestamp: Date.now()
-                },
-                dbName: SUMMARY_DB_NAME
-            }
-        });
-    };
+            summaryWorker.removeEventListener('message', messageHandler);
+            resolve({ summary, keywords });
+        };
 
-    summaryWorker.postMessage({ text: text_to_summarize, fileId, fileName });
+        summaryWorker.addEventListener('message', messageHandler);
+        
+        summaryWorker.postMessage({ text: text_to_summarize, fileId, fileName });
+        
+        // Add a timeout to prevent hanging
+        setTimeout(() => {
+            summaryWorker.removeEventListener('message', messageHandler);
+            reject(new Error('Summary worker timed out'));
+        }, 30000); // 30 seconds timeout
+    });
 }
 
 // Set up listener for dbWorker responses
@@ -64,21 +37,5 @@ dbWorker.onmessage = function(event) {
     if (error) {
         console.error(`Error in operation ${id}:`, error);
     } else {
-        console.log(`Operation ${id} completed:`, data);
     }
 };
-
-// Function to initialize the database
-export function initializeSummaryDB() {
-    dbWorker.postMessage({
-        id: 'initDB',
-        action: 'initializeDB',
-        data: {
-            storeNames: ['summaries', 'topics'],
-            dbName: SUMMARY_DB_NAME  // Specify the new database name
-        }
-    });
-}
-
-// Call this when your application starts
-initializeSummaryDB();

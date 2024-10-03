@@ -5,6 +5,7 @@ import {generateUniqueId} from '../utils/utils';
 import {getFileSystem} from "./collaboration/file_colab"
 // import embeddingWorker from '../ai/embeddings.js';
 import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
+import {orchestrateTextProcessing} from "../ai/text_orchestration.js"
 
 
 const fileTree = document.getElementById('fileTree');
@@ -49,7 +50,6 @@ async function processFile(fileEntry, id) {
                     fileName: file.name,
                     fileType: file.type
                 });
-
                 // Update file metadata with VectorDB key
                 fileMetadata.vectorDbKey = embeddingResult[0].key;
                 await fileSystem.addOrUpdateItem(fileMetadata, 'file');

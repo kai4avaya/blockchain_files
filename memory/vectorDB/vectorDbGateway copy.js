@@ -1,54 +1,32 @@
+// vectorDBGateway.js
 import textProcessorWorker from '../../ai/processText';
 import embeddingWorker from '../../ai/embeddings';
 import { VectorDB, getDBDefaults, setDBDefaults } from "./vectordb";
 import { generateUniqueId } from '../../utils/utils';
-``
-let dbs = {};
 
-export async function initiate(dbName = 'vectorDB_new', storeNames = ['vectors'], vectorPath = "embedding") {
+let db;
+
+export async function initiate(dbName) {
     setDBDefaults({ dbName: dbName });
-    
-    // Create the database and stores if they don't exist
-    await VectorDB.createDatabase(dbName, storeNames);
-
-    for (let storeName of storeNames) {
-        dbs[`${dbName}_${storeName}`] = new VectorDB({
-            dbName: dbName,
-            vectorPath: vectorPath,
-            storeName: storeName
-        });
-    }
-    
+    db = new VectorDB({
+        vectorPath: "embedding"
+    });
     return getDBDefaults();
 }
-
-
-export async function quickStart(metaData, storeName="vectors", dbName = 'vectorDB_new') {
-    console.log("QUICKSTART metaData", metaData);
+export async function quickStart(metaData) {
     const { text, ...otherMetaData } = metaData;
-    const fileId = metaData.fileId;
+    const fileId = generateUniqueId();
 
-    console.log("QUICKSTART fileid", fileId, metaData.fileId);
-    const dbKey = `${dbName}_${storeName}`;
-    if (!dbs[dbKey]) {
-        throw new Error(`Store "${storeName}" in database "${dbName}" not initialized`);
-    }
-
-    const db = dbs[dbKey];
-
-    let processedChunks
-    if(!metaData.processedChunks) {
-
-        console.log("NO processed chunks whaaaa in vectorDbGateway so will pass in this text", text)
     // Process text
-     processedChunks = await textProcessorWorker.processText(text, 'text', fileId);
+    const processedChunks = await textProcessorWorker.processText(text, 'text', fileId);
 
-    } else{
-        processedChunks = metaData.processedChunks;
-    }
-
+    console.log("I AM TURD POOL!", fileId)
     // Generate embeddings
+    console.time('OLD Embedding Generation');
+
     const embeddings = await embeddingWorker.generateEmbeddings(processedChunks, fileId);
+    console.timeEnd('OLD Embedding Generation');
+    console.log("i am durdur")
 
     const inMemoryRecord = [];
 
@@ -71,14 +49,7 @@ export async function quickStart(metaData, storeName="vectors", dbName = 'vector
     return inMemoryRecord;
 }
 
-export async function search(query, storeName, k = { limit: 5 }, token, isLocal = true, dbName = 'vectorDB_new') {
-    const dbKey = `${dbName}_${storeName}`;
-    if (!dbs[dbKey]) {
-        throw new Error(`Store "${storeName}" in database "${dbName}" not initialized`);
-    }
-
-    const db = dbs[dbKey];
-
+export async function search(query, k = { limit: 5 }, token, isLocal = true) {
     // Process the query text
     const processedQuery = await textProcessorWorker.processText(query, 'text', 'query');
 
@@ -89,22 +60,19 @@ export async function search(query, storeName, k = { limit: 5 }, token, isLocal 
     return db.query(queryEmbedding, k);
 }
 
-
-
-export async function quickStart_single(metaData, storeName) {
-    if (!dbs[storeName]) {
-        throw new Error(`Store "${storeName}" not initialized`);
-    }
-
-    const db = dbs[storeName];
+export async function quickStart_single(metaData) {
     const { text, ...otherMetaData } = metaData;
     const fileId = metaData.fileId;
 
     // Process text
     const [processedText] = await textProcessorWorker.processText(text, 'text', fileId);
 
+    console.log("processedText", processedText);
+
     // Generate embedding
     const [embedding] = await embeddingWorker.generateEmbeddings([processedText], fileId);
+
+    console.log("embedding", embedding);
 
     const key = await db.insert({
         embedding: embedding,
@@ -123,21 +91,11 @@ export async function quickStart_single(metaData, storeName) {
     return inMemoryRecord;
 }
 
-export async function delete_row(key, storeName) {
-    if (!dbs[storeName]) {
-        throw new Error(`Store "${storeName}" not initialized`);
-    }
-
-    const db = dbs[storeName];
+export async function delete_row(key) {
     return await db.delete(key);
 }
 
-export async function update(key, metaData, storeName) {
-    if (!dbs[storeName]) {
-        throw new Error(`Store "${storeName}" not initialized`);
-    }
-
-    const db = dbs[storeName];
+export async function update(key, metaData) {
     const { text, ...otherMetaData } = metaData;
     const fileId = metaData.fileId || generateUniqueId();
 

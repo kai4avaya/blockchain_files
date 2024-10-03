@@ -6,8 +6,6 @@ let DB_DEFAULTS = {
     dimensions: 384,
     numPlanes: 5
   };
-
-const CURRENT_DB_VERSION = 2;
   
   // Function to update defaults
   export function setDBDefaults(newValues) {
@@ -55,28 +53,27 @@ const CURRENT_DB_VERSION = 2;
     return dotProduct / (aMagnitude * bMagnitude);
   }
   
- // Modify the create function to use the provided storeName
   function create(options) {
-      const { dbName, objectStore, vectorPath } = {
-          ...DB_DEFAULTS,
-          ...options,
+    const { dbName, objectStore, vectorPath } = {
+      ...DB_DEFAULTS,
+      ...options,
+    };
+  
+  
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(dbName, 2); // Ensure a version number that triggers onupgradeneeded
+  
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(objectStore)) {
+          db.createObjectStore(objectStore, { autoIncrement: true });
+        }
+        const hashIndexStoreName = `${objectStore}_hashIndex`;
+        if (!db.objectStoreNames.contains(hashIndexStoreName)) {
+          db.createObjectStore(hashIndexStoreName, { autoIncrement: true });
+        }
       };
   
-      return new Promise((resolve, reject) => {
-          const request = indexedDB.open(dbName, CURRENT_DB_VERSION);
-  
-          request.onupgradeneeded = (event) => {
-              const db = event.target.result;
-              if (!db.objectStoreNames.contains(objectStore)) {
-                  db.createObjectStore(objectStore, { autoIncrement: true });
-              }
-              const hashIndexStoreName = `${objectStore}_hashIndex`;
-              if (!db.objectStoreNames.contains(hashIndexStoreName)) {
-                  db.createObjectStore(hashIndexStoreName, { autoIncrement: true });
-              }
-          };
-
-
       request.onsuccess = (event) => {
         resolve(event.target.result);
       };
@@ -95,38 +92,17 @@ const CURRENT_DB_VERSION = 2;
   
   
     constructor(options = {}) {
-      const { dbName, storeName, vectorPath, dimensions, numPlanes } = {
-          ...DB_DEFAULTS,
-          ...options,
+      const { dbName, objectStore, vectorPath, dimensions, numPlanes } = {
+        ...DB_DEFAULTS,
+        ...options,
       };
   
-      this.#objectStore = storeName || DB_DEFAULTS.objectStore;
+      this.#objectStore = objectStore;
       this.#vectorPath = vectorPath;
       this.#lsh = new LSH(dimensions, numPlanes);
-      this.#db = create({dbName, objectStore: this.#objectStore, vectorPath});
-  }
+      this.#db = create({dbName, objectStore, vectorPath});
+    }
   
-  static async createDatabase(dbName, storeNames) {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(dbName, CURRENT_DB_VERSION);
-
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            storeNames.forEach(storeName => {
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName, { autoIncrement: true });
-                }
-                const hashIndexStoreName = `${storeName}_hashIndex`;
-                if (!db.objectStoreNames.contains(hashIndexStoreName)) {
-                    db.createObjectStore(hashIndexStoreName, { autoIncrement: true });
-                }
-            });
-        };
-
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
-}
   
   async insert(object) {
     const vector = object[this.#vectorPath];

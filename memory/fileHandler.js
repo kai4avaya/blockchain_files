@@ -5,6 +5,8 @@ import {generateUniqueId} from '../utils/utils';
 import {getFileSystem} from "./collaboration/file_colab"
 // import embeddingWorker from '../ai/embeddings.js';
 import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
+import {orchestrateTextProcessing} from "../ai/text_orchestration.js"
+
 
 const fileTree = document.getElementById('fileTree');
 const processingQueue = [];
@@ -42,14 +44,15 @@ async function processFile(fileEntry, id) {
                     content = await file.text();
                 }
 
-                const embeddingResult = await vectorDBGateway.quickStart({
-                    text: content,
-                    fileId: id,
-                    fileName: file.name,
-                    fileType: file.type
-                });
+                // const embeddingResult = await vectorDBGateway.quickStart({
+                //     text: content,
+                //     fileId: id,
+                //     fileName: file.name,
+                //     fileType: file.type
+                // });
                 // Update file metadata with VectorDB key
-                fileMetadata.vectorDbKey = embeddingResult[0].key;
+                // fileMetadata.vectorDbKey = embeddingResult[0].key;
+                orchestrateTextProcessing(content, file, id)
                 await fileSystem.addOrUpdateItem(fileMetadata, 'file');
 
                 console.log(`Embeddings added to file ${id}`);
@@ -62,9 +65,9 @@ async function processFile(fileEntry, id) {
     });
 }
 
-async function processFiles(files) {
-    const processPromises = files.map(file => {
-        const id = generateUniqueId();
+async function processFiles(files, uuids) {
+    const processPromises = files.map((file, i) => {
+        const id = uuids[i]
         return processFile(file, id);
     });
 
@@ -98,7 +101,7 @@ export function handleFileDrop(event) {
     }
 
     if (files.length > 0) {
-        processFiles(files);
+        processFiles(files, uuids);
     }
 
     if (!isProcessing) {

@@ -16,12 +16,20 @@ async function extractTextFromPDF(arrayBuffer) {
 }
 
 function removeStopWords(text) {
+    if (typeof text !== 'string') {
+        console.error("removeStopWords received non-string input:", typeof text);
+        return '';
+    }
     return text.split(/\s+/)
                .filter(word => !stopWords.has(word.toLowerCase()))
                .join(' ');
 }
 
 function chunkText(text, chunkSize = 1000) {
+    if (typeof text !== 'string') {
+        console.error("chunkText received non-string input:", typeof text);
+        return [];
+    }
     const words = text.split(/\s+/);
     const chunks = [];
     for (let i = 0; i < words.length; i += chunkSize) {
@@ -32,37 +40,50 @@ function chunkText(text, chunkSize = 1000) {
 
 async function processContent(content, fileType) {
     let text;
-    if (fileType === 'application/pdf') {
-        text = await extractTextFromPDF(content);
-    } else {
-        text = content;
+    try {
+        if (fileType === 'application/pdf') {
+            text = await extractTextFromPDF(content);
+        } else {
+            text = content;
+        }
+        
+        if (typeof text !== 'string') {
+            throw new Error(`Expected text to be a string, but got ${typeof text}`);
+        }
+
+        text = removeStopWords(text);
+        const chunks = chunkText(text);
+        return { chunks, text };
+    } catch (error) {
+        console.error("Error in processContent:", error);
+        throw error;
     }
-    
-    text = removeStopWords(text);
-    return chunkText(text);
 }
 
 let taskQueue = [];
 let isProcessing = false;
+
 
 function processNextTask() {
     if (taskQueue.length === 0) {
         isProcessing = false;
         return;
     }
-
+    
     isProcessing = true;
     const task = taskQueue.shift();
     processContent(task.data, task.fileType)
-        .then(processedText => {
-            self.postMessage({ type: 'processedText', data: processedText, fileId: task.fileId });
+        .then(result => {
+            self.postMessage({ type: 'processedText', data: result, fileId: task.fileId });
             processNextTask();
         })
         .catch(error => {
+            console.error("Task processing error:", error);
             self.postMessage({ type: 'error', data: error.message, fileId: task.fileId });
             processNextTask();
         });
 }
+
 
 self.onmessage = function(e) {
     const { type, data, fileType, fileId } = e.data;

@@ -1,37 +1,54 @@
-import {textProcessorWorker} from './processText'
+import textProcessorWorker from './processText'
 import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
 import {summarizeText} from './summary'
 
-export async function orchestrateTextProcessing(file, id) {
+export async function orchestrateTextProcessing(content, file, id) {
     try {
+        const {chunks, text} = await textProcessorWorker.processText(content, file.type, id);
 
-        // Process text content
-        const content = file.type === 'application/pdf' ? await file.arrayBuffer() : await file.text();
+        await embeddingResult(text, chunks, file, id);
+        await summarizeTextAndStore(text, file, id);
 
-        // Use TextProcessorWorker to process the text
-        const processedText = await textProcessorWorker.processText(content, file.type, id);
-
-        // Start summarization process asynchronously
-        summarizeText(processedText, id, file.name);
-
-        // Start embedding generation asynchronously
-        try {
-            const _ = await vectorDBGateway.quickStart({
-                text: processedText,
-                fileId: id,
-                fileName: file.name,
-                fileType: file.type
-            });
-
-            // Update file metadata with VectorDB key
-            console.log(`Embeddings added to file ${id}`);
-        } catch (embeddingError) {
-            console.error(`Error generating embeddings for file ${id}:`, embeddingError);
-        }
-
-        console.log(`File ${id} processed successfully`);
     } catch (error) {
         console.error(`Error processing file ${id}:`, error);
-        throw error;  // Re-throw the error for the caller to handle
+        throw error; // Re-throw the error for the caller to handle
+    }
+}
+
+async function embeddingResult(content, chunks, file, id) {
+    try {
+        const embeddingResult = await vectorDBGateway.quickStart({
+            text: content,
+            processedChunks: chunks,
+            fileId: id,
+            fileName: file.name,
+            fileType: file.type
+        });
+        return embeddingResult;
+    } catch (error) {
+        console.error(`Error generating embeddings for file ${id}:`, error);
+        throw error; // Re-throw the error for the caller to handle
+    }
+}
+
+async function summarizeTextAndStore(content, file, id) {
+    try {
+        const { summary, keywords } = await summarizeText(content, id, file.name);
+
+        // Start embedding generation for the main vectorDB
+        await vectorDBGateway.quickStart({
+            text: content,
+            processedChunks: [summary],
+            fileId: id,
+            fileName: file.name,
+            fileType: file.type,
+            summary: summary,
+            keywords: keywords
+        }, 'summaries', 'summarizationDB');
+
+        return { summary, keywords };
+    } catch (error) {
+        console.error(`Error storing summary for file ${id}:`, error);
+        throw error; // Re-throw the error for the caller to handle
     }
 }

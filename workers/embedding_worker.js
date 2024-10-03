@@ -59,19 +59,7 @@ async function isWasmThreadsSupported() {
 
 
 // Initialize the extractor
-// async function initializeExtractor() {
-//     console.log("Extractor initialized and TURDING");
-//     if (!extractor) {
-//         extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-//             quantized: false,
-//         });
-//     }
-//     return extractor;
-// }
-
-// Initialize the extractor
 async function initializeExtractor() {
-  console.log("Initializing extractor...");
 
   if (!extractor) {
       // Perform feature detection
@@ -79,10 +67,8 @@ async function initializeExtractor() {
 
       if (threadsSupported) {
           env.useBrowserThreads = true;
-          console.log("WebAssembly threads are supported and enabled.");
       } else {
           env.useBrowserThreads = false;
-          console.log("WebAssembly threads are not supported. Running without multithreading.");
       }
 
       extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
@@ -100,7 +86,6 @@ async function generateEmbeddings(chunks) {
       if (typeof chunk !== 'string') {
           throw new Error(`Invalid chunk type: expected string, got ${typeof chunk}`);
       }
-      console.log("i am chunk", chunk);
       const output = await extractor(chunk, {
           pooling: 'mean',
           normalize: true,
@@ -108,20 +93,12 @@ async function generateEmbeddings(chunks) {
           precision: 'binary', // Set precision to 'binary'
       });
 
-      console.log("i am output", output);
-      console.log("Available properties on output:", Object.keys(output));
-      console.log("Available methods on output:", Object.getOwnPropertyNames(Object.getPrototypeOf(output)));
-
       let embeddingArray;
       try {
           if (ArrayBuffer.isView(output.data)) {
-              console.log("Using output.data to serialize embedding.");
               embeddingArray = Array.from(output.data);
-              console.log("Serialized using output.data:", embeddingArray);
           } else if (typeof output.tolist === 'function') {
-              console.log("Using output.tolist() to serialize embedding.");
               const tolistResult = output.tolist();
-              console.log("Output of tolist():", tolistResult);
               if (Array.isArray(tolistResult) && Array.isArray(tolistResult[0])) {
                   embeddingArray = tolistResult[0]; // Extract the first array if nested
               } else if (Array.isArray(tolistResult)) {
@@ -130,7 +107,6 @@ async function generateEmbeddings(chunks) {
                   console.error("Unexpected format from tolist():", tolistResult);
                   throw new Error("Unexpected tolist() format.");
               }
-              console.log("Serialized using tolist():", embeddingArray);
           } else {
               console.error("No known serialization method found on output.");
               throw new Error("Unsupported Tensor format for serialization.");
@@ -156,8 +132,6 @@ async function generateEmbeddings_chunks(chunks) {
       throw new Error('Chunks must be an array of strings');
   }
 
-  console.log("Processing chunks:", chunks);
-
   // Process all chunks in a single batch
   const outputs = await extractor(chunks, {
       pooling: 'mean',
@@ -165,8 +139,6 @@ async function generateEmbeddings_chunks(chunks) {
       quantize: true,        // Quantize output embeddings
       precision: 'binary',   // Use binary precision for embeddings
   });
-
-  console.log("Output Tensor:", outputs);
 
   // Extract embeddings from the Tensor
   const embeddings = [];
@@ -196,7 +168,6 @@ self.onmessage = async function (e) {
     } else if (type === "generateEmbeddings") {
         try {
             const embeddings = await generateEmbeddings_chunks(data); // Correct
-            console.log("i am embeddings", fileId, embeddings);
             self.postMessage({
                 type: "embeddingsResult",
                 data: embeddings, // Send serialized embeddings
