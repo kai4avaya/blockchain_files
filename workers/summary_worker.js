@@ -1,27 +1,7 @@
 // summary_worker.js
 console.log("Summary worker script starting to load");
 
-let nlp;
-try {
-  // Try to import nlp as a module
-  import('/node_modules/.vite/deps/compromise.js?v=f9272eb6')
-    .then(module => {
-      nlp = module.default;
-      console.log("NLP module loaded successfully");
-    })
-    .catch(error => {
-      console.error("Error importing NLP module:", error);
-    });
-} catch (error) {
-  console.error("Error in import statement:", error);
-  // Fallback to using self.compromise if import fails
-  nlp = self.compromise;
-  if (nlp) {
-    console.log("Using self.compromise as fallback");
-  } else {
-    console.error("Neither import nor self.compromise are available");
-  }
-}
+import nlp from 'compromise';
 
 const CHARACTER_LIMIT = 384;
 
@@ -51,6 +31,7 @@ function processText(text) {
 }
 
 function summarizeText(text) {
+  console.log("summarize text in summary worker:", text);
   try {
     const doc = nlp(text);
     const sentences = doc.sentences().out('array');
@@ -78,6 +59,7 @@ function summarizeText(text) {
       summary = summary.substring(0, CHARACTER_LIMIT - 3) + '...';
     }
 
+    console.log("Generated summary:", summary);
     return summary;
   } catch (error) {
     console.error("Error in summarizeText:", error);
@@ -96,7 +78,16 @@ function scoreImportance(sentence) {
 function extractKeywords(text) {
   try {
     const doc = nlp(text);
-    const keywords = doc.topics().slice(0, 5).out('array');
+    const topicsDoc = doc.topics();
+    const topicsArray = topicsDoc.out('array');
+    const frequencyMap = topicsArray.reduce((acc, topic) => {
+      acc[topic] = (acc[topic] || 0) + 1;
+      return acc;
+    }, {});
+    const frequencyArray = Object.entries(frequencyMap);
+    frequencyArray.sort((a, b) => b[1] - a[1]);
+    const topN = 5;
+    const keywords = frequencyArray.slice(0, topN).map(entry => entry[0]);
     return keywords;
   } catch (error) {
     console.error("Error in extractKeywords:", error);
@@ -104,7 +95,7 @@ function extractKeywords(text) {
   }
 }
 
-function removeStopWords(text) {
+export function removeStopWords(text) {
   try {
     const doc = nlp(text);
     const cleanedText = doc.normalize().remove('#Stop').out('text');

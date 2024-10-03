@@ -10,6 +10,14 @@ class EmbeddingWorker {
 
             this.worker.onmessage = this.handleWorkerMessage.bind(this);
 
+            this.worker.onerror = (e) => {
+                console.error('Worker error:', e);
+                console.error('Error message:', e.message);
+                console.error('Error filename:', e.filename);
+                console.error('Error lineno:', e.lineno);
+                console.error('Error stack:', e.error ? e.error.stack : 'No stack available');
+            };
+
             EmbeddingWorker.instance = this;
         }
         return EmbeddingWorker.instance;
@@ -17,6 +25,7 @@ class EmbeddingWorker {
 
     handleWorkerMessage(e) {
         const { type, data, fileId } = e.data;
+        console.log("GOT ME A MESSAGE",  type, fileId)
         if (type === 'ready') {
             this.isReady = true;
             this.processQueuedTasks();

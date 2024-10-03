@@ -39,3 +39,11 @@ dbWorker.onmessage = function(event) {
     } else {
     }
 };
+
+dbWorker.onerror = (e) => {
+    console.error('Worker error:', e);
+    console.error('Error message:', e.message);
+    console.error('Error filename:', e.filename);
+    console.error('Error lineno:', e.lineno);
+    console.error('Error stack:', e.error ? e.error.stack : 'No stack available');
+};

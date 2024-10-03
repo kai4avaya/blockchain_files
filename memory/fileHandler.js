@@ -4,7 +4,7 @@
 import {generateUniqueId} from '../utils/utils';
 import {getFileSystem} from "./collaboration/file_colab"
 // import embeddingWorker from '../ai/embeddings.js';
-import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
+// import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
 import {orchestrateTextProcessing} from "../ai/text_orchestration.js"
 
 
@@ -55,7 +55,7 @@ async function processFile(fileEntry, id) {
                 orchestrateTextProcessing(content, file, id)
                 await fileSystem.addOrUpdateItem(fileMetadata, 'file');
 
-                console.log(`Embeddings added to file ${id}`);
+                // console.log(`Embeddings added to file ${id}`);
                 resolve();
             } catch (error) {
                 console.error(`Error processing file ${id}:`, error);

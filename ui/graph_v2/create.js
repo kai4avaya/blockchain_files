@@ -1019,418 +1019,126 @@ export function createMiniMap(scene, nonBloomScene, camera, renderer) {
     markNeedsRender();
   });
 
-//   function updateMiniMap() {
-//     ctx.clearRect(0, 0, mapSize, mapSize);
+
+  function updateMiniMap() {
+    ctx.clearRect(0, 0, mapSize, mapSize);
   
-//     // Calculate camera position on mini-map
-//     const cameraX = mapSize / 2;
-//     const cameraY = mapSize - 20; // Place camera near bottom of mini-map
+    const centerX = mapSize / 2;
+    const centerY = mapSize * 0.8; // Position camera dot near the bottom
   
-//     // Function to draw objects from a scene
-//     function drawSceneObjects(sceneToRender) {
-//       sceneToRender.traverse((object) => {
-//         if (object.isMesh) {
-//           // Calculate object position relative to camera
-//           const relativePos = object.position.clone().sub(camera.position);
-//           relativePos.applyAxisAngle(new THREE.Vector3(0, 1, 0), -camera.rotation.y);
-  
-//           // Scale and translate to mini-map coordinates
-//           const scaleFactor = mapSize / 100;
-//           const x = cameraX + relativePos.x * scaleFactor;
-//           const y = cameraY - relativePos.z * scaleFactor; // Subtract because +Z is away from camera
-  
-//           let color;
-//           if (object.geometry.type === "IcosahedronGeometry") {
-//             color = 'red';
-//           } else if (object.geometry.type === "BoxGeometry") {
-//             color = object.material.color.getStyle();
-//           } else {
-//             return;
-//           }
-  
-//           ctx.fillStyle = color;
-//           ctx.beginPath();
-//           ctx.arc(x, y, 3, 0, Math.PI * 2);
-//           ctx.fill();
-//         }
-//       });
-//     }
-  
-//     // Draw objects from both scenes
-//     drawSceneObjects(scene);
-//     drawSceneObjects(nonBloomScene);
-  
-//     // Draw view frustum
-//     const fov = camera.fov * Math.PI / 180;
-//     const aspectRatio = camera.aspect;
-//     const nearDistance = 10 * (mapSize / 100); // Adjust as needed
-//     const farDistance = 50 * (mapSize / 100); // Adjust as needed
-  
-//     ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-//     ctx.beginPath();
-//     ctx.moveTo(cameraX - nearDistance * Math.tan(fov / 2) * aspectRatio, cameraY - nearDistance);
-//     ctx.lineTo(cameraX + nearDistance * Math.tan(fov / 2) * aspectRatio, cameraY - nearDistance);
-//     ctx.lineTo(cameraX + farDistance * Math.tan(fov / 2) * aspectRatio, cameraY - farDistance);
-//     ctx.lineTo(cameraX - farDistance * Math.tan(fov / 2) * aspectRatio, cameraY - farDistance);
-//     ctx.closePath();
-//     ctx.stroke();
-  
-//     // Fill the frustum with a semi-transparent color
-//     ctx.fillStyle = 'rgba(255, 255, 0, 0.1)';
-//     ctx.fill();
-  
-//     // Draw camera position
-//     ctx.fillStyle = 'yellow';
-//     ctx.beginPath();
-//     ctx.arc(cameraX, cameraY, 3, 0, Math.PI * 2);
-//     ctx.fill();
-  
-//     // Draw direction indicator
-//     ctx.strokeStyle = 'yellow';
-//     ctx.beginPath();
-//     ctx.moveTo(cameraX, cameraY);
-//     ctx.lineTo(cameraX, cameraY - farDistance);
-//     ctx.stroke();
-  
-//     // Draw a simple compass arrow
-//     const compassRadius = 15;
-//     const compassX = mapSize - compassRadius - 5;
-//     const compassY = compassRadius + 5;
-  
-//     ctx.save();
-//     ctx.translate(compassX, compassY);
-//     ctx.rotate(-camera.rotation.y);
-  
-//     ctx.strokeStyle = 'white';
-//     ctx.beginPath();
-//     ctx.moveTo(0, -compassRadius);
-//     ctx.lineTo(0, compassRadius);
-//     ctx.moveTo(0, -compassRadius);
-//     ctx.lineTo(-compassRadius / 2, 0);
-//     ctx.moveTo(0, -compassRadius);
-//     ctx.lineTo(compassRadius / 2, 0);
-//     ctx.stroke();
-  
-//     ctx.restore();
-//   }
-
-//   // Initial update
-//   updateMiniMap();
-
-//   // Return the update function
-//   return updateMiniMap;
-// }
-
-// function updateMiniMap() {
-//   ctx.clearRect(0, 0, mapSize, mapSize);
-
-//   // Calculate camera position on mini-map
-//   const cameraX = mapSize / 2;
-//   const cameraY = mapSize - 20; // Place camera near bottom of mini-map
-
-//   // Function to draw objects from a scene
-//   function drawSceneObjects(sceneToRender) {
-//     sceneToRender.traverse((object) => {
-//       if (object.isMesh) {
-//         // Calculate object position relative to camera
-//         const relativePos = object.position.clone().sub(camera.position);
-//         relativePos.applyAxisAngle(new THREE.Vector3(0, 1, 0), -camera.rotation.y);
-
-//         // Scale and translate to mini-map coordinates
-//         const scaleFactor = mapSize / 100;
-//         const x = cameraX + relativePos.x * scaleFactor;
-//         const y = cameraY - relativePos.z * scaleFactor; // Subtract because +Z is away from camera
-
-//         let color;
-//         if (object.geometry.type === "IcosahedronGeometry") {
-//           color = 'red';
-//         } else if (object.geometry.type === "BoxGeometry") {
-//           color = object.material.color.getStyle();
-//         } else {
-//           return;
-//         }
-
-//         ctx.fillStyle = color;
-//         ctx.beginPath();
-//         ctx.arc(x, y, 3, 0, Math.PI * 2);
-//         ctx.fill();
-//       }
-//     });
-//   }
-
-//   // Draw objects from both scenes
-//   drawSceneObjects(scene);
-//   drawSceneObjects(nonBloomScene);
-
-//   // Draw view frustum
-//   const fov = camera.fov * Math.PI / 180;
-//   const aspectRatio = camera.aspect;
-//   const nearDistance = 10 * (mapSize / 100); // Adjust as needed
-//   const farDistance = 50 * (mapSize / 100); // Adjust as needed
-
-//   ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-//   ctx.beginPath();
-//   ctx.moveTo(cameraX - nearDistance * Math.tan(fov / 2) * aspectRatio, cameraY - nearDistance);
-//   ctx.lineTo(cameraX + nearDistance * Math.tan(fov / 2) * aspectRatio, cameraY - nearDistance);
-//   ctx.lineTo(cameraX + farDistance * Math.tan(fov / 2) * aspectRatio, cameraY - farDistance);
-//   ctx.lineTo(cameraX - farDistance * Math.tan(fov / 2) * aspectRatio, cameraY - farDistance);
-//   ctx.closePath();
-//   ctx.stroke();
-
-//   // Fill the frustum with a semi-transparent color
-//   ctx.fillStyle = 'rgba(255, 255, 0, 0.1)';
-//   ctx.fill();
-
-//   // Draw camera position
-//   ctx.fillStyle = 'yellow';
-//   ctx.beginPath();
-//   ctx.arc(cameraX, cameraY, 3, 0, Math.PI * 2);
-//   ctx.fill();
-
-//   // Draw direction indicator
-//   ctx.strokeStyle = 'yellow';
-//   ctx.beginPath();
-//   ctx.moveTo(cameraX, cameraY);
-//   ctx.lineTo(cameraX, cameraY - farDistance);
-//   ctx.stroke();
-
-//   // Draw camera pitch indicator
-//   const pitchIndicatorSize = 30;
-//   const pitchX = 20; // Position on the left side
-//   const pitchY = mapSize - 20; // Near the bottom
-
-//   ctx.save();
-//   ctx.translate(pitchX, pitchY);
-
-//   // Draw the circular background
-//   ctx.beginPath();
-//   ctx.arc(0, 0, pitchIndicatorSize / 2, 0, Math.PI * 2);
-//   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-//   ctx.fill();
-
-//   // Draw the horizontal line
-//   ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-//   ctx.beginPath();
-//   ctx.moveTo(-pitchIndicatorSize / 2, 0);
-//   ctx.lineTo(pitchIndicatorSize / 2, 0);
-//   ctx.stroke();
-
-//   // Calculate and draw the pitch line
-//   const pitchAngle = camera.rotation.x;
-//   const lineLength = pitchIndicatorSize / 2;
-//   const endY = -Math.sin(pitchAngle) * lineLength;
-//   const endX = Math.cos(pitchAngle) * lineLength;
-
-//   ctx.strokeStyle = 'yellow';
-//   ctx.lineWidth = 2;
-//   ctx.beginPath();
-//   ctx.moveTo(0, 0);
-//   ctx.lineTo(endX, endY);
-//   ctx.stroke();
-
-//   // Add a dot at the end of the line for better visibility
-//   ctx.fillStyle = 'yellow';
-//   ctx.beginPath();
-//   ctx.arc(endX, endY, 2, 0, Math.PI * 2);
-//   ctx.fill();
-
-//   ctx.restore();
-
-//   // Draw a simple compass arrow
-//   const compassRadius = 15;
-//   const compassX = mapSize - compassRadius - 5;
-//   const compassY = compassRadius + 5;
-
-//   ctx.save();
-//   ctx.translate(compassX, compassY);
-//   ctx.rotate(-camera.rotation.y);
-
-//   ctx.strokeStyle = 'white';
-//   ctx.beginPath();
-//   ctx.moveTo(0, -compassRadius);
-//   ctx.lineTo(0, compassRadius);
-//   ctx.moveTo(0, -compassRadius);
-//   ctx.lineTo(-compassRadius / 2, 0);
-//   ctx.moveTo(0, -compassRadius);
-//   ctx.lineTo(compassRadius / 2, 0);
-//   ctx.stroke();
-
-//   ctx.restore();
-// }
-
-// // Initial update
-// updateMiniMap();
-
-// // Return the update function
-// return updateMiniMap;
-// }
-function updateMiniMap() {
-  ctx.clearRect(0, 0, mapSize, mapSize);
-
-  const centerX = mapSize / 2;
-  const centerY = mapSize / 2;
-
-  // Calculate bounds of all objects
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  function updateBounds(sceneToCheck) {
-    sceneToCheck.traverse((object) => {
-      if (object.isMesh) {
-        minX = Math.min(minX, object.position.x);
-        maxX = Math.max(maxX, object.position.x);
-        minZ = Math.min(minZ, object.position.z);
-        maxZ = Math.max(maxZ, object.position.z);
-      }
-    });
-  }
-  updateBounds(scene);
-  updateBounds(nonBloomScene);
-
-  // Add padding
-  const padding = 50;
-  minX -= padding;
-  maxX += padding;
-  minZ -= padding;
-  maxZ += padding;
-
-  // Ensure the view area is square
-  const range = Math.max(maxX - minX, maxZ - minZ);
-  minX = -range / 2;
-  maxX = range / 2;
-  minZ = -range / 2;
-  maxZ = range / 2;
-
-  // Calculate scale factor to fit all objects
-  const scaleFactor = (mapSize * 0.8) / range; // 80% of map size to leave some margin
-
-  // Function to convert world coordinates to mini-map coordinates
-  function worldToMap(x, z) {
-    // Rotate the point around the origin (camera position)
-    const rotatedX = x * Math.cos(camera.rotation.y) + z * Math.sin(camera.rotation.y);
-    const rotatedZ = -x * Math.sin(camera.rotation.y) + z * Math.cos(camera.rotation.y);
-    
-    return {
-      x: centerX + rotatedX * scaleFactor,
-      y: centerY - rotatedZ * scaleFactor // Invert Y axis
-    };
-  }
-
-  // Function to draw objects from a scene
-  function drawSceneObjects(sceneToRender) {
-    sceneToRender.traverse((object) => {
-      if (object.isMesh) {
-        const relativeX = object.position.x - camera.position.x;
-        const relativeZ = object.position.z - camera.position.z;
-        const { x, y } = worldToMap(relativeX, relativeZ);
-
-        let color;
-        if (object.geometry.type === "IcosahedronGeometry") {
-          color = 'red';
-        } else if (object.geometry.type === "BoxGeometry") {
-          color = object.material.color.getStyle();
-        } else {
-          return;
+    // Calculate bounds of all objects
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    function updateBounds(sceneToCheck) {
+      sceneToCheck.traverse((object) => {
+        if (object.isMesh) {
+          minX = Math.min(minX, object.position.x);
+          maxX = Math.max(maxX, object.position.x);
+          minZ = Math.min(minZ, object.position.z);
+          maxZ = Math.max(maxZ, object.position.z);
         }
-
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    });
+      });
+    }
+    updateBounds(scene);
+    updateBounds(nonBloomScene);
+  
+    // Add padding
+    const padding = 50;
+    minX -= padding;
+    maxX += padding;
+    minZ -= padding;
+    maxZ += padding;
+  
+    // Ensure the view area is square
+    const range = Math.max(maxX - minX, maxZ - minZ);
+    
+    // Calculate scale factor to fit all objects
+    const scaleFactor = (mapSize * 0.6) / range; // 60% of map size to leave margin
+  
+    // Function to convert world coordinates to mini-map coordinates
+    function worldToMap(x, z) {
+      return {
+        x: centerX + (x - camera.position.x) * scaleFactor,
+        y: centerY - (z - camera.position.z) * scaleFactor
+      };
+    }
+  
+    // Function to draw objects from a scene
+    function drawSceneObjects(sceneToRender) {
+      sceneToRender.traverse((object) => {
+        if (object.isMesh) {
+          const { x, y } = worldToMap(object.position.x, object.position.z);
+  
+          let color;
+          if (object.geometry.type === "IcosahedronGeometry") {
+            color = 'red';
+          } else if (object.geometry.type === "BoxGeometry") {
+            color = object.material.color.getStyle();
+          } else {
+            return;
+          }
+  
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+    }
+  
+    // Draw objects from both scenes
+    drawSceneObjects(scene);
+    drawSceneObjects(nonBloomScene);
+  
+    // Calculate camera's visible range based on zoom
+    const visibleRange = 100 / camera.zoom; // Adjust this factor as needed
+    const cameraY = centerY + (visibleRange / 2) * scaleFactor;
+  
+    // Draw camera position
+    ctx.fillStyle = 'yellow';
+    ctx.beginPath();
+    ctx.arc(centerX, cameraY, 5, 0, Math.PI * 2);
+    ctx.fill();
+  
+    // Calculate view frustum
+    const fov = camera.fov * Math.PI / 180;
+    const aspect = camera.aspect;
+    const nearDistance = 10 * scaleFactor;
+    const farDistance = visibleRange * scaleFactor;
+  
+    // Draw viewpoint cone
+    ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+    ctx.fillStyle = 'rgba(255, 255, 0, 0.1)';
+    ctx.beginPath();
+    ctx.moveTo(centerX, cameraY);
+    ctx.lineTo(centerX + Math.tan(fov / 2) * aspect * nearDistance, cameraY - nearDistance);
+    ctx.lineTo(centerX + Math.tan(fov / 2) * aspect * farDistance, cameraY - farDistance);
+    ctx.lineTo(centerX - Math.tan(fov / 2) * aspect * farDistance, cameraY - farDistance);
+    ctx.lineTo(centerX - Math.tan(fov / 2) * aspect * nearDistance, cameraY - nearDistance);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  
+    // Draw compass
+    const compassRadius = 15;
+    const compassX = mapSize - compassRadius - 5;
+    const compassY = compassRadius + 5;
+  
+    ctx.save();
+    ctx.translate(compassX, compassY);
+    ctx.rotate(-camera.rotation.y);
+  
+    ctx.strokeStyle = 'white';
+    ctx.beginPath();
+    ctx.moveTo(0, -compassRadius);
+    ctx.lineTo(0, compassRadius);
+    ctx.moveTo(0, -compassRadius);
+    ctx.lineTo(-compassRadius / 2, 0);
+    ctx.moveTo(0, -compassRadius);
+    ctx.lineTo(compassRadius / 2, 0);
+    ctx.stroke();
+  
+    ctx.restore();
   }
-
-  // Draw objects from both scenes
-  drawSceneObjects(scene);
-  drawSceneObjects(nonBloomScene);
-
-  // Draw camera position (centered)
-  ctx.fillStyle = 'yellow';
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Calculate view frustum
-  const fov = camera.fov * Math.PI / 180;
-  const aspect = camera.aspect;
-  const zoom = camera.zoom;
-  const nearDistance = 10 * scaleFactor;
-  const farDistance = (1000 / zoom) * scaleFactor; // Adjust far distance based on zoom
-
-  // Draw viewpoint cone
-  ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-  ctx.fillStyle = 'rgba(255, 255, 0, 0.1)';
-  ctx.beginPath();
-  ctx.moveTo(centerX, centerY);
-  ctx.lineTo(centerX + Math.tan(fov / 2) * aspect * nearDistance, centerY - nearDistance);
-  ctx.lineTo(centerX + Math.tan(fov / 2) * aspect * farDistance, centerY - farDistance);
-  ctx.lineTo(centerX - Math.tan(fov / 2) * aspect * farDistance, centerY - farDistance);
-  ctx.lineTo(centerX - Math.tan(fov / 2) * aspect * nearDistance, centerY - nearDistance);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Draw camera pitch indicator
-  const pitchIndicatorSize = 30;
-  const pitchX = 20;
-  const pitchY = mapSize - 20;
-
-  ctx.save();
-  ctx.translate(pitchX, pitchY);
-
-  // Draw the circular background
-  ctx.beginPath();
-  ctx.arc(0, 0, pitchIndicatorSize / 2, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-  ctx.fill();
-
-  // Draw the horizontal line
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-  ctx.beginPath();
-  ctx.moveTo(-pitchIndicatorSize / 2, 0);
-  ctx.lineTo(pitchIndicatorSize / 2, 0);
-  ctx.stroke();
-
-  // Calculate and draw the pitch line
-  const pitchAngle = camera.rotation.x;
-  const lineLength = pitchIndicatorSize / 2;
-  const endY = -Math.sin(pitchAngle) * lineLength;
-  const endX = Math.cos(pitchAngle) * lineLength;
-
-  ctx.strokeStyle = 'yellow';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(endX, endY);
-  ctx.stroke();
-
-  // Add a dot at the end of the line for better visibility
-  ctx.fillStyle = 'yellow';
-  ctx.beginPath();
-  ctx.arc(endX, endY, 2, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.restore();
-
-  // Draw a simple compass arrow (now static since the world rotates)
-  const compassRadius = 15;
-  const compassX = mapSize - compassRadius - 5;
-  const compassY = compassRadius + 5;
-
-  ctx.save();
-  ctx.translate(compassX, compassY);
-
-  ctx.strokeStyle = 'white';
-  ctx.beginPath();
-  ctx.moveTo(0, -compassRadius);
-  ctx.lineTo(0, compassRadius);
-  ctx.moveTo(0, -compassRadius);
-  ctx.lineTo(-compassRadius / 2, 0);
-  ctx.moveTo(0, -compassRadius);
-  ctx.lineTo(compassRadius / 2, 0);
-  ctx.stroke();
-
-  ctx.restore();
-}
 
 // Initial update
 updateMiniMap();

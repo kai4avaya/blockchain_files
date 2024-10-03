@@ -1,3 +1,5 @@
+// embedding_worker.js
+
 
 import { pipeline, env } from '@xenova/transformers';
 

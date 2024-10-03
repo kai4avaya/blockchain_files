@@ -1,19 +1,5 @@
-// // vite.config.js
-// import { defineConfig } from 'vite';
-// import wasm from 'vite-plugin-wasm';
-// import topLevelAwait from 'vite-plugin-top-level-await';
 
-// export default defineConfig({
-//   resolve: {
-//     alias: {
-//       '@': '/'
-//     }
-//   },
-//   plugins: [
-//     wasm(),
-//     topLevelAwait()
-//   ],
-// });
+// // vite.config.js
 // import { defineConfig } from 'vite';
 // import wasm from 'vite-plugin-wasm';
 // import topLevelAwait from 'vite-plugin-top-level-await';
@@ -36,17 +22,20 @@
 //     ]
 //   },
 //   optimizeDeps: {
-//     include: ['onnxruntime-web'],
+//     include: ['onnxruntime-web', 'compromise'],
 //     exclude: ['@xenova/transformers']
 //   },
 //   build: {
 //     target: 'esnext',
-//     minify: false
+//     minify: false,
+//     commonjsOptions: {
+//       include: [/node_modules/]
+//     }
 //   },
 //   server: {
 //     headers: {
 //       'Cross-Origin-Opener-Policy': 'same-origin',
-//       'Cross-Origin-Embedder-Policy': 'credentialless'
+//       'Cross-Origin-Embedder-Policy': 'require-corp'
 //     }
 //   }
 // });
@@ -75,17 +64,20 @@ export default defineConfig({
     ]
   },
   optimizeDeps: {
-    include: ['onnxruntime-web'],
+    include: ['onnxruntime-web', 'compromise'],
     exclude: ['@xenova/transformers']
   },
   build: {
     target: 'esnext',
-    minify: false
+    minify: false,
+    commonjsOptions: {
+      include: [/node_modules/]
+    }
   },
   server: {
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp' // Changed from 'credentialless'
+      'Cross-Origin-Embedder-Policy': 'require-corp'
     }
   }
 });
