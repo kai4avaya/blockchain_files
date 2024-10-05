@@ -1,471 +1,184 @@
-To implement a system that separates text processing from embedding generation and allows for parallel processing when possible, we can create two separate worker singletons: one for text processing and another for embedding generation. This approach will allow us to process multiple files concurrently and optimize CPU usage. Here's how we can structure this system:
+ensure summary is accurate, ensure topics are correct
+fix deadzone from culling...
+ability to double click canvas to pull up upload widget (use copy paste, file, or website)
+click cube will will bring up question input bar with send to chat with what's inside that cube
+ - along with stats on what's inside that cube
+click node will also bring up input
+reorganize 3d space by smilar articles using embeddings matches
 
 
 
-```javascript
-// TextProcessorWorker.js
-class TextProcessorWorker {
-    constructor() {
-        if (!TextProcessorWorker.instance) {
-            this.worker = new Worker(new URL('./text_processor_worker.js', import.meta.url), { type: 'module' });
-            this.taskQueue = [];
-            this.isProcessing = false;
+----
 
-            this.worker.onmessage = (e) => {
-                const { type, data, fileId } = e.data;
-                if (type === 'processedText') {
-                    this.onTextProcessed(fileId, data);
-                } else if (type === 'error') {
-                    console.error('Text processing error:', data);
-                    this.onProcessingError(fileId, data);
-                }
-                this.processNextTask();
-            };
+To visualize the relationships between your files by projecting their 384-dimensional embeddings into a 3D space, you can use dimensionality reduction techniques like **UMAP** or **t-SNE**. These algorithms reduce high-dimensional data to lower dimensions while preserving the structure of the data as much as possible.
 
-            TextProcessorWorker.instance = this;
-        }
-        return TextProcessorWorker.instance;
-    }
+Here's how you can achieve this:
 
-    processText(content, fileType, fileId) {
-        return new Promise((resolve, reject) => {
-            this.taskQueue.push({ content, fileType, fileId, resolve, reject });
-            if (!this.isProcessing) {
-                this.processNextTask();
-            }
-        });
-    }
+1. **Collect the Embeddings**: Gather all your 384-dimensional embeddings into an array.
 
-    processNextTask() {
-        if (this.taskQueue.length === 0) {
-            this.isProcessing = false;
-            return;
-        }
+2. **Choose a Dimensionality Reduction Algorithm**: Use a JavaScript implementation of UMAP or t-SNE to reduce the embeddings to 3 dimensions.
 
-        this.isProcessing = true;
-        const { content, fileType, fileId, resolve, reject } = this.taskQueue.shift();
+   - **UMAP** is often faster and can handle larger datasets efficiently.
+   - **t-SNE** is good for small datasets but can be computationally intensive.
 
-        this.worker.postMessage({
-            type: 'processText',
-            data: content,
-            fileType: fileType,
-            fileId: fileId
-        });
+3. **Install the Necessary Library**: For UMAP, you can use the [umap-js](https://github.com/PAIR-code/umap-js) library.
 
-        this.currentTask = { fileId, resolve, reject };
-    }
+   ```bash
+   npm install umap-js
+   ```
 
-    onTextProcessed(fileId, processedText) {
-        if (this.currentTask && this.currentTask.fileId === fileId) {
-            this.currentTask.resolve(processedText);
-            this.currentTask = null;
-        }
-    }
+4. **Perform Dimensionality Reduction**:
 
-    onProcessingError(fileId, error) {
-        if (this.currentTask && this.currentTask.fileId === fileId) {
-            this.currentTask.reject(new Error(error));
-            this.currentTask = null;
-        }
-    }
-}
+   ```javascript
+   import { UMAP } from 'umap-js';
 
-const textProcessorWorker = new TextProcessorWorker();
-export default textProcessorWorker;
+   // Suppose 'embeddings' is an array of your 384-dimensional embeddings
+   let embeddings = [ /* your embeddings here */ ];
 
-// text_processor_worker.js
-import * as pdfjsLib from 'pdfjs-dist';
+   // Configure UMAP
+   const umap = new UMAP({
+       nComponents: 3,   // Reduce to 3 dimensions
+       nNeighbors: 15,   // Adjust as needed
+       minDist: 0.1,     // Adjust as needed
+   });
 
-const stopWords = new Set(['a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he', 'in', 'is', 'it',
-                           'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will', 'with']);
+   // Fit and transform the embeddings
+   const embedding3D = umap.fit(embeddings);
 
-async function extractTextFromPDF(arrayBuffer) {
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let text = '';
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    text += content.items.map(item => item.str).join(' ') + ' ';
-  }
-  return text;
-}
+   // Now 'embedding3D' is an array of 3D coordinates
+   ```
 
-function removeStopWords(text) {
-  return text.split(/\s+/)
-             .filter(word => !stopWords.has(word.toLowerCase()))
-             .join(' ');
-}
+5. **Update Your Three.js Scene**:
 
-function chunkText(text, chunkSize = 1000) {
-  const words = text.split(/\s+/);
-  const chunks = [];
-  for (let i = 0; i < words.length; i += chunkSize) {
-    chunks.push(words.slice(i, i + chunkSize).join(' '));
-  }
-  return chunks;
-}
+   - **Position the Spheres**: Use the 3D coordinates from `embedding3D` to set the positions of your spheres.
 
-async function processContent(content, fileType) {
-  let text;
-  if (fileType === 'application/pdf') {
-    text = await extractTextFromPDF(content);
-  } else {
-    text = content;
-  }
-  
-  text = removeStopWords(text);
-  return chunkText(text);
-}
+     ```javascript
+     // Assuming you have an array 'spheres' corresponding to the embeddings
+     for (let i = 0; i < spheres.length; i++) {
+         let sphere = spheres[i];
+         let coords = embedding3D[i];
+         sphere.position.set(coords[0], coords[1], coords[2]);
+     }
+     ```
 
-self.onmessage = async function(e) {
-  const { type, data, fileType, fileId } = e.data;
-  if (type === 'processText') {
-    try {
-      const processedText = await processContent(data, fileType);
-      self.postMessage({ type: 'processedText', data: processedText, fileId });
-    } catch (error) {
-      self.postMessage({ type: 'error', data: error.message, fileId });
-    }
-  }
-};
+   - **Scale the Coordinates**: Depending on your scene's scale, you might need to normalize or scale the coordinates.
 
-// EmbeddingWorker.js (updated)
-class EmbeddingWorker {
-    constructor() {
-        if (!EmbeddingWorker.instance) {
-            this.worker = new Worker(new URL('./embedding_worker.js', import.meta.url), { type: 'module' });
-            this.taskQueue = [];
-            this.isProcessing = false;
+     ```javascript
+     // Find min and max values for normalization
+     let minCoord = [Infinity, Infinity, Infinity];
+     let maxCoord = [-Infinity, -Infinity, -Infinity];
 
-            this.worker.onmessage = (e) => {
-                const { type, data, fileId } = e.data;
-                if (type === 'embeddingsResult') {
-                    this.onEmbeddingsGenerated(fileId, data);
-                } else if (type === 'error') {
-                    console.error('Embedding error:', data);
-                    this.onEmbeddingError(fileId, data);
-                }
-                this.processNextTask();
-            };
+     embedding3D.forEach(coord => {
+         for (let i = 0; i < 3; i++) {
+             if (coord[i] < minCoord[i]) minCoord[i] = coord[i];
+             if (coord[i] > maxCoord[i]) maxCoord[i] = coord[i];
+         }
+     });
 
-            EmbeddingWorker.instance = this;
-        }
-        return EmbeddingWorker.instance;
-    }
+     // Normalize and scale coordinates
+     const scale = 50; // Adjust based on your scene size
+     embedding3D = embedding3D.map(coord => {
+         return coord.map((value, index) => {
+             return ((value - minCoord[index]) / (maxCoord[index] - minCoord[index]) - 0.5) * scale;
+         });
+     });
+     ```
 
-    generateEmbeddings(chunks, fileId) {
-        return new Promise((resolve, reject) => {
-            this.taskQueue.push({ chunks, fileId, resolve, reject });
-            if (!this.isProcessing) {
-                this.processNextTask();
-            }
-        });
-    }
+6. **Visualize Relationships**:
 
-    processNextTask() {
-        if (this.taskQueue.length === 0) {
-            this.isProcessing = false;
-            return;
-        }
+   - **Color Coding**: Optionally, you can color-code the spheres based on clusters or other metadata to enhance visualization.
 
-        this.isProcessing = true;
-        const { chunks, fileId, resolve, reject } = this.taskQueue.shift();
+     ```javascript
+     // Example: Assign random colors to spheres
+     spheres.forEach(sphere => {
+         sphere.material.color.setHex(Math.random() * 0xffffff);
+     });
+     ```
 
-        this.worker.postMessage({
-            type: 'generateEmbeddings',
-            data: chunks,
-            fileId: fileId
-        });
+   - **Add Interactivity**: Implement controls to rotate, zoom, and pan the scene to explore the data.
 
-        this.currentTask = { fileId, resolve, reject };
-    }
+7. **Render the Scene**:
 
-    onEmbeddingsGenerated(fileId, embeddings) {
-        if (this.currentTask && this.currentTask.fileId === fileId) {
-            this.currentTask.resolve(embeddings);
-            this.currentTask = null;
-        }
-    }
+   - Ensure your render loop updates the scene with the new positions.
 
-    onEmbeddingError(fileId, error) {
-        if (this.currentTask && this.currentTask.fileId === fileId) {
-            this.currentTask.reject(new Error(error));
-            this.currentTask = null;
-        }
-    }
-}
+     ```javascript
+     function animate() {
+         requestAnimationFrame(animate);
+         renderer.render(scene, camera);
+     }
+     animate();
+     ```
 
-const embeddingWorker = new EmbeddingWorker();
-export default embeddingWorker;
+**Example Integration into Your Existing Code**:
 
-// embedding_worker.js (updated)
-import { pipeline } from '@xenova/transformers';
-
-let extractor;
-
-async function initializeExtractor() {
-  if (!extractor) {
-    extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-      quantized: false,
-      cache_dir: '/models',
-    });
-  }
-}
-
-async function generateBinaryEmbeddings(chunks) {
-  const embeddings = [];
-  for (const chunk of chunks) {
-    const output = await extractor(chunk, {
-      pooling: 'mean',
-      quantize: true,
-      precision: 'binary'
-    });
-    embeddings.push(output);
-  }
-  return embeddings;
-}
-
-self.onmessage = async function(e) {
-  const { type, data, fileId } = e.data;
-  if (type === 'generateEmbeddings') {
-    try {
-      await initializeExtractor();
-      const embeddings = await generateBinaryEmbeddings(data);
-      self.postMessage({ type: 'embeddingsResult', data: embeddings, fileId });
-    } catch (error) {
-      self.postMessage({ type: 'error', data: error.message, fileId });
-    }
-  }
-};
-
-// Main application usage
-import textProcessorWorker from './TextProcessorWorker';
-import embeddingWorker from './EmbeddingWorker';
-
-async function processFile(file, id) {
-    try {
-        let content;
-        if (file.type === 'application/pdf') {
-            content = await file.arrayBuffer();
-        } else {
-            content = await file.text();
-        }
-
-        // Process text
-        const processedText = await textProcessorWorker.processText(content, file.type, id);
-
-        // Generate embeddings
-        const embeddings = await embeddingWorker.generateEmbeddings(processedText, id);
-
-        // Process embeddings, update file system, etc.
-        return embeddings;
-    } catch (error) {
-        console.error('Error processing file:', error);
-        throw error;
-    }
-}
-
-// Function to process multiple files in parallel
-async function processFiles(files) {
-    const promises = files.map((file, index) => processFile(file, `file_${index}`));
-    return Promise.all(promises);
-}
-
-```
-
-Here's a breakdown of the implemented system:
-
-1. TextProcessorWorker:
-   - Handles text extraction from PDFs and text files.
-   - Removes stop words and chunks the text.
-   - Works in its own thread, allowing for parallel processing of multiple files.
-
-2. EmbeddingWorker:
-   - Generates binary embeddings for processed text chunks.
-   - Also works in its own thread, allowing for parallel embedding generation.
-
-3. Main Application:
-   - Coordinates between TextProcessorWorker and EmbeddingWorker.
-   - Can process multiple files concurrently.
-
-4. Parallel Processing:
-   - The `processFiles` function demonstrates how to process multiple files in parallel.
-   - Each file goes through text processing and then embedding generation sequentially, but different files can be at different stages simultaneously.
-
-5. Queue System:
-   - Both workers implement a queue system to manage tasks.
-   - This allows for efficient use of resources and prevents overwhelming the workers.
-
-To use this system:
-
-1. Set up the four files: `TextProcessorWorker.js`, `text_processor_worker.js`, `EmbeddingWorker.js`, and `embedding_worker.js`.
-2. In your main application, import and use the `textProcessorWorker` and `embeddingWorker` as shown in the example usage.
-3. Use the `processFile` function for individual files or `processFiles` for multiple files.
-
-This implementation allows for:
-- Parallel processing of multiple files.
-- Efficient use of CPU resources by separating text processing and embedding generation.
-- Scalability, as you can easily add more worker types or modify existing ones without affecting the overall structure.
-
-Remember to handle errors appropriately and consider implementing a way to track progress, especially when processing multiple large files.
-
-
-KAI THEN USE VECTORDBGATEWAY:
-
-To integrate the new TextProcessorWorker and updated EmbeddingWorker into your vectorDBGateway, we'll need to modify the gateway to use both workers in sequence. Here's how we can update the vectorDBGateway to work with the new parallel processing system:
-
-
+Given your existing code structure, here's how you might integrate the dimensionality reduction:
 
 ```javascript
-// vectorDBGateway.js
-import textProcessorWorker from './TextProcessorWorker';
-import embeddingWorker from './EmbeddingWorker';
-import { VectorDB, getDBDefaults, setDBDefaults } from "./vectordb";
-import { generateUniqueId } from '../utils/utils';
+import { UMAP } from 'umap-js';
 
-let db;
+// ... [Your existing imports and code] ...
 
-export async function initiate(dbName) {
-    setDBDefaults({ dbName: dbName });
-    db = new VectorDB({
-        vectorPath: "embedding"
-    });
-    return getDBDefaults();
-}
+// Function to process embeddings and update sphere positions
+async function updateSpherePositions(embeddings) {
+    // Perform dimensionality reduction
+    const umap = new UMAP({ nComponents: 3 });
+    let embedding3D = umap.fit(embeddings);
 
-export async function quickStart(metaData, token, isLocal = true) {
-    const { text, ...otherMetaData } = metaData;
-    const fileId = generateUniqueId();
+    // Normalize and scale coordinates
+    // [Normalization code as shown above]
 
-    // Process text
-    const processedChunks = await textProcessorWorker.processText(text, 'text', fileId);
-
-    // Generate embeddings
-    const embeddings = await embeddingWorker.generateEmbeddings(processedChunks, fileId);
-
-    const inMemoryRecord = [];
-
-    for (let i = 0; i < processedChunks.length; i++) {
-        const key = await db.insert({
-            embedding: embeddings[i],
-            fileId: fileId,
-            ...otherMetaData,
-            text: processedChunks[i]
-        });
-
-        inMemoryRecord.push({
-            key: key,
-            fileId: fileId,
-            ...otherMetaData,
-            text: processedChunks[i]
-        });
+    // Update sphere positions
+    for (let i = 0; i < spheres.length; i++) {
+        let sphere = spheres[i];
+        let coords = embedding3D[i];
+        sphere.position.set(coords[0], coords[1], coords[2]);
     }
 
-    return inMemoryRecord;
+    // Mark the scene to re-render
+    markNeedsRender();
 }
 
-export async function search(query, k = { limit: 5 }, token, isLocal = true) {
-    // Process the query text
-    const processedQuery = await textProcessorWorker.processText(query, 'text', 'query');
-
-    // Generate embedding for the processed query
-    const [queryEmbedding] = await embeddingWorker.generateEmbeddings(processedQuery, 'query');
-
-    // Perform the search using the query embedding
-    return db.query(queryEmbedding, k);
-}
-
-export async function quickStart_single(metaData, token, isLocal = true) {
-    const { text, ...otherMetaData } = metaData;
-    const fileId = generateUniqueId();
-
-    // Process text
-    const [processedText] = await textProcessorWorker.processText(text, 'text', fileId);
-
-    // Generate embedding
-    const [embedding] = await embeddingWorker.generateEmbeddings([processedText], fileId);
-
-    const key = await db.insert({
-        embedding: embedding,
-        fileId: fileId,
-        ...otherMetaData,
-        text: processedText
-    });
-
-    const inMemoryRecord = [{
-        key: key,
-        fileId: fileId,
-        ...otherMetaData,
-        text: processedText
-    }];
-
-    return inMemoryRecord;
-}
-
-export async function delete_row(key) {
-    return await db.delete(key);
-}
-
-export async function update(key, metaData, token) {
-    const { text, ...otherMetaData } = metaData;
-    const fileId = metaData.fileId || generateUniqueId();
-
-    // Process text
-    const [processedText] = await textProcessorWorker.processText(text, 'text', fileId);
-
-    // Generate embedding
-    const [embedding] = await embeddingWorker.generateEmbeddings([processedText], fileId);
-
-    return await db.update(key, {
-        embedding: embedding,
-        fileId: fileId,
-        ...otherMetaData,
-        text: processedText
-    });
-}
-
+// Example usage after generating embeddings
+embeddingWorker.onmessage = async function (e) {
+    const { type, data } = e.data;
+    if (type === "embeddingsResult") {
+        await updateSpherePositions(data);
+    }
+};
 ```
 
-Here's a breakdown of the changes and how this implementation works:
+**Notes**:
 
-1. Imports:
-   - We now import both `textProcessorWorker` and `embeddingWorker` instead of just the embedding worker.
+- **Performance Considerations**: Dimensionality reduction can be computationally intensive. For large datasets, consider performing this step in a Web Worker or server-side.
+- **Interactivity**: To improve user experience, you might want to add loading indicators or perform the computation incrementally.
+- **Experiment with Parameters**: The quality of the visualization can vary based on the parameters of UMAP or t-SNE. Experiment to find what best represents your data.
 
-2. `initiate` function:
-   - This now creates an instance of VectorDB, ensuring it's ready for use in other functions.
+**Alternative Libraries**:
 
-3. `quickStart` function:
-   - First processes the text using `textProcessorWorker`.
-   - Then generates embeddings for the processed chunks using `embeddingWorker`.
-   - Inserts each chunk with its embedding into the VectorDB.
+- **PCA**: For a simpler and faster (but linear) dimensionality reduction, you could use PCA.
 
-4. `search` function:
-   - Processes the query text, generates an embedding for it, and then performs the search.
+  ```javascript
+  import { PCA } from 'ml-pca';
 
-5. `quickStart_single` function:
-   - Similar to `quickStart`, but for a single text item.
-   - Processes the text, generates an embedding, and inserts it into the VectorDB.
+  const pca = new PCA(embeddings);
+  let embedding3D = pca.predict(embeddings, { nComponents: 3 }).to2DArray();
+  ```
 
-6. `update` function:
-   - Processes the new text, generates a new embedding, and updates the entry in the VectorDB.
+- **t-SNE**: Use [tsne-js](https://github.com/karpathy/tsnejs) for t-SNE.
 
-7. Parallel Processing:
-   - While this implementation processes text and generates embeddings sequentially for each item, it allows for parallel processing of multiple files when used with multiple calls (e.g., processing multiple files simultaneously).
+  ```javascript
+  import tsnejs from 'tsne-js';
 
-To use this updated vectorDBGateway:
+  const model = new tsnejs.tSNE({ dim: 3 });
+  model.initDataRaw(embeddings);
+  for (let k = 0; k < 500; k++) {
+      model.step();
+  }
+  let embedding3D = model.getSolution();
+  ```
 
-1. Replace your existing vectorDBGateway.js file with this updated version.
-2. Ensure that the TextProcessorWorker and EmbeddingWorker are properly set up and imported.
-3. Make sure the VectorDB class is correctly imported and matches the interface expected by this gateway.
-4. Update any code that uses these functions to handle the returned data correctly.
+**Final Thoughts**:
 
-This implementation now correctly utilizes both the text processing and embedding generation workers, allowing for more efficient processing of files and queries. It maintains the existing functionality while leveraging the new parallel processing capabilities of the separate workers.
+By projecting your high-dimensional embeddings into 3D space and updating your three.js scene accordingly, you can create a powerful visualization that reveals the relationships between your files. This approach is widely used in data science for visualizing complex datasets.
 
-
----------------
-
-strategies for embedding efficinecy
-summarize files only key words
-3/10 size ideal
-  thne embedding
-  
+Feel free to ask if you need further clarification or assistance with the implementation!

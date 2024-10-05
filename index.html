@@ -358,8 +358,9 @@
   </head>
   <body>
     <div class="sidebar">
-      <div class="sidebar-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <div class="sidebar-icon" id="homeIcon">
+          <svg 
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
               <polyline points="9 22 9 12 15 12 15 22"></polyline>
           </svg>
@@ -472,13 +473,9 @@
   const icons = document.querySelectorAll('.sidebar-icon');
   const modal = document.querySelector('.modal');
   let activeIcon = null;
-
-  // function showModal(icon) {
-  //     const iconRect = icon.getBoundingClientRect();
-  //     modal.style.top = `${iconRect.top}px`;
-  //     modal.classList.add('active');
-  //     activeIcon = icon;
-  // }
+  // const homeModal = document.getElementById('homeModal');
+  const homeIcon = document.getElementById('homeIcon');
+  let isHomeModalActive = false;
   function showModal(icon) {
         const iconRect = icon.getBoundingClientRect();
         // Adjust the vertical position of the modal
@@ -496,19 +493,69 @@
       activeIcon = null;
   }
 
+  
+  function toggleHomeModal() {
+    if (isHomeModalActive) {
+      modal.innerHTML = `
+        <input type="text" class="p2p_peer_input" id="userIdInput" placeholder="Enter your user ID">
+        <input type="text" class="p2p_peer_input" id="peerIdInput" placeholder="Enter peer ID to connect">
+        <button id="connectButton">
+            Connect
+            <span class="tooltip">Click to connect to the peer</span>
+        </button>
+        <div id="status"></div>
+      `;
+    } else {
+      modal.innerHTML = `
+        <div class="modal-icons">
+          <div class="modal-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="16"></line>
+              <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+          </div>
+          <div class="modal-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </div>
+          <div class="modal-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </div>
+          <div class="modal-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </div>
+        </div>
+      `;
+    }
+    isHomeModalActive = !isHomeModalActive;
+  }
+
   icons.forEach((icon, index) => {
-      icon.addEventListener('click', (e) => {
-          if (activeIcon === icon) {
-              hideModal();
-          } else {
-              if (activeIcon) {
-                  hideModal();
-                  setTimeout(() => showModal(icon), 300); // Wait for fade-out before showing new modal
-              } else {
-                  showModal(icon);
-              }
-          }
-      });
+    console.log("I am icon clicked", icon)
+    icon.addEventListener('click', (e) => {
+      if (icon === homeIcon) {
+        toggleHomeModal();
+      }
+      if (activeIcon === icon) {
+        hideModal();
+      } else {
+        if (activeIcon) {
+          hideModal();
+          setTimeout(() => showModal(icon), 300);
+        } else {
+          showModal(icon);
+        }
+      }
+    });
   });
 
   document.addEventListener('click', (e) => {

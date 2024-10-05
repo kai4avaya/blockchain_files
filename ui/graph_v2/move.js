@@ -1,3 +1,5 @@
+// move
+
 import {
   createSphere,
   share3dDat,
@@ -106,10 +108,8 @@ function getCubeUnderPointer(event, intersects) {
   return null; // Return null if no cube is found
 }
 
-
 // // Define a global drag plane (e.g., XZ-plane)
 // const globalDragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Y-up plane
-
 
 // export function dragCube() {
 //   if (!selectedObject || !selectedObject.wireframeCube) return;
@@ -325,7 +325,7 @@ export function checkIntersections(raycaster, scenes) {
 
 function handleFileDragOver(
   event,
-  allIntersectsN = undefined,
+  allIntersectsN = undefined
   // foundSpheres = undefined
 ) {
   const { camera, scene, nonBloomScene, renderer } = share3dDat();
@@ -379,8 +379,7 @@ function resetCubeHighlight() {
 }
 
 // async function handleFileDrop_sphere(event) {
-   function handleFileDrop_sphere(event) {
-
+function handleFileDrop_sphere(event) {
   isFileDragging = false;
   resetCubeHighlight();
   const { camera, scene, nonBloomScene, renderer } = share3dDat();
@@ -450,8 +449,22 @@ function resetCubeHighlight() {
         createdShapes.push(createSphere(sphereData));
       }
     } else {
-      planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
-      plane.normal.copy(planeNormal);
+      // planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+      // plane.normal.copy(planeNormal);
+      // raycaster.ray.intersectPlane(plane, intersectPoint);
+      // Get the camera's forward direction
+      planeNormal.copy(camera.getWorldDirection(new THREE.Vector3()));
+
+      // Set the plane at a certain distance in front of the camera
+      const distance = 40; // Adjust this value as needed
+      const planePoint = camera.position
+        .clone()
+        .add(planeNormal.clone().multiplyScalar(distance));
+
+      // Define the plane using the normal and a point on the plane
+      plane.setFromNormalAndCoplanarPoint(planeNormal, planePoint);
+
+      // Intersect the ray with the plane
       raycaster.ray.intersectPlane(plane, intersectPoint);
 
       dataObject = convertToThreeJSFormat({
@@ -475,7 +488,6 @@ function resetCubeHighlight() {
     resetCubeColor(CUBEINTERSECTED);
     CUBEINTERSECTED = null;
   }
-
 }
 
 function resetCubeColor(cube) {
@@ -494,7 +506,7 @@ function setupDragAndDrop() {
   canvas.addEventListener("dragenter", (event) => {
     event.preventDefault();
     isFileDragging = true;
-    isDragging = true; 
+    isDragging = true;
   });
 
   canvas.addEventListener("dragover", (event) => {
@@ -714,7 +726,6 @@ async function onPointerUp(event) {
     removeGhostCube();
     resetCubeHighlight();
     diffSceneChanges(scene, nonBloomScene, sceneSnapshot);
-
   }
   controls.enabled = true;
   // Reset variables
@@ -724,7 +735,6 @@ async function onPointerUp(event) {
   selectedObject = null;
   currentSnapshot = null;
 }
-
 
 const onPointerMove = (event) => {
   const { controls, camera, scene, nonBloomScene } = share3dDat();
@@ -786,7 +796,6 @@ const onPointerMove = (event) => {
     markNeedsRender();
   }
 };
-
 
 function cleanupOldCubes() {
   const { scene, nonBloomScene } = share3dDat();
