@@ -1,4 +1,4 @@
-// src/workers/umap_worker.js
+// /workers/umap_worker.js
 
 import { UMAP } from 'umap-js';
 import { normalizeAndScaleCoordinates } from '../utils/sceneCoordsUtils.js'; // Adjust path as necessary
@@ -33,6 +33,7 @@ self.onmessage = async function (e) {
     else if (type === 'reduceDimensions') {
         // The embeddings data is received from the main thread
         const embeddings = data.embeddings;
+        const labels = data.labels; // Receive labels
 
         // Ensure embeddings are in the correct format
         if (!Array.isArray(embeddings) || embeddings.length === 0) {
@@ -79,11 +80,11 @@ self.onmessage = async function (e) {
 
             debugLog('Normalization and scaling completed.');
 
-            // Send the scaled embeddings back to the main thread
-            self.postMessage({
-                type: 'dimensionReductionResult',
-                data: scaledCoordinates
-            });
+          // Send the scaled embeddings and labels back to the main thread
+    self.postMessage({
+        type: 'dimensionReductionResult',
+        data: { reducedData: scaledCoordinates, labels: labels }
+    });
             debugLog('Sent scaled dimension reduction result back to main thread.');
         } catch (error) {
             // Handle any errors during processing

@@ -1,5 +1,8 @@
+// umap.js
 import { getSceneBoundingBox} from '../ui/graph_v2/create.js'
 import { share3dDat } from '../ui/graph_v2/create.js';
+const dbWorker = new Worker('../workers/memory_worker.js');
+
 // Initialize the worker
 import UMAPWorker from '../workers/umap_worker.js?worker';
 const umapWorker = new UMAPWorker();
@@ -25,14 +28,35 @@ umapWorker.onmessage = function (e) {
 };
 
 
+
+// Handle messages from the DB worker (memory_worker.js)
+dbWorker.onmessage = function (e) {
+    const { id, data, error } = e.data;
+    if (error) {
+        console.error('DB Worker Error:', error);
+        return;
+    }
+
+    if (id === 'getEmbeddings') {
+        // Extract embeddings and fileId labels from the data
+        const embeddings = data.map(item => item.embedding);
+        const labels = data.map(item => item.fileId);
+
+        // Perform UMAP dimensionality reduction with embeddings and labels
+        performUMAP(embeddings, labels);
+    }
+};
+
+
 // Function to perform UMAP dimensionality reduction
-export function performUMAP(embeddings) {
+export function performUMAP(embeddings, labels) {
     umapWorker.postMessage({
         type: 'reduceDimensions',
-        data: { embeddings }
+        data: { embeddings, labels }
     });
-    console.log('Sent embeddings to UMAP worker for dimensionality reduction.');
+    console.log('Sent embeddings and labels to UMAP worker for dimensionality reduction.');
 }
+
 
 // Function to send the scene bounding box to the UMAP worker
 export function sendSceneBoundingBoxToWorker() {
@@ -43,6 +67,18 @@ export function sendSceneBoundingBoxToWorker() {
         data: sceneBoundingBox
     });
     console.log('Sent scene bounding box to UMAP worker:', sceneBoundingBox);
+}
+
+
+
+// Fetch embeddings from IndexedDB and trigger UMAP
+export function fetchEmbeddingsAndPerformUMAP() {
+    dbWorker.postMessage({
+        id: 'getEmbeddings',
+        action: 'getData',
+        data: { storeName: 'summaries', dbName: 'summarizationDB' }
+    });
+    console.log('Requested embeddings from IndexedDB.');
 }
 
 // Optional: Terminate workers when no longer needed

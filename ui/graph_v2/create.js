@@ -1001,22 +1001,32 @@ export function getSceneBoundingBox(scene) {
   };
 }
 
-
-export function updateSphereAndCubePositions(embedding3D) {
+export function updateSphereAndCubePositions(reducedData, labels) {
   const { scene, nonBloomScene } = share3dDat();
-  const sceneBoundingBox = getSceneBoundingBox(scene);
 
-  const scaledCoordinates = normalizeAndScaleCoordinates(embedding3D, sceneBoundingBox);
+  // Create a mapping from fileId (label) to coordinates
+  const idToCoordinates = {};
+  for (let i = 0; i < labels.length; i++) {
+      const fileId = labels[i];
+      const coords = reducedData[i];
+      idToCoordinates[fileId] = coords;
+  }
 
   // Find all spheres
   const spheres = findAllSpheres([scene, nonBloomScene]);
 
-  // Update sphere positions
-  for (let i = 0; i < spheres.length; i++) {
-    let sphere = spheres[i];
-    let coords = scaledCoordinates[i];
-    sphere.position.set(coords[0], coords[1], coords[2]);
-  }
+  // Update sphere positions using userData.id (fileId)
+  spheres.forEach(sphere => {
+      const fileId = sphere.userData.id; // Get the fileId from userData.id
+
+      // Find the corresponding coordinates
+      const coords = idToCoordinates[fileId];
+      if (coords) {
+          sphere.position.set(coords[0], coords[1], coords[2]);
+      } else {
+          console.warn(`No coordinates found for sphere with fileId: ${fileId}`);
+      }
+  });
 
   // Find all cubes
   const cubes = findAllCubes([scene, nonBloomScene]);
@@ -1032,6 +1042,7 @@ export function updateSphereAndCubePositions(embedding3D) {
   // Mark the scene to re-render
   markNeedsRender();
 }
+
 
 // Function to adjust the camera based on scene bounds (optional)
 function adjustCameraIfNecessary(sceneBoundingBox) {
