@@ -10,7 +10,7 @@ import { initializeGraph, share3dDat } from "./ui/graph_v2/create";
 import { p2pSync } from "./network/peer2peer_simple"; // Import the P2PSync class
 import embeddingWorker from "./ai/embeddings.js";
 import { initiate } from "./memory/vectorDB/vectorDbGateway.js"; // Assuming your initiate function is exported
-
+import {initiate_gui_controls} from './ui/gui.listens.js'
 const userId = "kai";
 localStorage.setItem("login_block", userId);
 
@@ -36,6 +36,8 @@ async function main() {
 
   // Initialize the graph and SceneState
   await initializeGraph();
+
+  initiate_gui_controls()
 
   const {
     renderer,

@@ -47,20 +47,37 @@ self.onmessage = async function (e) {
         }
 
         try {
-            debugLog('Initializing UMAP with parameters:', {
-                nComponents: 3,
-                nNeighbors: 15,
-                minDist: 0.1
-            });
+            // debugLog('Initializing UMAP with parameters:', {
+            //     nComponents: 3,
+            //     nNeighbors: 15,
+            //     minDist: 0.1
+            // });
 
-            // Perform dimensionality reduction using UMAP
-            const umap = new UMAP({
-                nComponents: 3,   // Reduce to 3 dimensions
-                nNeighbors: 15,   // Number of nearest neighbors
-                minDist: 0.1      // Minimum distance between points
-                // You can adjust the parameters above as needed
-            });
+            // // Perform dimensionality reduction using UMAP
+            // const umap = new UMAP({
+            //     nComponents: 3,   // Reduce to 3 dimensions
+            //     nNeighbors: 15,   // Number of nearest neighbors
+            //     minDist: 0.1      // Minimum distance between points
+            //     // You can adjust the parameters above as needed
+            // });
 
+               // Adjust hyperparameters for small datasets
+               const nNeighbors = Math.min(embeddings.length - 1, 2);  // Reduce nNeighbors to avoid errors with small datasets
+               const minDist = 0.5;  // Adjust minDist for small datasets
+   
+               debugLog('Initializing UMAP with parameters:', {
+                   nComponents: 3,
+                   nNeighbors: nNeighbors,
+                   minDist: minDist
+               });
+   
+               // Perform dimensionality reduction using UMAP
+               const umap = new UMAP({
+                   nComponents: 3,   // Reduce to 3 dimensions
+                   nNeighbors: nNeighbors,   // Number of nearest neighbors, adjusted for small dataset
+                   minDist: minDist  // Minimum distance between points
+               });
+               
             debugLog('Fitting UMAP to the embeddings...');
 
             // Fit the UMAP model to the embeddings asynchronously

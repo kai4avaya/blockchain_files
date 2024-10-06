@@ -1,6 +1,6 @@
 // umap.js
 import { getSceneBoundingBox} from '../ui/graph_v2/create.js'
-import { share3dDat } from '../ui/graph_v2/create.js';
+import { share3dDat, updateSphereAndCubePositions} from '../ui/graph_v2/create.js';
 const dbWorker = new Worker('../workers/memory_worker.js');
 
 // Initialize the worker
@@ -54,7 +54,7 @@ export function performUMAP(embeddings, labels) {
         type: 'reduceDimensions',
         data: { embeddings, labels }
     });
-    console.log('Sent embeddings and labels to UMAP worker for dimensionality reduction.');
+    console.log('Sent embeddings and labels to UMAP worker for dimensionality reduction.', embeddings, labels);
 }
 
 
