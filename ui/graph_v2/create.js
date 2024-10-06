@@ -8,9 +8,11 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
-import { makeObjectWritable, convertToThreeJSFormat, getCurrentTimeOfDay  } from "../../utils/utils";
-import { createSceneSnapshot, findSpheresInCube } from "./snapshot.js";
-import MousePositionManager from "../../memory/collaboration/mouse_colab";
+import { makeObjectWritable, convertToThreeJSFormat, getCurrentTimeOfDay } from "../../utils/utils";
+import { normalizeAndScaleCoordinates } from '../../utils/sceneCoordsUtils.js'; // Adjust path as necessary
+
+import { createSceneSnapshot, findSpheresInCube,findAllSpheres, findAllCubes} from "./snapshot.js";
+import {sendSceneBoundingBoxToWorker} from '../../ai/umap.js'
 import MouseOverlayCanvas from './MouseOverlayCanvas';
 
 import { Frustum, Matrix4 } from 'three';
@@ -420,7 +422,6 @@ export function createWireframeCube(convertedData) {
   nonBloomScene.add(wireframeCube);
   nonBloomScene.add(solidCube);
 
-
   console.log("CUBE CREATED! I have created wireframecube", wireframeCube, solidCube)
   return { wireframeCube, solidCube };
 }
@@ -443,6 +444,7 @@ window.onresize = function () {
   bloomComposer.setSize(width, height);
   finalComposer.setSize(width, height);
 
+  sendSceneBoundingBoxToWorker()
   // render();
   markNeedsRender();
 };
@@ -969,7 +971,81 @@ function createSphereWrapper(objectState) {
   // sphere.uuid = objectState.uuid;
 }
 
+// Function to calculate the scene's bounding box
+export function getSceneBoundingBox(scene) {
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
 
+  scene.traverse(function (object) {
+      if (object.isMesh) {
+          const boundingBox = new THREE.Box3().setFromObject(object);
+          minX = Math.min(minX, boundingBox.min.x);
+          minY = Math.min(minY, boundingBox.min.y);
+          minZ = Math.min(minZ, boundingBox.min.z);
+          maxX = Math.max(maxX, boundingBox.max.x);
+          maxY = Math.max(maxY, boundingBox.max.y);
+          maxZ = Math.max(maxZ, boundingBox.max.z);
+      }
+  });
+
+  // If scene is empty, use default bounds
+  if (minX === Infinity || maxX === -Infinity) {
+      const gridSize = 1000; // Replace with your actual grid size
+      minX = minY = minZ = -gridSize / 2;
+      maxX = maxY = maxZ = gridSize / 2;
+  }
+
+  return {
+      min: { x: minX, y: minY, z: minZ },
+      max: { x: maxX, y: maxY, z: maxZ }
+  };
+}
+
+
+export function updateSphereAndCubePositions(embedding3D) {
+  const { scene, nonBloomScene } = share3dDat();
+  const sceneBoundingBox = getSceneBoundingBox(scene);
+
+  const scaledCoordinates = normalizeAndScaleCoordinates(embedding3D, sceneBoundingBox);
+
+  // Find all spheres
+  const spheres = findAllSpheres([scene, nonBloomScene]);
+
+  // Update sphere positions
+  for (let i = 0; i < spheres.length; i++) {
+    let sphere = spheres[i];
+    let coords = scaledCoordinates[i];
+    sphere.position.set(coords[0], coords[1], coords[2]);
+  }
+
+  // Find all cubes
+  const cubes = findAllCubes([scene, nonBloomScene]);
+
+  // Update cube positions and sizes to fit the spheres
+  cubes.forEach(cube => {
+      resizeCubeToFitSpheres(cube);
+  });
+
+  // Optionally, adjust camera or controls if needed
+  // adjustCameraIfNecessary(sceneBoundingBox);
+
+  // Mark the scene to re-render
+  markNeedsRender();
+}
+
+// Function to adjust the camera based on scene bounds (optional)
+function adjustCameraIfNecessary(sceneBoundingBox) {
+  // Calculate the diagonal of the bounding box
+  const dx = sceneBoundingBox.max.x - sceneBoundingBox.min.x;
+  const dy = sceneBoundingBox.max.y - sceneBoundingBox.min.y;
+  const dz = sceneBoundingBox.max.z - sceneBoundingBox.min.z;
+  const diagonal = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+  // Position the camera to fit the entire scene
+  camera.position.set(0, 0, diagonal * 1.5);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
 
 
 export function createMiniMap(scene, nonBloomScene, camera, renderer) {

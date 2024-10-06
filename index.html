@@ -336,6 +336,37 @@
   background: rgba(0, 0, 0, 0.5);
   z-index: 999; /* Ensure it's below the popup */
 }
+
+/* Add these styles to your existing CSS */
+  .modal-icons {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    width: 100%;
+  }
+  .modal-icon {
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    background-color: #f0f0f0;
+    transition: background-color 0.3s ease;
+  }
+  .modal-icon:hover {
+    background-color: #e0e0e0;
+  }
+  .modal-icon svg {
+    width: 100%;
+    height: 100%;
+    stroke: #333;
+  }
+  .modal.active {
+    display: flex;
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
         
     </style>
     <script type="x-shader/x-vertex" id="vertexshader">
@@ -476,87 +507,90 @@
   // const homeModal = document.getElementById('homeModal');
   const homeIcon = document.getElementById('homeIcon');
   let isHomeModalActive = false;
+  const originalModalContent = modal.innerHTML;
+ 
   function showModal(icon) {
-        const iconRect = icon.getBoundingClientRect();
-        // Adjust the vertical position of the modal
-        modal.style.top = `${iconRect.top - 15}px`; // Moved slightly up
-        modal.classList.add('active');
-        
-        // Position the arrow pointer
-        const arrowOffset = iconRect.height / 2;
-        modal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`); // Adjusted for the modal's upward shift
-        
-        activeIcon = icon;
-    }
+    const iconRect = icon.getBoundingClientRect();
+    modal.style.top = `${iconRect.top - 15}px`;
+    modal.classList.add('active');
+    
+    const arrowOffset = iconRect.height / 2;
+    modal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
+    
+    activeIcon = icon;
+
+    // Set appropriate content based on the clicked icon
+    if (icon === homeIcon) {
+    toggleHomeModal();
+  } else {
+    modal.innerHTML = originalModalContent;
+    isHomeModalActive = false;
+  }
+}
+
+
   function hideModal() {
       modal.classList.remove('active');
       activeIcon = null;
   }
 
   
-  function toggleHomeModal() {
-    if (isHomeModalActive) {
-      modal.innerHTML = `
-        <input type="text" class="p2p_peer_input" id="userIdInput" placeholder="Enter your user ID">
-        <input type="text" class="p2p_peer_input" id="peerIdInput" placeholder="Enter peer ID to connect">
-        <button id="connectButton">
-            Connect
-            <span class="tooltip">Click to connect to the peer</span>
-        </button>
-        <div id="status"></div>
-      `;
-    } else {
-      modal.innerHTML = `
-        <div class="modal-icons">
-          <div class="modal-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="16"></line>
-              <line x1="8" y1="12" x2="16" y2="12"></line>
-            </svg>
-          </div>
-          <div class="modal-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </div>
-          <div class="modal-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-          </div>
-          <div class="modal-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-              <polyline points="22 4 12 14.01 9 11.01"></polyline>
-            </svg>
-          </div>
+  function setHomeModalContent() {
+    modal.innerHTML = `
+      <div class="modal-icons">
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="16"></line>
+            <line x1="8" y1="12" x2="16" y2="12"></line>
+          </svg>
         </div>
-      `;
-    }
-    isHomeModalActive = !isHomeModalActive;
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </div>
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </div>
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </div>
+      </div>
+    `;
+    isHomeModalActive = true;
   }
 
+  function toggleHomeModal() {
+    if (isHomeModalActive) {
+      modal.innerHTML = originalModalContent;
+      isHomeModalActive = false;
+    } else {
+      setHomeModalContent();
+    }
+  }
   icons.forEach((icon, index) => {
-    console.log("I am icon clicked", icon)
-    icon.addEventListener('click', (e) => {
-      if (icon === homeIcon) {
-        toggleHomeModal();
-      }
-      if (activeIcon === icon) {
+  icon.addEventListener('click', (e) => {
+    if (activeIcon === icon) {
+      hideModal();
+    } else {
+      if (activeIcon) {
         hideModal();
+        setTimeout(() => showModal(icon), 300);
       } else {
-        if (activeIcon) {
-          hideModal();
-          setTimeout(() => showModal(icon), 300);
-        } else {
-          showModal(icon);
-        }
+        showModal(icon);
       }
-    });
+    }
   });
+});
+
 
   document.addEventListener('click', (e) => {
       if (!modal.contains(e.target) && !e.target.closest('.sidebar-icon')) {

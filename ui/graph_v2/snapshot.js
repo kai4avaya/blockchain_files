@@ -1,8 +1,35 @@
+// snapshot.js
+
 import * as THREE from 'three';
 import config from '../../configs/config.json';
 import { share3dDat } from './create';
 
 
+export function findAllSpheres(scenes) {
+    const spheres = [];
+    scenes.forEach((currentScene) => {
+      currentScene.traverse((object) => {
+        if (object.geometry && object.geometry.type === "IcosahedronGeometry") {
+          spheres.push(object);
+        }
+      });
+    });
+    return spheres;
+  }
+  
+  export function findAllCubes(scenes) {
+    const cubes = [];
+    scenes.forEach((currentScene) => {
+      currentScene.traverse((object) => {
+        if (object.geometry && object.geometry.type === "BoxGeometry") {
+          cubes.push(object);
+        }
+      });
+    });
+    return cubes;
+  }
+
+  
 
 export function createSceneSnapshot(scenes) {
     const { ghostCube } = share3dDat(); 
