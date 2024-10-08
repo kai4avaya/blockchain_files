@@ -58,12 +58,19 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ReinhardToneMapping;
 document.body.appendChild(renderer.domElement);
 // const scene = new THREE.Scene();
+// const camera = new THREE.PerspectiveCamera(
+//   40,
+//   window.innerWidth / window.innerHeight,
+//   1,
+//   200
+// );
 const camera = new THREE.PerspectiveCamera(
   40,
   window.innerWidth / window.innerHeight,
   1,
-  200
+  1000 // Increased Far Clipping Plane
 );
+
 
 
 camera.position.set(0, 0, 20);
@@ -81,7 +88,8 @@ const controls = new OrbitControls(camera, renderer.domElement, labelRenderer.do
 
 controls.maxPolarAngle = Math.PI * 0.5;
 controls.minDistance = 1;
-controls.maxDistance = 100;
+// controls.maxDistance = 100;
+controls.maxDistance = 500; // Increased Max Distance
 let needsRender = false;
 let renderCount = 0;
 

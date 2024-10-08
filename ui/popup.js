@@ -94,6 +94,7 @@ overlay.classList.add('show');
 
   // Handle Click on Overlay to Close Popup
   function handleOverlayClick() {
+    console.log("overlay got da click")
     closePopup();
   }
 
@@ -135,8 +136,8 @@ overlay.classList.add('show');
         <p><strong>Size:</strong> ${fileData.size} bytes</p>
         <p><strong>Last Modified:</strong> ${new Date(fileData.lastModified).toLocaleString()}</p>
         <p><strong>Summary:</strong> <pre class="content-pre">${summary || 'No summary available.'}</pre></p>
-        <div id="keywordsContainer" style="margin-bottom: 10px;">
-          <strong>Keywords:</strong> ${keywords ? keywords.map(k => `<span class="tag">${k}</span>`).join(' ') : 'No keywords available.'}
+        <div id="tagsContainer" style="margin-bottom: 10px;">
+          <strong>Keywords:</strong> ${keywords ? keywords.map(k => `<span class="tag">${k}</span>`).join(' ') : '</span class="tag" style="background-color=#FFC0CB">No keywords available.</span>'}
         </div>
         <button id="downloadButton" class="download-button">
           ${getFileTypeIcon(fileData.type)}
