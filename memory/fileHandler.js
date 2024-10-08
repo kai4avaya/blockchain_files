@@ -6,6 +6,17 @@ import {getFileSystem} from "./collaboration/file_colab"
 // import embeddingWorker from '../ai/embeddings.js';
 // import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
 import {orchestrateTextProcessing} from "../ai/text_orchestration.js"
+import pako from 'pako';
+
+// Compress the ArrayBuffer
+function compressData(arrayBuffer) {
+  return pako.deflate(new Uint8Array(arrayBuffer));
+}
+
+// Decompress the data when retrieving
+function decompressData(uint8Array) {
+  return pako.inflate(uint8Array);
+}
 
 
 const fileTree = document.getElementById('fileTree');
@@ -19,6 +30,11 @@ async function processFile(fileEntry, id) {
         fileEntry.file(async file => {
             try {
                 const fileSystem = getFileSystem();
+
+                const contentArrayBuffer = await readFileContent(file);
+
+                // Compress the content if desired
+                const compressedContent = compressData(contentArrayBuffer);
                 const fileMetadata = {
 
                     id,
@@ -29,7 +45,8 @@ async function processFile(fileEntry, id) {
                     version: 1,
                     versionNonce: Math.floor(Math.random() * 1000000),
                     isDeleted: false,
-                    file: file
+                    file: compressedContent.buffer,
+                    // file: file
                 };
 
                 // Add file to file system
@@ -80,35 +97,118 @@ async function processFiles(files, uuids) {
     }
 }
 
+function readFileContent(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  
+
+// export async function useStoredFile(id) {
+//     try {
+//       const restoredFile = await retrieveFile(id);
+  
+//       // Use the file (e.g., display it, upload it, process it)
+//       console.log('Restored file:', restoredFile);
+//     } catch (error) {
+//       console.error('Error retrieving file:', error);
+//     }
+//   }
+  
+
+// if I need to retrieve a file from buffer
+ export async function retrieveFile(id) {
+    const fileSystem = getFileSystem();
+    const fileMetadata = await fileSystem.getItem(id, 'file');
+    if (fileMetadata) {
+      const compressedContent = new Uint8Array(fileMetadata.content);
+      const decompressedContent = decompressData(compressedContent);
+  
+      // Create a Blob from the decompressed content
+      const blob = new Blob([decompressedContent], { type: fileMetadata.type });
+  
+      // Optionally, reconstruct a File object
+      const restoredFile = new File([blob], fileMetadata.name, {
+        type: fileMetadata.type,
+        lastModified: fileMetadata.lastModified,
+      });
+  
+      return restoredFile; // or return blob if File constructor isn't supported
+    } else {
+      throw new Error(`File with id ${id} not found`);
+    }
+  }
+  
+
 // Modify handleFileDrop to use processFiles
+// export function handleFileDrop(event) {
+//     event.preventDefault();
+//     const items = event.dataTransfer.items;
+//     const files = [];
+//     const uuids = [];
+
+//     for (let i = 0; i < items.length; i++) {
+//         const item = items[i].webkitGetAsEntry();
+//         const uuid = generateUniqueId();
+
+//         if (item.isFile) {
+//             files.push(item);
+//             uuids.push(uuid);
+//         } else if (item.isDirectory) {
+//             queueItemForProcessing(() => processDirectory(item, uuid));
+//             uuids.push(uuid);
+//         }
+//     }
+
+//     if (files.length > 0) {
+//         processFiles(files, uuids);
+//     }
+
+//     if (!isProcessing) {
+//         processQueue();
+//     }
+
+//     return uuids;
+// }
+
 export function handleFileDrop(event) {
     event.preventDefault();
     const items = event.dataTransfer.items;
     const files = [];
-    const uuids = [];
+    const fileIds = [];
+    const fileNames = [];
+    const fileEntries = [];
 
     for (let i = 0; i < items.length; i++) {
         const item = items[i].webkitGetAsEntry();
         const uuid = generateUniqueId();
 
-        if (item.isFile) {
-            files.push(item);
-            uuids.push(uuid);
-        } else if (item.isDirectory) {
-            queueItemForProcessing(() => processDirectory(item, uuid));
-            uuids.push(uuid);
+        if (item) {
+            fileIds.push(uuid);
+            fileNames.push(item.name);
+            fileEntries.push(item);
+
+            if (item.isFile) {
+                files.push(item);
+            } else if (item.isDirectory) {
+                queueItemForProcessing(() => processDirectory(item, uuid));
+            }
         }
     }
 
     if (files.length > 0) {
-        processFiles(files, uuids);
+        processFiles(files, fileIds);
     }
 
     if (!isProcessing) {
         processQueue();
     }
 
-    return uuids;
+    // Return an object with uuids and fileNames, ensuring correspondence
+    return { fileIds, fileNames, fileEntries };
 }
 
 // ... [rest of the code remains the same]

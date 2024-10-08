@@ -176,7 +176,11 @@ async function saveData(storeName, data, dbName) {
       const store = tx.objectStore(storeName);
 
       if (Array.isArray(data)) {
-        data.forEach(item => store.put(item));
+        
+        data.forEach(item => {
+          console.log("PUT i am put item from memory_worker", item)
+          store.put(item)
+        });
       } else {
         store.put(data);
       }
@@ -188,6 +192,29 @@ async function saveData(storeName, data, dbName) {
     throw error;
   }
 }
+
+async function getItem(storeName, key, dbName) {
+  try {
+    const db = await openDB(dbName);
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const request = store.get(key);
+
+      request.onsuccess = function (event) {
+        resolve(event.target.result);
+      };
+
+      request.onerror = function (event) {
+        reject(new Error(`Error fetching item from ${storeName}: ${event.target.error.message}`));
+      };
+    });
+  } catch (error) {
+    throw error;
+  }
+}
+
 
 self.onmessage = async function(event) {
   const { id, action, data } = event.data;
@@ -207,6 +234,9 @@ self.onmessage = async function(event) {
         break;
       case 'saveData':
         result = await saveData(data.storeName, data.data, data.dbName);
+        break;
+      case 'getItem':
+        result = await getItem(data.storeName, data.key, data.dbName);
         break;
       default:
         throw new Error(`Unknown action: ${action}`);

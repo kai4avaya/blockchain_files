@@ -108,44 +108,6 @@ function getCubeUnderPointer(event, intersects) {
   return null; // Return null if no cube is found
 }
 
-// // Define a global drag plane (e.g., XZ-plane)
-// const globalDragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Y-up plane
-
-// export function dragCube() {
-//   if (!selectedObject || !selectedObject.wireframeCube) return;
-
-//   // Store the initial position of the wireframe cube
-//   const initialPosition = selectedObject.wireframeCube.position.clone();
-
-//   // Calculate the movement delta based on the change in intersect point
-//   const movementDelta = new THREE.Vector3().subVectors(
-//     intersectPoint,
-//     previousIntersectPoint
-//   );
-
-//   // Move the wireframe and solid cubes
-//   selectedObject.wireframeCube.position.add(movementDelta);
-//   selectedObject.solidCube.position.copy(selectedObject.wireframeCube.position);
-
-//   // Calculate the actual movement of the cube
-//   const actualMovement = new THREE.Vector3().subVectors(
-//     selectedObject.wireframeCube.position,
-//     initialPosition
-//   );
-
-//   // Move all spheres inside this cube
-//   selectedObject.containedSpheres.forEach((sphere) => {
-//     sphere.object.position.add(actualMovement);
-//     // Update the position in the selectedObject
-//     sphere.position = sphere.object.position.toArray();
-//   });
-
-//   // Update the previous intersect point for the next drag event
-//   previousIntersectPoint.copy(intersectPoint);
-
-//   markNeedsRender();
-// }
-
 // Define a global drag plane (e.g., XZ-plane)
 const globalDragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Y-up plane
 
@@ -199,6 +161,67 @@ export function dragCube() {
   return actualMovement;
 }
 
+
+export function labelListerners(labelDiv, sphere){
+
+  const { controls, markNeedsRender } = share3dDat();
+
+  // Add event listeners to enable dragging the sphere via its label
+labelDiv.addEventListener('pointerdown', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+ console.log("labeldive been clicked", labelDiv)
+  // Record initial pointer position
+  initialPointerPosition = { x: event.clientX, y: event.clientY };
+
+  isDragging = false; // We will set to true when moved enough
+  selectedSphere = sphere;
+  selectedObject = sphere;
+
+  // Disable controls during drag
+  controls.enabled = false;
+
+  // Set pointer capture
+  labelDiv.setPointerCapture(event.pointerId);
+});
+
+labelDiv.addEventListener('pointermove', (event) => {
+  if (!selectedSphere || selectedSphere !== sphere) return;
+
+  const deltaX = event.clientX - initialPointerPosition.x;
+  const deltaY = event.clientY - initialPointerPosition.y;
+  const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+  if (distanceMoved > DRAG_THRESHOLD) {
+    isDragging = true;
+    controls.enabled = false;
+  }
+
+  if (isDragging) {
+    moveSphere(event);
+    markNeedsRender();
+  }
+});
+
+labelDiv.addEventListener('pointerup', (event) => {
+  if (selectedSphere === sphere) {
+    if (isDragging) {
+      // Handle end of drag
+      onPointerUp(event);
+    }
+
+    // Reset variables
+    isDragging = false;
+    selectedSphere = null;
+    selectedObject = null;
+    controls.enabled = true;
+
+    // Release pointer capture
+    labelDiv.releasePointerCapture(event.pointerId);
+  }
+});
+
+}
 function highlightCube(cube) {
   if (CUBEINTERSECTED !== cube) {
     resetCubeHighlight();
@@ -404,12 +427,12 @@ function handleFileDrop_sphere(event) {
     (intersect) => intersect.object.geometry.type === "IcosahedronGeometry"
   );
 
+  const { fileIds, fileNames, fileEntries } = handleFileDrop(event);
+  console.log("SPHERE CREATED", fileIds);
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
     const size = normalizeSize(file.size);
-    const fileIds = handleFileDrop(event);
-
-    console.log("SPHERE CREATED", fileIds);
+  
 
     if (allIntersects.length > 0) {
       const intersect = allIntersects[0];
@@ -418,7 +441,7 @@ function handleFileDrop_sphere(event) {
       const sphereData = convertToThreeJSFormat({
         position: [dropPosition.x, dropPosition.y, dropPosition.z],
         size: size,
-        userData: { id: fileIds[i] },
+        userData: { id: fileIds[i], filename: fileNames[i] },
         color: randomColorGenerator(),
         lastEditedBy: loginName,
       });
@@ -475,7 +498,7 @@ function handleFileDrop_sphere(event) {
         ),
         size: size,
         color: randomColorGenerator(),
-        userData: { id: fileIds[i] },
+        userData: { id: fileIds[i], filename: fileNames[i] },
         lastEditedBy: loginName,
       });
 

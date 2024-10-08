@@ -138,3 +138,7 @@ export function getCurrentTimeOfDay() {
     return 0;
   }
 }
+
+export function calculateDistance(point1, point2) {
+  return point1.distanceTo(point2);
+}

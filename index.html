@@ -22,12 +22,25 @@
       max-width: 90%;
       max-height: 90%;
       overflow: auto;
+
+      opacity: 0;
+      transform: translateY(-20px);
     }
     .popup-content {
       max-width: 100%;
       max-height: 100%;
       overflow: auto;
     }
+
+    #popup.show {
+  display: block; /* Show when .show class is added */
+  animation: popupFadeIn 0.3s forwards;
+}
+
+#popup.hide {
+  animation: popupFadeOut 0.3s forwards;
+}
+
     .content-pre {
       max-height: 200px; /* Limit the height of the content pre element */
       overflow: auto;
@@ -327,14 +340,31 @@
     canvas {
   pointer-events: auto;
 }
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999; /* Ensure it's below the popup */
+.overlay.show {
+  display: block;
+  animation: overlayFadeIn 0.3s forwards;
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.overlay.hide {
+  animation: overlayFadeOut 0.3s forwards;
+}
+
+@keyframes overlayFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* Add these styles to your existing CSS */
@@ -344,31 +374,113 @@
     align-items: center;
     width: 100%;
   }
-  .modal-icon {
-    width: 40px;
-    height: 40px;
+  /* .modal-icon {
     cursor: pointer;
     padding: 2px;
     border-radius: 50%;
     background-color: #f0f0f0;
     transition: background-color 0.3s ease;
+  } */
+  .modal-icon {
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+  transition: background-color 0.3s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.modal-icon:hover {
+  background-color: #e0e0e0;
+}
+
+.modal-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #333;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.download-button {
+  display: flex;
+  align-items: center;
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s;
+  border-radius: 4px;
+}
+
+.download-button:hover {
+  background-color: #e0f0ff; /* Light blue background on hover */
+  color: #007bff; /* Change text color on hover */
+}
+
+.download-button svg {
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+  transition: fill 0.3s;
+}
+
+.download-button:hover svg {
+  fill: #007bff; /* Light blue icon on hover */
+}
+
+.download-label {
+  font-size: 16px;
+  color: inherit;
+}
+
+.popup-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  cursor: pointer;
+  font-size: 24px;
+}
+
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
   }
-  .modal-icon:hover {
-    background-color: #e0e0e0;
-  }
-  .modal-icon svg {
-    width: 100%;
-    height: 100%;
-    stroke: #333;
-  }
-  .modal.active {
-    display: flex;
-    transform: translateY(0);
+  to {
     opacity: 1;
-    pointer-events: auto;
+    transform: translateY(0);
   }
-  
-        
+}
+
+@keyframes popupFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+
     </style>
     <script type="x-shader/x-vertex" id="vertexshader">
       varying vec2 vUv;
@@ -578,6 +690,7 @@ function attachActionListeners() {
     icon.addEventListener('click', (e) => {
       const action = e.currentTarget.dataset.action;
       if (action) {
+        showSpinner(e.currentTarget);
         // Dispatch a custom event
         console.log("Dispatching", action);
         const event = new CustomEvent('modalAction', { detail: { action } });
@@ -587,12 +700,25 @@ function attachActionListeners() {
   });
 }
  
+function showSpinner(iconElement) {
+        const svgIcon = iconElement.querySelector('svg');
+        const spinner = document.createElement('div');
+        spinner.className = 'spinner';
+        svgIcon.style.display = 'none';
+        iconElement.insertBefore(spinner, svgIcon);
+
+        setTimeout(() => {
+          spinner.remove();
+          svgIcon.style.display = '';
+        }, 4000);
+      }
+
 function toggleHomeModal() {
-  if (isHomeModalActive) {
-    setOriginalModalContent();
-  } else {
+  // if (isHomeModalActive) {
+  //   setOriginalModalContent();
+  // } else {
     setHomeModalContent();
-  }
+  // }
 }
   icons.forEach((icon, index) => {
   icon.addEventListener('click', (e) => {

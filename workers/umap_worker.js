@@ -77,7 +77,7 @@ self.onmessage = async function (e) {
                    nNeighbors: nNeighbors,   // Number of nearest neighbors, adjusted for small dataset
                    minDist: minDist  // Minimum distance between points
                });
-               
+
             debugLog('Fitting UMAP to the embeddings...');
 
             // Fit the UMAP model to the embeddings asynchronously
@@ -92,8 +92,13 @@ self.onmessage = async function (e) {
 
             debugLog('UMAP fitting completed.');
 
-            // Normalize and scale the embeddings based on scene bounding box
-            const scaledCoordinates = normalizeAndScaleCoordinates(embedding3D, sceneBoundingBox);
+            // // Normalize and scale the embeddings based on scene bounding box
+            // const scaledCoordinates = normalizeAndScaleCoordinates(embedding3D, sceneBoundingBox);
+
+            const zOffset = 50; // Adjust this value as needed
+
+// Normalize and scale the embeddings based on scene bounding box and Z-offset
+const scaledCoordinates = normalizeAndScaleCoordinates(embedding3D, sceneBoundingBox, zOffset);
 
             debugLog('Normalization and scaling completed.');
 

@@ -1,6 +1,8 @@
 // umap.js
-import { getSceneBoundingBox} from '../ui/graph_v2/create.js'
-import { share3dDat, updateSphereAndCubePositions} from '../ui/graph_v2/create.js';
+import { share3dDat} from '../ui/graph_v2/create.js'
+// import { share3dDat, updateSphereAndCubePositions} from '../ui/graph_v2/create.js';
+import { getSceneBoundingBox, updateSphereAndCubePositions} from '../ui/graph_v2/reorientScene.js';
+
 const dbWorker = new Worker('../workers/memory_worker.js');
 
 // Initialize the worker

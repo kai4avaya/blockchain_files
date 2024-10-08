@@ -1,3 +1,4 @@
+
 class IndexDBWorkerOverlay {
     private worker: Worker;
     private callbacks: Map<string, (data: any) => void> = new Map();
@@ -41,28 +42,64 @@ class IndexDBWorkerOverlay {
       return dataRetreived;
     }
   
-    // async saveData(storeName: string, data: any, dbName: string = 'fileGraphDB'): Promise<void> {
-    //   await this.sendToWorker('saveData', { storeName, data, dbName });
+    async saveData(storeName: string, data: any, dbName: string = 'fileGraphDB'): Promise<void> {
+      await this.sendToWorker('saveData', { storeName, data, dbName });
+    }
+    
+    async getItem(storeName: string, key: string, dbName: string = 'fileGraphDB'): Promise<any> {
+      const dataRetrieved = await this.sendToWorker('getItem', { storeName, key, dbName });
+      return dataRetrieved;
+    }
+
+    // TODO: this should be removed and replaced with the worker!
+    // async saveData(storeName: string, data: any[], dbName: string = 'fileGraphDB'): Promise<void> {
+    //   return new Promise((resolve, reject) => {
+    //     const request = indexedDB.open(dbName);
+    //     request.onerror = (event) => reject(`Error opening database: ${event}`);
+    //     request.onsuccess = (event) => {
+    //       const db = (event.target as IDBOpenDBRequest).result;
+    //       const transaction = db.transaction([storeName], 'readwrite');
+    //       const objectStore = transaction.objectStore(storeName);
+    
+    //       data.forEach(item => {
+    //         console.log("i am put item in local item", item)
+    //         objectStore.put(item); // Use 'put' instead of 'add' to update existing records
+    //       });
+    
+    //       transaction.oncomplete = () => resolve();
+    //       transaction.onerror = (event) => reject(`Error saving data: ${event}`);
+    //     };
+    //   });
     // }
 
-    async saveData(storeName: string, data: any[], dbName: string = 'fileGraphDB'): Promise<void> {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(dbName);
-        request.onerror = (event) => reject(`Error opening database: ${event}`);
-        request.onsuccess = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          const transaction = db.transaction([storeName], 'readwrite');
-          const objectStore = transaction.objectStore(storeName);
+  //   async saveData(storeName: string, data: any[], dbName: string = 'fileGraphDB'): Promise<void> {
+  //     return new Promise((resolve, reject) => {
+  //       const request = indexedDB.open(dbName);
+  //       request.onerror = (event) => reject(`Error opening database: ${event}`);
+  //       request.onsuccess = (event) => {
+  //         const db = (event.target as IDBOpenDBRequest).result;
+  //         const transaction = db.transaction([storeName], 'readwrite');
+  //         const objectStore = transaction.objectStore(storeName);
     
-          data.forEach(item => {
-            objectStore.put(item); // Use 'put' instead of 'add' to update existing records
-          });
+  //         data.forEach(item => {
+  //           // Remove functions from item
+  //           const { cleanedItem, functionsFound } = removeFunctions(item);
     
-          transaction.oncomplete = () => resolve();
-          transaction.onerror = (event) => reject(`Error saving data: ${event}`);
-        };
-      });
-    }
+  //           // If any functions were removed, log a warning with the original item
+  //           if (functionsFound) {
+  //             console.warn('Item contains functions, which are not serializable. Original item:', item);
+  //           }
+    
+  //           console.log("Saving cleaned item to IndexedDB:", cleanedItem);
+  //           objectStore.put(cleanedItem); // Use 'put' instead of 'add' to update existing records
+  //         });
+    
+  //         transaction.oncomplete = () => resolve();
+  //         transaction.onerror = (event) => reject(`Error saving data: ${event}`);
+  //       };
+  //     });
+  //   }
+
   }
   
   const indexDBOverlay = new IndexDBWorkerOverlay();

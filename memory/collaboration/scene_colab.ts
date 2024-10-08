@@ -22,6 +22,7 @@ interface ObjectState {
   size?: number;
   userData: {
     id: string; // links back to file id
+    filename: string;
   };
 }
 
@@ -483,58 +484,6 @@ function serializeThreeObject(objectData){
 
   return commonData;
 }
-
-// export function diffSceneChanges(scene, nonBloomScene, previousSnapShot) {
-//   const changedObjects = [];
-//   const currentSnapshot = {};
-
-//   // Function to process objects in a scene
-//   function processSceneObjects(sceneToProcess) {
-//     sceneToProcess.traverse((object) => {
-
-//       if(object.shape){
-//       // if ((object.isMesh && (object.shape === 'sphere' || object.shape.includes('Cube') )) || object.isLineSegments) {
-
-//       console.log("i am object in  AFTER I DO THAT DIFF! diff", object);
-//       console.log("isDelete?", object.isDeleted)
-//       console.log("createdby", object.lastEditedBy)
-
-//         const uuid = object.uuid;
-//         const simplifiedObject = {
-//           position: object.position.clone(),
-//           rotation: object.rotation.clone(),
-//           scale: object.scale.clone(),
-//           color: object.material?.color?.clone(),
-//           isDeleted: object.isDeleted || false,
-//           // Add other relevant properties
-//         };
-
-//         currentSnapshot[uuid] = simplifiedObject;
-
-//         const prevObject = previousSnapShot[uuid];
-//         if (!prevObject) {
-//           // New object
-//           changedObjects.push(object);
-//         } else if (!areObjectsEqual(simplifiedObject, prevObject)) {
-//           // Object has changed
-//           changedObjects.push(object);
-//         }
-//       }
-//     });
-//   }
-
-//   // Process objects in both scenes
-//   processSceneObjects(scene);
-//   processSceneObjects(nonBloomScene);
-
-//   // Update changed objects
-//   changedObjects.forEach((object) => {
-//     saveObjectChanges(object);
-//   });
-
-//   // Update the scene snapshot after processing
-//   // sceneSnapshot = currentSnapshot;
-// }
 
 export function diffSceneChanges(
   scene,

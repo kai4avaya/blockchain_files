@@ -44,7 +44,11 @@ class FileSystem {
       }
       return FileSystem.instance;
     }
-  
+    async getItem<T extends FileMetadata | DirectoryMetadata>(id: string, type: 'file' | 'directory'): Promise<T | undefined> {
+      const storeName = type === 'file' ? 'files' : 'directories';
+      const item = await indexDBOverlay.getItem(storeName, id);
+      return item as T | undefined;
+    }
     private async initializeDB() {
       try {
         await indexDBOverlay.initializeDB(['files', 'directories']);
@@ -87,12 +91,12 @@ class FileSystem {
     return { ...this.snapshot };
   }
 
-  getMetadata<T extends FileMetadata | DirectoryMetadata>(id: string, type: 'file' | 'directory'): T | undefined {
-    const items = type === 'file' ? this.snapshot.files : this.snapshot.directories;
+  // getMetadata<T extends FileMetadata | DirectoryMetadata>(id: string, type: 'file' | 'directory'): T | undefined {
+  //   const items = type === 'file' ? this.snapshot.files : this.snapshot.directories;
 
-    console.log("i am items", items)
-    return items.find(item => item.id === id) as T | undefined;
-  }
+  //   console.log("i am items", items)
+  //   return items.find(item => item.id === id) as T | undefined;
+  // }
 
 
   private async applyUpdate(update: Partial<FileSystemSnapshot>) {
@@ -133,6 +137,23 @@ class FileSystem {
     item.lastModified = Date.now();
     item.version = (item.version || 0) + 1;
     item.versionNonce = Math.floor(Math.random() * 1000000);
+    return item;
+  }
+
+  async getMetadata<T extends FileMetadata | DirectoryMetadata>(id: string, type: 'file' | 'directory'): Promise<T | undefined> {
+    // First, try to get the item from the snapshot
+    const items = type === 'file' ? this.snapshot.files : this.snapshot.directories;
+    let item = items.find(item => item.id === id) as T | undefined;
+
+    // If not found in snapshot, try to get from IndexedDB
+    if (!item) {
+      item = await this.getItem<T>(id, type);
+      // Optionally, add it to the snapshot for future use
+      if (item) {
+        this.snapshot[type === 'file' ? 'files' : 'directories'].push(item);
+      }
+    }
+
     return item;
   }
 

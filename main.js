@@ -62,26 +62,38 @@ async function main() {
   addEventListeners(canvas);
 }
 
-function handleQuickClick(event) {
+// function handleQuickClick(event) {
+//   const selectedObject = getObjectUnderPointer(event, "sphere");
+//   if (selectedObject) {
+//     console.log("GOT ME A QUICK CLICK main.js");
+//     const nodeId = selectedObject.userData.id;
+//     const fileSystem = getFileSystem();
+//     const fileMetadata = fileSystem.getMetadata(nodeId, "file");
+
+//     if (fileMetadata) {
+//       console.log(
+//         "GOT ME A QUICK  fileMetadata CLICK in main.js",
+//         fileMetadata
+//       );
+//       showPopup(fileMetadata, event.clientX, event.clientY);
+//     }
+//   }
+// }
+async function handleQuickClick(event) {
   const selectedObject = getObjectUnderPointer(event, "sphere");
   if (selectedObject) {
     console.log("GOT ME A QUICK CLICK main.js");
     const nodeId = selectedObject.userData.id;
-    console.log("NODEID", nodeId);
     const fileSystem = getFileSystem();
-    console.log("fileSystem", fileSystem);
-    const fileMetadata = fileSystem.getMetadata(nodeId, "file");
-    console.log("fileMetadata", fileMetadata);
+    const fileMetadata = await fileSystem.getMetadata(nodeId, "file");
 
     if (fileMetadata) {
-      console.log(
-        "GOT ME A QUICK  fileMetadata CLICK in main.js",
-        fileMetadata
-      );
+      console.log("GOT ME A QUICK  fileMetadata CLICK in main.js", fileMetadata);
       showPopup(fileMetadata, event.clientX, event.clientY);
     }
   }
 }
+
 
 function addEventListeners(canvas) {
   let pointerDownTime = null;
@@ -105,34 +117,40 @@ function addEventListeners(canvas) {
     { capture: true }
   );
 
-  canvas.addEventListener(
-    "pointerup",
-    (event) => {
-      if (pointerDownTime === null) {
-        return;
-      }
+  // canvas.addEventListener(
+  //   "pointerup",
+  //   (event) => {
+  //     if (pointerDownTime === null) {
+  //       return;
+  //     }
 
-      const pointerUpTime = Date.now();
-      const clickDuration = pointerUpTime - pointerDownTime;
+  //     const pointerUpTime = Date.now();
+  //     const clickDuration = pointerUpTime - pointerDownTime;
 
-      // userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target);
+  //     // userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target);
 
-      if (!isDragging && clickDuration <= CLICK_DURATION_THRESHOLD) {
-        handleQuickClick(event);
-      } else {
-        if (isDragging) {
-        } else {
-        }
-      }
+  //     if (!isDragging && clickDuration <= CLICK_DURATION_THRESHOLD) {
+  //       handleQuickClick(event);
+  //     } else {
+  //       if (isDragging) {
+  //       } else {
+  //       }
+  //     }
 
-      // Log user action
-      // userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
+  //     // Log user action
+  //     // userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
 
-      // Reset pointerDownTime
-      pointerDownTime = null;
-    },
-    { capture: true }
-  );
+  //     // Reset pointerDownTime
+  //     pointerDownTime = null;
+  //   },
+  //   { capture: true }
+  // );
+
+  // Add this new event listener for double-clicks
+canvas.addEventListener("dblclick", (event) => {
+  handleQuickClick(event);
+});
+
 
   canvas.addEventListener("pointermove", (event) => {
     if (pointerDownTime !== null) {
