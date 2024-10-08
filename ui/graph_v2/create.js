@@ -192,16 +192,16 @@ const mouse = new THREE.Vector2();
 let cubes = [];
 let mousePositionManager;
 // Cache for geometries and materials
-const geometryCache = {
-  sphere: null,
-  cube: null
-};
+// const geometryCache = {
+//   sphere: null,
+//   cube: null
+// };
 
-const materialCache = {
-  sphere: {},
-  wireframe: {},
-  solid: {}
-};
+// const materialCache = {
+//   sphere: {},
+//   wireframe: {},
+//   solid: {}
+// };
 
 const updateMiniMap = createMiniMap(scene, nonBloomScene, camera, renderer);
 

@@ -20,6 +20,7 @@ import { handleFileDrop } from "../../memory/fileHandler.js";
 import * as THREE from "three";
 import { convertToThreeJSFormat } from "../../utils/utils";
 import { diffSceneChanges } from "../../memory/collaboration/scene_colab";
+import {updateConnectedLines} from './lineGraphs.js'
 
 let isDragging = false;
 // let isClicking = false;
@@ -164,7 +165,7 @@ export function dragCube() {
 
 export function labelListerners(labelDiv, sphere){
 
-  const { controls, markNeedsRender } = share3dDat();
+  const { controls } = share3dDat();
 
   // Add event listeners to enable dragging the sphere via its label
 labelDiv.addEventListener('pointerdown', (event) => {
@@ -320,6 +321,8 @@ export function moveSphere(event, sphere, intersectPointIn = null) {
   // Adjust the scale to maintain apparent size
   const scaleFactor = newDistance / originalDistance;
   targetSphere.scale.multiplyScalar(scaleFactor);
+
+  updateConnectedLines()
   // handleFileDragOver(event);
   // render();
   markNeedsRender();

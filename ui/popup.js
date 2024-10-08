@@ -2,6 +2,7 @@
 // Import getFileSystem to access IndexedDB
 import { getFileSystem } from '../memory/collaboration/file_colab';
 import { retrieveFile } from '../memory/fileHandler.js'; // Adjust the import path
+import indexDBOverlay from '../memory/local/file_worker'; // Adjust the path as necessary
 // import Chart from 'chart.js/auto'; // Ensure Chart.js is properly imported
 
 // Function to Show Popup with Overlay
@@ -110,6 +111,19 @@ overlay.classList.add('show');
 
   // Fetch summary and keywords from IndexedDB
   try {
+    // await indexDBOverlay.openDB('summarizationDB', 1);
+    // await indexDBOverlay.initializeDB(['summaries'], 'summarizationDB');
+
+    // const fileSystem = getFileSystem();
+    // const fileData = await fileSystem.getItem(metadata.id, 'file');
+    // Initialize the summarizationDB with version 1
+  // Open the 'summarizationDB' without specifying the version
+  await indexDBOverlay.openDB('summarizationDB', 2); // No version specified
+
+  // Open the 'fileGraphDB' without specifying the version
+  await indexDBOverlay.openDB('fileGraphDB'); // No version specified
+
+    // Fetch file data from 'file' store in 'fileGraphDB'
     const fileSystem = getFileSystem();
     const fileData = await fileSystem.getItem(metadata.id, 'file');
 
@@ -117,7 +131,15 @@ overlay.classList.add('show');
       throw new Error('File data not found in IndexedDB');
     }
 
-    const { summary, keywords } = fileData;
+    // const { summary, keywords } = fileData;
+     // Fetch summaries from 'summaries' store
+     const summaries = await indexDBOverlay.getData('summaries', 'summarizationDB');
+
+     // Find the summary entry for the current file
+     const summaryEntry = summaries.find(entry => entry.fileId === metadata.id);
+ 
+     const { summary, keywords } = summaryEntry || { summary: 'No summary available.', keywords: [] };
+ 
 
     // Remove the spinner
     const spinner = popup.querySelector('.spinner');

@@ -1,4 +1,5 @@
 import { fetchEmbeddingsAndPerformUMAP } from '../ai/umap'
+import { initConnectLines } from './graph_v2/lineGraphs'
 
 export function initiate_gui_controls() {
   document.addEventListener('modalAction', (e) => {
@@ -21,6 +22,7 @@ export function initiate_gui_controls() {
         break;
       case 'show-network-graph':
         console.log('Show network graph action triggered');
+        initConnectLines()
         // The spinner is already shown by the showSpinner function
         setTimeout(() => {
           // Add your logic here

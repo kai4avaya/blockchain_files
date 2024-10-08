@@ -41,14 +41,15 @@
   animation: popupFadeOut 0.3s forwards;
 }
 
-    .content-pre {
-      max-height: 200px; /* Limit the height of the content pre element */
-      overflow: auto;
-    }
+.content-pre {
+  max-width: 400px;
+  white-space: pre-wrap; /* Add this property */
+}
     .tag {
       display: inline-block;
       padding: 5px;
-      margin: 5px;
+      /* margin: 5px; */
+      margin: 2px;
       background-color: azure;
       border-radius: 5px;
       color: #000;
@@ -354,6 +355,20 @@
   }
 }
 
+.overlay {
+  position: fixed; /* Ensures the overlay covers the viewport */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
+  z-index: 1000; /* Should be below the popup's z-index */
+  display: none; /* Hidden by default */
+  opacity: 0; /* Initial opacity for fade-in effect */
+  transition: opacity 0.3s ease; /* Smooth transition for opacity */
+}
+
+
 .overlay.hide {
   animation: overlayFadeOut 0.3s forwards;
 }
@@ -448,6 +463,10 @@
 .download-label {
   font-size: 16px;
   color: inherit;
+}
+
+.popup-body {
+  max-width: 400px;
 }
 
 .popup-close {

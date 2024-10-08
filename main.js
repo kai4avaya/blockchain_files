@@ -11,6 +11,7 @@ import { p2pSync } from "./network/peer2peer_simple"; // Import the P2PSync clas
 import embeddingWorker from "./ai/embeddings.js";
 import { initiate } from "./memory/vectorDB/vectorDbGateway.js"; // Assuming your initiate function is exported
 import {initiate_gui_controls} from './ui/gui.listens.js'
+import indexDBOverlay from './memory/local/file_worker'
 const userId = "kai";
 localStorage.setItem("login_block", userId);
 
@@ -59,6 +60,8 @@ async function main() {
 
   p2pSync_instance.setMouseOverlay(mouseOverlay);
 
+  // initializeDatabases()
+
   addEventListeners(canvas);
 }
 
@@ -91,6 +94,22 @@ async function handleQuickClick(event) {
       console.log("GOT ME A QUICK  fileMetadata CLICK in main.js", fileMetadata);
       showPopup(fileMetadata, event.clientX, event.clientY);
     }
+  }
+}
+
+export async function initializeDatabases() {
+  try {
+    // Initialize 'fileGraphDB' with version 2
+    await indexDBOverlay.openDB('fileGraphDB', 2);
+    await indexDBOverlay.initializeDB(['directories', 'files', 'graph'], 'fileGraphDB');
+
+    // Initialize 'summarizationDB' with version 1
+    await indexDBOverlay.openDB('summarizationDB', 1);
+    await indexDBOverlay.initializeDB(['summaries'], 'summarizationDB');
+
+    console.log('Databases initialized successfully');
+  } catch (error) {
+    console.error('Error initializing databases:', error);
   }
 }
 
