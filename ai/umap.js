@@ -2,7 +2,7 @@
 import { share3dDat} from '../ui/graph_v2/create.js'
 // import { share3dDat, updateSphereAndCubePositions} from '../ui/graph_v2/create.js';
 import { getSceneBoundingBox, updateSphereAndCubePositions} from '../ui/graph_v2/reorientScene.js';
-
+import indexDBOverlay from  '../memory/local/file_worker'
 const dbWorker = new Worker('../workers/memory_worker.js');
 
 // Initialize the worker
@@ -74,14 +74,49 @@ export function sendSceneBoundingBoxToWorker() {
 
 
 // Fetch embeddings from IndexedDB and trigger UMAP
-export function fetchEmbeddingsAndPerformUMAP() {
-    dbWorker.postMessage({
-        id: 'getEmbeddings',
-        action: 'getData',
-        data: { storeName: 'summaries', dbName: 'summarizationDB' }
-    });
-    console.log('Requested embeddings from IndexedDB.');
+// export function fetchEmbeddingsAndPerformUMAP() {
+//     dbWorker.postMessage({
+//         id: 'getEmbeddings',
+//         action: 'getData',
+//         data: { storeName: 'summaries', dbName: 'summarizationDB' }
+//     });
+//     console.log('Requested embeddings from IndexedDB.');
+// }
+
+
+// / Function to initialize the database and fetch embeddings
+async function initDBAndFetchEmbeddings() {
+  try {
+    // Open the database
+    await indexDBOverlay.openDB('summarizationDB', 2);
+
+    // Initialize the database with the required object store
+    await indexDBOverlay.initializeDB(['summaries']);
+
+    // Fetch the embeddings
+    const embeddings = await indexDBOverlay.getData('summaries', 'summarizationDB');
+
+    // Process the embeddings
+    if (embeddings && embeddings.length > 0) {
+      const embeddingVectors = embeddings.map(item => item.embedding);
+      const labels = embeddings.map(item => item.fileId);
+
+      // Perform UMAP
+      performUMAP(embeddingVectors, labels);
+    } else {
+      console.log('No embeddings found in the database.');
+    }
+  } catch (error) {
+    console.error('Error initializing database or fetching embeddings:', error);
+  }
 }
+
+// Update your fetchEmbeddingsAndPerformUMAP function
+export function fetchEmbeddingsAndPerformUMAP() {
+  initDBAndFetchEmbeddings();
+}
+
+
 
 // Optional: Terminate workers when no longer needed
 export function terminateWorkers() {
