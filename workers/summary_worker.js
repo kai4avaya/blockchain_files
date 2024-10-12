@@ -9,7 +9,7 @@ const its = nlp.its;
 const as = nlp.as;
 
 const CHARACTER_LIMIT = 384;
-const topN = 20;
+const topN = 400;
 
 self.onmessage = function (e) {
   try {

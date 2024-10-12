@@ -1,73 +1,50 @@
-// src/workers/dbscan_worker.js
+// cluster_worker.js
+import densityClustering from 'density-clustering';
 
-import { DBSCAN } from 'ml-dbscan';
+console.log('DBSCAN Worker initialized');
 
-// Enable detailed debugging
-const DEBUG = true;
+self.onmessage = function(e) {
+    console.log("DBSCAN Worker received message:", e.data);
+    const { reducedData, keywords, fileIds } = e.data;
+    
+    console.log("Received data:", {
+        reducedDataLength: reducedData.length,
+        keywordsLength: keywords.length,
+        fileIdsLength: fileIds.length
+    });
 
-// Helper function for logging
-function debugLog(message, data) {
-    if (DEBUG) {
-        console.log(`[DBSCAN Worker] ${message}`, data || '');
+    // Perform DBSCAN clustering
+    const dbscan = new densityClustering.DBSCAN();
+    const epsilon = 0.5; // Adjust this value based on your data
+    const minPoints = 3; // Minimum points to form a cluster
+    
+    console.log("Starting DBSCAN clustering with parameters:", { epsilon, minPoints });
+    
+    const clusters = dbscan.run(reducedData, epsilon, minPoints);
+    
+    console.log("DBSCAN clustering completed. Clusters:", clusters.length);
+
+    // Handle noise points
+    const noise = dbscan.noise;
+    if (noise.length > 0) {
+        clusters.push(noise); // Add noise points as a separate cluster
     }
-}
 
-// Listen for messages from the main thread
-self.onmessage = function (e) {
-    const { type, data } = e.data;
+    self.postMessage({
+        type: 'umapResult',
+        reducedData,
+        keywords,
+        fileIds,
+        clusters
+    });
+    
+    console.log("DBSCAN Worker sent result back");
+};
 
-    debugLog(`Received message of type: ${type}`);
-
-    if (type === 'clusterData') {
-        const { reducedData, dbscanOptions } = data;
-
-        // Validate inputs
-        if (!Array.isArray(reducedData) || reducedData.length === 0) {
-            const errorMsg = 'Invalid reducedData received for clustering.';
-            debugLog(errorMsg);
-            self.postMessage({
-                type: 'error',
-                data: errorMsg
-            });
-            return;
-        }
-
-        try {
-            debugLog('Initializing DBSCAN with options:', dbscanOptions);
-
-            // Perform DBSCAN clustering
-            const dbscan = new DBSCAN();
-            const labels = dbscan.run(reducedData, dbscanOptions.epsilon, dbscanOptions.minPts);
-
-            debugLog('DBSCAN clustering completed.');
-
-            // Send the cluster labels back to the main thread
-            self.postMessage({
-                type: 'clusteringResult',
-                data: labels
-            });
-            debugLog('Sent clustering result back to main thread.');
-        } catch (error) {
-            // Handle any errors during clustering
-            const errorMsg = `Error during DBSCAN processing: ${error.message}`;
-            debugLog(errorMsg, error);
-            self.postMessage({
-                type: 'error',
-                data: errorMsg
-            });
-        }
-    }
-    // Optionally handle other message types
-    else if (type === 'terminate') {
-        debugLog('Terminating worker as per request.');
-        self.close();
-    }
-    else {
-        const errorMsg = `Unknown message type: ${type}`;
-        debugLog(errorMsg);
-        self.postMessage({
-            type: 'error',
-            data: errorMsg
-        });
-    }
+self.onerror = function(error) {
+    console.error("DBSCAN Worker error:", error);
+    self.postMessage({
+        type: 'error',
+        error: error.message
+    });
 };

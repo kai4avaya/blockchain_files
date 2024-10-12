@@ -536,7 +536,161 @@ export function getSceneBoundingBox(scene) {
     console.log("Camera Adjusted:");
     console.log(`Target Position: (${center.x}, ${center.y}, ${center.z})`);
   }
+
   
+// export function zoomCameraToPointCloud(duration = 2) {
+//   const { scene, camera, controls } = share3dDat();
+
+//   // Find all points in the point cloud
+//   const points = scene.children.filter(child => child instanceof THREE.Points);
+
+//   if (points.length === 0) {
+//     console.warn('No point cloud found in the scene.');
+//     return;
+//   }
+
+//   // Calculate bounding box of all points
+//   const boundingBox = new THREE.Box3();
+//   points.forEach(points => {
+//     points.geometry.computeBoundingBox();
+//     boundingBox.union(points.geometry.boundingBox);
+//   });
+
+//   // Calculate center and size of bounding box
+//   const center = new THREE.Vector3();
+//   boundingBox.getCenter(center);
+//   const size = new THREE.Vector3();
+//   boundingBox.getSize(size);
+
+//   // Calculate ideal camera position
+//   const maxDim = Math.max(size.x, size.y, size.z);
+//   const fov = camera.fov * (Math.PI / 180);
+//   const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.1; // Reduced from 1.5 to 1.1 to zoom in closer
+//   const cameraPosition = new THREE.Vector3(center.x, center.y, center.z + cameraZ);
+
+//   // Animate camera position
+//   gsap.to(camera.position, {
+//     duration: duration,
+//     x: cameraPosition.x,
+//     y: cameraPosition.y,
+//     z: cameraPosition.z,
+//     ease: "power2.inOut",
+//     onUpdate: () => {
+//       camera.lookAt(center);
+//       markNeedsRender();
+//     }
+//   });
+
+//   // Animate controls target
+//   gsap.to(controls.target, {
+//     duration: duration,
+//     x: center.x,
+//     y: center.y,
+//     z: center.z,
+//     ease: "power2.inOut",
+//     onUpdate: () => {
+//       controls.update();
+//       markNeedsRender();
+//     }
+//   });
+
+//   // Adjust near and far planes
+//   camera.near = cameraZ / 100;
+//   camera.far = cameraZ * 100;
+//   camera.updateProjectionMatrix();
+
+//   console.log(`Camera zoomed to point cloud. New position: (${cameraPosition.x}, ${cameraPosition.y}, ${cameraPosition.z})`);
+// }
+
+export function zoomCameraToPointCloud(duration = 2) {
+  const { scene, camera, controls } = share3dDat();
+
+  // Find all points in the point cloud
+  const points = scene.children.filter(child => child instanceof THREE.Points);
+
+  if (points.length === 0) {
+    console.warn('No point cloud found in the scene.');
+    return;
+  }
+
+  // Calculate bounding box of all points
+  const boundingBox = new THREE.Box3();
+  points.forEach(points => {
+    points.geometry.computeBoundingBox();
+    boundingBox.union(points.geometry.boundingBox);
+  });
+
+  // Calculate center and size of bounding box
+  const center = new THREE.Vector3();
+  boundingBox.getCenter(center);
+  const size = new THREE.Vector3();
+  boundingBox.getSize(size);
+
+  // Calculate ideal camera position
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * (Math.PI / 180);
+  const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.1; // Reduced from 1.5 to 1.1 to zoom in closer
+  const cameraPosition = new THREE.Vector3(center.x, center.y, center.z + cameraZ);
+
+  // Animate camera position
+  gsap.to(camera.position, {
+    duration: duration,
+    x: cameraPosition.x,
+    y: cameraPosition.y,
+    z: cameraPosition.z,
+    ease: "power2.inOut",
+    onUpdate: () => {
+      camera.lookAt(center);
+      markNeedsRender();
+    }
+  });
+
+  // Animate controls target
+  gsap.to(controls.target, {
+    duration: duration,
+    x: center.x,
+    y: center.y,
+    z: center.z,
+    ease: "power2.inOut",
+    onUpdate: () => {
+      controls.update();
+      markNeedsRender();
+    }
+  });
+
+  // Set more permissive near and far planes
+  camera.near = 0.1;
+  camera.far = cameraZ * 1000;
+  camera.updateProjectionMatrix();
+
+  // Adjust control limits
+  controls.minDistance = 0.1;
+  controls.maxDistance = cameraZ * 10;
+
+  console.log(`Camera zoomed to point cloud. New position: (${cameraPosition.x}, ${cameraPosition.y}, ${cameraPosition.z})`);
+}
+export function clearScenesAndHideObjects() {
+  const { scene, nonBloomScene } = share3dDat();
+
+  // Function to recursively hide objects
+  function hideObject(obj) {
+    obj.visible = false;
+    if (obj.children) {
+      obj.children.forEach(hideObject);
+    }
+  }
+
+  // Hide all objects in main scene
+  scene.children.forEach(hideObject);
+
+  // Hide all objects in non-bloom scene
+  nonBloomScene.children.forEach(hideObject);
+
+  console.log(`Hidden ${scene.children.length} objects in main scene and ${nonBloomScene.children.length} objects in non-bloom scene.`);
+
+  markNeedsRender();
+}
+
   function adjustCameraToFitSceneAnimated() {
     const { scene, nonBloomScene, camera, controls } = share3dDat();
   

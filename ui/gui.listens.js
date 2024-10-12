@@ -1,5 +1,6 @@
 import { fetchEmbeddingsAndPerformUMAP } from '../ai/umap'
 import { initConnectLines } from './graph_v2/lineGraphs'
+import { performClustering } from '../ai/clustering.js'
 
 export function initiate_gui_controls() {
   document.addEventListener('modalAction', (e) => {
@@ -16,6 +17,7 @@ export function initiate_gui_controls() {
       case 'cluster-nodes':
         console.log('Cluster nodes action triggered');
         // The spinner is already shown by the showSpinner function
+        performClustering();
         setTimeout(() => {
           // Add your logic here
         }, 4000);

@@ -47,19 +47,6 @@ self.onmessage = async function (e) {
         }
 
         try {
-            // debugLog('Initializing UMAP with parameters:', {
-            //     nComponents: 3,
-            //     nNeighbors: 15,
-            //     minDist: 0.1
-            // });
-
-            // // Perform dimensionality reduction using UMAP
-            // const umap = new UMAP({
-            //     nComponents: 3,   // Reduce to 3 dimensions
-            //     nNeighbors: 15,   // Number of nearest neighbors
-            //     minDist: 0.1      // Minimum distance between points
-            //     // You can adjust the parameters above as needed
-            // });
 
                // Adjust hyperparameters for small datasets
                const nNeighbors = Math.min(embeddings.length - 1, 2);  // Reduce nNeighbors to avoid errors with small datasets

@@ -64,7 +64,7 @@ export default defineConfig({
     ]
   },
   optimizeDeps: {
-    include: ['onnxruntime-web', 'compromise', 'umap-js'],
+    include: ['onnxruntime-web', 'compromise', 'umap-js','density-clustering'],
     exclude: ['@xenova/transformers']
   },
   build: {
