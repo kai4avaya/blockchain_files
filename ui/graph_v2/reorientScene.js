@@ -518,8 +518,6 @@ export function getSceneBoundingBox(scene) {
       }
     });
   
-    // Adjust camera's near and far planes based on camera distance
-    // Animate near and far planes
     gsap.to(camera, {
       duration: 1.5,
       near: cameraDistance / 100,
@@ -533,74 +531,10 @@ export function getSceneBoundingBox(scene) {
       }
     });
   
-    console.log("Camera Adjusted:");
     console.log(`Target Position: (${center.x}, ${center.y}, ${center.z})`);
   }
 
   
-// export function zoomCameraToPointCloud(duration = 2) {
-//   const { scene, camera, controls } = share3dDat();
-
-//   // Find all points in the point cloud
-//   const points = scene.children.filter(child => child instanceof THREE.Points);
-
-//   if (points.length === 0) {
-//     console.warn('No point cloud found in the scene.');
-//     return;
-//   }
-
-//   // Calculate bounding box of all points
-//   const boundingBox = new THREE.Box3();
-//   points.forEach(points => {
-//     points.geometry.computeBoundingBox();
-//     boundingBox.union(points.geometry.boundingBox);
-//   });
-
-//   // Calculate center and size of bounding box
-//   const center = new THREE.Vector3();
-//   boundingBox.getCenter(center);
-//   const size = new THREE.Vector3();
-//   boundingBox.getSize(size);
-
-//   // Calculate ideal camera position
-//   const maxDim = Math.max(size.x, size.y, size.z);
-//   const fov = camera.fov * (Math.PI / 180);
-//   const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.1; // Reduced from 1.5 to 1.1 to zoom in closer
-//   const cameraPosition = new THREE.Vector3(center.x, center.y, center.z + cameraZ);
-
-//   // Animate camera position
-//   gsap.to(camera.position, {
-//     duration: duration,
-//     x: cameraPosition.x,
-//     y: cameraPosition.y,
-//     z: cameraPosition.z,
-//     ease: "power2.inOut",
-//     onUpdate: () => {
-//       camera.lookAt(center);
-//       markNeedsRender();
-//     }
-//   });
-
-//   // Animate controls target
-//   gsap.to(controls.target, {
-//     duration: duration,
-//     x: center.x,
-//     y: center.y,
-//     z: center.z,
-//     ease: "power2.inOut",
-//     onUpdate: () => {
-//       controls.update();
-//       markNeedsRender();
-//     }
-//   });
-
-//   // Adjust near and far planes
-//   camera.near = cameraZ / 100;
-//   camera.far = cameraZ * 100;
-//   camera.updateProjectionMatrix();
-
-//   console.log(`Camera zoomed to point cloud. New position: (${cameraPosition.x}, ${cameraPosition.y}, ${cameraPosition.z})`);
-// }
 
 export function zoomCameraToPointCloud(duration = 2) {
   const { scene, camera, controls } = share3dDat();

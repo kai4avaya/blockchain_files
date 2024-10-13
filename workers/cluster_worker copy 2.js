@@ -64,10 +64,9 @@ function euclideanDistance(a, b) {
 function estimateEpsilon(data) {
     const distances = calculateDistances(data);
     distances.sort((a, b) => a - b);
-    const k = Math.floor(Math.sqrt(data.length));
-    return distances[k] * 1.5;  // Increase epsilon slightly
-}
-
+    const k = Math.floor(Math.sqrt(data.length)); // Use square root of data points
+    return distances[k];
+  }
 
 
 self.onmessage = function(e) {
@@ -83,8 +82,8 @@ self.onmessage = function(e) {
 
 
   const epsilon = estimateEpsilon(reducedData);
-//   const minPoints = Math.max(3, Math.floor(Math.log(reducedData.length) / 2)); // Reduce minPoints
-const minPoints = Math.max(3, Math.ceil(Math.log(reducedData.length)));
+  const minPoints = Math.max(3, Math.floor(Math.log(reducedData.length) / 2)); // Reduce minPoints
+
   console.log("Estimated DBSCAN parameters:", { epsilon, minPoints });
 
   // Perform DBSCAN clustering
@@ -106,22 +105,13 @@ const minPoints = Math.max(3, Math.ceil(Math.log(reducedData.length)));
 //   }
 
 // / Handle noise points
-// const noise = dbscan.noise;
-// if (noise.length > 0) {
-//   // Create small clusters of noise points or individual noise points
-//   const noiseClusterSize = Math.min(5, Math.floor(noise.length / 10));
-//   for (let i = 0; i < noise.length; i += noiseClusterSize) {
-//     clusters.push(noise.slice(i, i + noiseClusterSize));
-//   }
-// }
-
-// Handle outliers
-const outliers = dbscan.noise;
-if (outliers.length > 0) {
-    const outlierClusterSize = Math.min(5, Math.ceil(outliers.length / 20));
-    for (let i = 0; i < outliers.length; i += outlierClusterSize) {
-        clusters.push(outliers.slice(i, i + outlierClusterSize));
-    }
+const noise = dbscan.noise;
+if (noise.length > 0) {
+  // Create small clusters of noise points or individual noise points
+  const noiseClusterSize = Math.min(5, Math.floor(noise.length / 10));
+  for (let i = 0; i < noise.length; i += noiseClusterSize) {
+    clusters.push(noise.slice(i, i + noiseClusterSize));
+  }
 }
 
   self.postMessage({

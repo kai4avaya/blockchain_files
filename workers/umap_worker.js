@@ -49,23 +49,25 @@ self.onmessage = async function (e) {
         try {
 
                // Adjust hyperparameters for small datasets
-               const nNeighbors = Math.min(embeddings.length - 1, 2);  // Reduce nNeighbors to avoid errors with small datasets
-               const minDist = 0.5;  // Adjust minDist for small datasets
-   
-               debugLog('Initializing UMAP with parameters:', {
-                   nComponents: 3,
-                   nNeighbors: nNeighbors,
-                   minDist: minDist
-               });
-   
-               // Perform dimensionality reduction using UMAP
-               const umap = new UMAP({
-                   nComponents: 3,   // Reduce to 3 dimensions
-                   nNeighbors: nNeighbors,   // Number of nearest neighbors, adjusted for small dataset
-                   minDist: minDist  // Minimum distance between points
-               });
+               const nNeighbors = Math.min(embeddings.length - 1, 100);  // Reduce nNeighbors to avoid errors with small datasets
+               const minDist = 0.1;  // Adjust minDist for small datasets
 
-            debugLog('Fitting UMAP to the embeddings...');
+               // Perform dimensionality reduction using UMAP
+            //    const umap = new UMAP({
+            //        nComponents: 3,   // Reduce to 3 dimensions
+            //        nNeighbors: nNeighbors,   // Number of nearest neighbors, adjusted for small dataset
+            //        minDist: minDist  // Minimum distance between points
+            //    });
+
+            const umap = new UMAP({
+                nComponents: 3,
+                nNeighbors: Math.min(30, embeddings.length - 1),  // Adjust based on dataset size
+                minDist: 0.1,
+                spread: 1.5,  // Increase spread for better separation
+                repulsionStrength: 1.5,  // Increase repulsion for more distinct clusters
+                nEpochs: 500  // Increase number of epochs for potentially better results
+            });
+
 
             // Fit the UMAP model to the embeddings asynchronously
             const embedding3D = await umap.fitAsync(embeddings, (epochNumber) => {

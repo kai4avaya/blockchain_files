@@ -1,12 +1,7 @@
 // clustering.js
-// clustering.js
-import * as THREE from 'three';
 import { processKeywordEmbeddings } from './embeddingBatches.js';
 import { performUMAPOnly, sendSceneBoundingBoxToWorker } from './umap.js';
 import { createAnimatedPointCloud } from '../ui/graph_v2/createPointCloud.js';
-import { share3dDat, markNeedsRender } from '../ui/graph_v2/create.js';
-// import { getSceneBoundingBox } from '../ui/graph_v2/reorientScene.js';
-// import { normalizeAndScaleCoordinates } from '../utils/sceneCoordsUtils.js';
 
 import {zoomCameraToPointCloud, clearScenesAndHideObjects} from '../ui/graph_v2/reorientScene.js'
 
@@ -19,7 +14,6 @@ dbscanWorker.onerror = (error) => {
     console.error('DBSCAN Worker error:', error);
 };
 
-
 export async function performClustering() {
     console.log("Starting clustering process");
     try {
@@ -27,7 +21,7 @@ export async function performClustering() {
         clearScenesAndHideObjects();
 
         // Step 1: Process embeddings
-        const { embeddings, keywords, fileIds } = await processKeywordEmbeddings();
+        const { embeddings, keywords, fileIds, fileNames } = await processKeywordEmbeddings();
         console.log('Embeddings processed:', embeddings.length);
 
         // Step 2: Perform UMAP
@@ -44,7 +38,8 @@ export async function performClustering() {
             dbscanWorker.postMessage({
                 reducedData: umapResult.reducedData,
                 keywords,
-                fileIds
+                fileIds,
+                fileNames  // Include fileNames in the message to the worker
             });
 
             dbscanWorker.onmessage = function (e) {
@@ -60,12 +55,12 @@ export async function performClustering() {
         console.log('DBSCAN result:', dbscanResult);
 
         // Step 5: Create point cloud
-        console.log("Creating point cloud...");
         const pointCloud = createAnimatedPointCloud(
             dbscanResult.reducedData,
             dbscanResult.keywords,
             dbscanResult.fileIds,
-            dbscanResult.clusters
+            dbscanResult.clusters,
+            dbscanResult.fileNames  // Pass fileNames to createAnimatedPointCloud
         );
         console.log('Point cloud created');
 
@@ -78,46 +73,3 @@ export async function performClustering() {
         throw error;
     } 
 }
-
-export function onPointCloudInteraction(event) {
-    const sharedData = share3dDat();
-    if (!sharedData || !sharedData.raycaster || !sharedData.camera || !sharedData.scene) {
-        console.warn('Required 3D objects are not available');
-        return;
-    }
-    
-    const { raycaster, camera, scene } = sharedData;
-    
-    // Update the picking ray with the camera and mouse position
-    const mouse = new THREE.Vector2(
-        (event.clientX / window.innerWidth) * 2 - 1,
-        -(event.clientY / window.innerHeight) * 2 + 1
-    );
-    raycaster.setFromCamera(mouse, camera);
-
-    // Calculate objects intersecting the picking ray
-    const intersects = raycaster.intersectObjects(scene.children);
-
-    if (intersects.length > 0) {
-        const intersectedPoint = intersects[0].object;
-        if (intersectedPoint && intersectedPoint.userData) {
-            const index = intersects[0].index;
-            if (index !== undefined && 
-                intersectedPoint.userData.fileIds && 
-                intersectedPoint.userData.keywords) {
-                // Display information about the intersected point
-                console.log('Intersected point:', {
-                    fileId: intersectedPoint.userData.fileIds[index],
-                    keywords: intersectedPoint.userData.keywords[index]
-                });
-            } else {
-                console.warn('Intersected point does not have expected userData');
-            }
-        } else {
-            console.warn('Intersected object does not have expected properties');
-        }
-        
-        // You can add more interaction logic here, such as highlighting the point or showing a tooltip
-    }
-}
-// Add event listener for point cloud interaction
