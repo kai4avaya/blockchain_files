@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status Indicator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-image: url('/api/placeholder/1920/1080'); /* Placeholder background */
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        #status-container {
+            position: fixed;
+            top: 20px;
+            max-width: 300px;
+            width: 90%;
+            padding: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+        #status-container.visible {
+            opacity: 1;
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            opacity: 0;
+            animation: fadeIn 0.5s ease-in forwards;
+        }
+        .status-item span {
+            font-family: 'Courier New', monospace;
+            color: #3498db;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(52, 152, 219, 0.3);
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .checkmark {
+            color: #2ecc71;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="status-container"></div>
+
+    <script>
+        class StatusIndicator {
+            constructor() {
+                this.container = document.getElementById('status-container');
+                this.statuses = [];
+                this.isVisible = false;
+                this.setupEventListener();
+            }
+
+            setupEventListener() {
+                window.addEventListener('statusUpdate', (event) => {
+                    this.addStatus(event.detail.status);
+                });
+            }
+
+            show() {
+                if (!this.isVisible) {
+                    this.container.classList.add('visible');
+                    this.isVisible = true;
+                }
+            }
+
+            hide() {
+                if (this.isVisible) {
+                    this.container.classList.remove('visible');
+                    this.isVisible = false;
+                }
+            }
+
+            addStatus(status) {
+                this.show();
+                if (status.toLowerCase() === 'done') {
+                    this.complete();
+                } else {
+                    const statusItem = document.createElement('div');
+                    statusItem.className = 'status-item';
+                    statusItem.innerHTML = `
+                        <span>${status}</span>
+                        <div class="spinner"></div>
+                    `;
+                    this.container.appendChild(statusItem);
+                    this.statuses.push(statusItem);
+
+                    setTimeout(() => {
+                        statusItem.querySelector('.spinner').outerHTML = '<span class="checkmark">✓</span>';
+                    }, 2000);
+                }
+            }
+
+            complete() {
+                setTimeout(() => {
+                    this.hide();
+                    setTimeout(() => {
+                        this.container.innerHTML = '';
+                        this.statuses = [];
+                    }, 500); // Wait for fade out to complete before clearing
+                }, 2000);
+            }
+        }
+
+        // Initialize the StatusIndicator
+        const statusIndicator = new StatusIndicator();
+
+        // Function to update status (can be called directly or used with events)
+        function updateStatus(status) {
+            statusIndicator.addStatus(status);
+        }
+
+        // Function to dispatch a status update event
+        function dispatchStatusUpdate(status) {
+            window.dispatchEvent(new CustomEvent('statusUpdate', { 
+                detail: { status: status }
+            }));
+        }
+
+        // Example usage with direct function calls
+        setTimeout(() => updateStatus("Starting process..."), 1000);
+        setTimeout(() => updateStatus("Loading data..."), 3000);
+
+        // Example usage with events
+        setTimeout(() => dispatchStatusUpdate("Processing..."), 5000);
+        setTimeout(() => dispatchStatusUpdate("Finalizing..."), 7000);
+        setTimeout(() => dispatchStatusUpdate("done"), 9000);
+    </script>
+</body>
+</html>

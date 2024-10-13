@@ -1,7 +1,8 @@
 // clustering.js
 import { processKeywordEmbeddings } from './embeddingBatches.js';
 import { performUMAPOnly, sendSceneBoundingBoxToWorker } from './umap.js';
-import { createAnimatedPointCloud } from '../ui/graph_v2/createPointCloud.js';
+import { createAnimatedPointCloud, adjustCameraAndRaycaster } from '../ui/graph_v2/createPointCloud.js';
+
 
 import {zoomCameraToPointCloud, clearScenesAndHideObjects} from '../ui/graph_v2/reorientScene.js'
 
@@ -66,6 +67,8 @@ export async function performClustering() {
 
         // Step 6: Zoom camera to point cloud
         zoomCameraToPointCloud();
+
+        adjustCameraAndRaycaster();
 
         return pointCloud;
     } catch (error) {
