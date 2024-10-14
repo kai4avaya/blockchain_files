@@ -49,8 +49,8 @@ self.onmessage = async function (e) {
         try {
 
                // Adjust hyperparameters for small datasets
-               const nNeighbors = Math.min(embeddings.length - 1, 100);  // Reduce nNeighbors to avoid errors with small datasets
-               const minDist = 0.1;  // Adjust minDist for small datasets
+            //    const nNeighbors = Math.min(embeddings.length - 1, 100);  // Reduce nNeighbors to avoid errors with small datasets
+            //    const minDist = 0.1;  // Adjust minDist for small datasets
 
                // Perform dimensionality reduction using UMAP
             //    const umap = new UMAP({

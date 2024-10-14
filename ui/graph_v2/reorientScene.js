@@ -442,7 +442,7 @@ export function getSceneBoundingBox(scene) {
     console.log("Bounding Box Helper added to the scene.");
   }
   
-  function adjustCameraToFitScene() {
+  export function adjustCameraToFitScene() {
     const { scene, nonBloomScene } = share3dDat();
   
     // Combine all spheres from both scenes
@@ -625,7 +625,7 @@ export function clearScenesAndHideObjects() {
   markNeedsRender();
 }
 
-  function adjustCameraToFitSceneAnimated() {
+ function adjustCameraToFitSceneAnimated() {
     const { scene, nonBloomScene, camera, controls } = share3dDat();
   
     // Combine all spheres from both scenes
@@ -750,3 +750,61 @@ export function clearScenesAndHideObjects() {
   //   camera.updateProjectionMatrix();
   // }
   
+
+//   export function rescalePositions(scene, targetSize = 100) {
+//     const bbox = new THREE.Box3().setFromObject(scene);
+//     const center = bbox.getCenter(new THREE.Vector3());
+//     const size = bbox.getSize(new THREE.Vector3());
+//     const maxDim = Math.max(size.x, size.y, size.z);
+//     const scale = targetSize / maxDim;
+
+//     scene.traverse((object) => {
+//         if (object.isObject3D) {
+//             object.position.sub(center).multiplyScalar(scale).add(center);
+//             if (object.isLine) {
+//                 object.geometry.computeBoundingBox();
+//                 object.geometry.scale(scale, scale, scale);
+//             }
+//         }
+//     });
+
+//     return { center, scale };
+// }
+
+export function reorientCamera(scene, camera, controls) {
+  const bbox = new THREE.Box3().setFromObject(scene);
+  const center = bbox.getCenter(new THREE.Vector3());
+  const size = bbox.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * (Math.PI / 180);
+  const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+
+  camera.position.set(center.x, center.y, center.z + cameraZ);
+  camera.lookAt(center);
+  camera.updateProjectionMatrix();
+
+  if (controls) {
+      controls.target.copy(center);
+      controls.update();
+  }
+}
+
+export function rescalePositions(scene, targetSize = 100) {
+  const bbox = new THREE.Box3().setFromObject(scene);
+  const center = bbox.getCenter(new THREE.Vector3());
+  const size = bbox.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = targetSize / maxDim;
+
+  scene.traverse((object) => {
+      if (object.isObject3D) {
+          object.position.sub(center).multiplyScalar(scale).add(center);
+          if (object.isLine) {
+              object.geometry.computeBoundingBox();
+              object.geometry.scale(scale, scale, scale);
+          }
+      }
+  });
+
+  return { center, scale };
+}

@@ -47,7 +47,7 @@ import { fetchEmbeddingsAndPerformUMAP } from '../ai/umap'
 import { initConnectLines } from './graph_v2/lineGraphs'
 import { performClustering } from '../ai/clustering.js'
 import { updateStatus } from './components/process.js'  // Import the updateStatus function
-
+import {setupTextProjectionVisualization} from '../ai/vector_text_patterns.js'
 export function initiate_gui_controls() {
   document.addEventListener('modalAction', (e) => {
     const action = e.detail.action;
@@ -113,6 +113,7 @@ export function initiate_gui_controls() {
           updateStatus("Applying filters to ideas...");
           // Add your logic here
           // For now, we'll just simulate a process
+          setupTextProjectionVisualization()
           setTimeout(() => {
             updateStatus("Idea filtering complete");
             setTimeout(() => updateStatus("done"), 2000);

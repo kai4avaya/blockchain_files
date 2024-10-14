@@ -66,7 +66,7 @@ export async function performClustering() {
         console.log('Point cloud created');
 
         // Step 6: Zoom camera to point cloud
-        zoomCameraToPointCloud();
+        // zoomCameraToPointCloud();
 
         adjustCameraAndRaycaster();
 

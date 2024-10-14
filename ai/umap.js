@@ -118,3 +118,23 @@ export function terminateWorkers() {
     umapWorker.postMessage({ type: 'terminate' });
     console.log('Terminated UMAP worker.');
 }
+
+export async function fetchDataAndPerformUMAP_projections() {
+  try {
+    await indexDBOverlay.openDB('vectorDB_new');
+    await indexDBOverlay.initializeDB(['vectors', 'vectors_hashIndex']);
+
+    const vectorsData = await indexDBOverlay.getData('vectors');
+    const hashIndexData = await indexDBOverlay.getData('vectors_hashIndex');
+
+    const embeddings = vectorsData.map(item => item.embedding);
+    const labels = vectorsData.map(item => item.fileId);
+
+    const umapResult = await performUMAPOnly(embeddings, labels);
+
+    return { umapResult, vectorsData, hashIndexData };
+  } catch (error) {
+    console.error('Error fetching data or performing UMAP:', error);
+    throw error;
+  }
+}
