@@ -26,17 +26,21 @@ class IndexDBWorkerOverlay {
     }
   
     private async sendToWorkerWithRetry(action: string, data: any, retries: number = 0): Promise<any> {
-      try {
-        return await this.sendToWorker(action, data);
-      } catch (error) {
-        if (retries < this.maxRetries) {
-          console.log(`Retrying ${action} (Attempt ${retries + 1}/${this.maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, this.retryDelay));
-          return this.sendToWorkerWithRetry(action, data, retries + 1);
-        } else {
-          throw error;
+        try {
+          return await this.sendToWorker(action, data);
+        } catch (error: any) {
+          if (retries < this.maxRetries) {
+            console.log(`Retrying ${action} (Attempt ${retries + 1}/${this.maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+            if (error.message.includes('database connection is closing')) {
+              // If the database was closing, try to reopen it before retrying
+              await this.openDB(data.dbName);
+            }
+            return this.sendToWorkerWithRetry(action, data, retries + 1);
+          } else {
+            throw error;
+          }
         }
-      }
     }
   
     private sendToWorker(action: string, data: any): Promise<any> {
@@ -104,6 +108,8 @@ class IndexDBWorkerOverlay {
       await this.ensureDBOpen();
       return this.sendToWorkerWithRetry('getItem', { storeName, key, dbName });
     }
+
+    
   }
   
   const indexDBOverlay = new IndexDBWorkerOverlay();

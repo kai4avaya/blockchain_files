@@ -1,6 +1,5 @@
 // memory_worker.js
 const dbs = {}; // Map of dbName to dbInstance
-
 async function openDB(dbName, version = undefined) {
   return new Promise((resolve, reject) => {
     console.log(`Attempting to open database: ${dbName}, Version: ${version || 'current'}`);
@@ -31,11 +30,17 @@ async function openDB(dbName, version = undefined) {
       }
       // Add other databases and their stores as needed
     };
-
     request.onsuccess = function (event) {
       const db = event.target.result;
       dbs[dbName] = db;
       console.log(`Database ${dbName} opened successfully with version ${db.version}`);
+      
+      // Listen for close events
+      db.onclose = () => {
+        console.log(`Database ${dbName} connection closed`);
+        delete dbs[dbName];
+      };
+      
       resolve({ message: 'Database opened successfully', version: db.version });
     };
 
@@ -93,20 +98,75 @@ async function getData(storeName, dbName = 'fileGraphDB') {
   }
 }
 
-async function saveData(storeName, data, dbName = 'fileGraphDB') {
+// async function saveData(storeName, data, dbName = 'fileGraphDB') {
+//   try {
+//     if (!dbs[dbName]) {
+//       throw new Error(`Database "${dbName}" is not open`);
+//     }
+//     const db = dbs[dbName];
+
+//     return new Promise((resolve, reject) => {
+//       const tx = db.transaction([storeName], 'readwrite');
+//       const store = tx.objectStore(storeName);
+
+//       if (Array.isArray(data)) {
+//         data.forEach(item => {
+//           console.log("PUT i am put item from memory_worker", item);
+//           store.put(item);
+//         });
+//       } else {
+//         store.put(data);
+//       }
+
+//       tx.oncomplete = () => resolve("Data saved successfully");
+//       tx.onerror = () => reject(new Error(`Error saving data to ${storeName}`));
+//     });
+//   } catch (error) {
+//     throw error;
+//   }
+// }
+
+
+async function saveData(storeName, data, dbName = 'fileGraphDB', retries = 3) {
   try {
-    if (!dbs[dbName]) {
-      throw new Error(`Database "${dbName}" is not open`);
+    if (!dbs[dbName] || dbs[dbName].closePending) {
+      console.log(`Database ${dbName} is not open or is closing. Attempting to reopen...`);
+      await openDB(dbName);
     }
+    
     const db = dbs[dbName];
 
     return new Promise((resolve, reject) => {
-      const tx = db.transaction([storeName], 'readwrite');
+      let tx;
+      try {
+        tx = db.transaction([storeName], 'readwrite');
+      } catch (error) {
+        if (error.name === 'InvalidStateError' && retries > 0) {
+          console.log(`Database connection is closing. Retrying... (${retries} attempts left)`);
+          setTimeout(() => {
+            saveData(storeName, data, dbName, retries - 1).then(resolve).catch(reject);
+          }, 1000); // Wait for 1 second before retrying
+          return;
+        } else if (error.name === 'NotFoundError') {
+          // Attempt to create the missing object store
+          const version = db.version + 1;
+          db.close();
+          openDB(dbName, version).then(() => {
+            // Retry the save operation after creating the store
+            saveData(storeName, data, dbName).then(resolve).catch(reject);
+          }).catch(reject);
+          return;
+        } else {
+          reject(error);
+          return;
+        }
+      }
+
       const store = tx.objectStore(storeName);
 
       if (Array.isArray(data)) {
         data.forEach(item => {
-          console.log("PUT i am put item from memory_worker", item);
+          console.log("PUT item from memory_worker", item);
           store.put(item);
         });
       } else {
@@ -117,6 +177,7 @@ async function saveData(storeName, data, dbName = 'fileGraphDB') {
       tx.onerror = () => reject(new Error(`Error saving data to ${storeName}`));
     });
   } catch (error) {
+    console.error('Error in saveData:', error);
     throw error;
   }
 }

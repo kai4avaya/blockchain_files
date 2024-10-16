@@ -10,9 +10,6 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
 import { makeObjectWritable, convertToThreeJSFormat, getCurrentTimeOfDay, calculateDistance  } from "../../utils/utils";
-// import { normalizeAndScaleCoordinates } from '../../utils/sceneCoordsUtils.js'; // Adjust path as necessary
-// import { gsap } from "gsap"; // Ensure GSAP is imported
-// import { normalizeAndScaleCoordinates } from '../../utils/sceneCoordsUtils.js'; // Adjust path as necessary
 import {labelListerners} from './move.js'
 import { createSceneSnapshot, findSpheresInCube,findAllSpheres, findAllCubes} from "./snapshot.js";
 import {sendSceneBoundingBoxToWorker} from '../../ai/umap.js'
@@ -50,8 +47,6 @@ const nonBloomRT = new THREE.WebGLRenderTarget(
 );
 const darkMaterial = new THREE.MeshBasicMaterial({ color: "black" });
 const materials = {};
-// const renderer = new THREE.WebGLRenderer( { antialias: true } );
-// const renderer = new THREE.WebGLRenderer({ antialias: false });
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -739,8 +734,8 @@ export function render_cull() {
 //   // Final composite
 //   finalComposer.render();
 // }
-
-function render() {
+// Kai new render
+export function render() {
   // Update frustum
   camera.updateMatrixWorld();
   frustum.setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
@@ -822,7 +817,7 @@ export function addNode(
   x = Math.random() * 100 - 50,
   y = Math.random() * 100 - 50,
   z = Math.random() * 100 - 50,
-  color = Math.random() * 0xffffff
+  // color = Math.random() * 0xffffff
 ) {
   // Placeholder implementation
 }
@@ -840,6 +835,7 @@ export function share3dDat() {
     sceneSnapshot: typeof sceneSnapshot !== "undefined" ? sceneSnapshot : null,
     mousePositionManager: mousePositionManager, // Add this line
     mouseOverlay: mouseOverlay,
+    labelRenderer: labelRenderer,
   };
 }
 
