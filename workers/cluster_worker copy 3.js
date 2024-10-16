@@ -55,18 +55,21 @@ function euclideanDistance(a, b) {
   return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
 }
 
+
 // function estimateEpsilon(data) {
 //     const distances = calculateDistances(data);
 //     distances.sort((a, b) => a - b);
-//     const k = Math.floor(data.length * 0.2); // Use 20% of the data points instead of 10%
-//     return distances[k];
-//   }
+//     const k = Math.floor(Math.sqrt(data.length));
+//     return distances[k] * 1.5;  // Increase epsilon slightly
+// }
+
 function estimateEpsilon(data) {
     const distances = calculateDistances(data);
     distances.sort((a, b) => a - b);
-    const k = Math.floor(Math.sqrt(data.length)); // Use square root of data points
-    return distances[k];
+    const k = Math.floor(Math.sqrt(data.length));
+    return distances[k] * 2.5;  // Increase epsilon more significantly
   }
+
 
 
 self.onmessage = function(e) {
@@ -82,8 +85,9 @@ self.onmessage = function(e) {
 
 
   const epsilon = estimateEpsilon(reducedData);
-  const minPoints = Math.max(3, Math.floor(Math.log(reducedData.length) / 2)); // Reduce minPoints
-
+//   const minPoints = Math.max(3, Math.floor(Math.log(reducedData.length) / 2)); // Reduce minPoints
+// const minPoints = Math.max(3, Math.ceil(Math.log(reducedData.length)));
+const minPoints = Math.max(5, Math.ceil(Math.log(reducedData.length) * 1.5));
   console.log("Estimated DBSCAN parameters:", { epsilon, minPoints });
 
   // Perform DBSCAN clustering
@@ -98,20 +102,15 @@ self.onmessage = function(e) {
   }
 
   console.log("Clustering completed. Clusters:", clusters.length);
-  // Handle noise points
-//   const noise = dbscan.noise;
-//   if (noise.length > 0) {
-//     clusters.push(noise); // Add noise points as a separate cluster
-//   }
 
-// / Handle noise points
-const noise = dbscan.noise;
-if (noise.length > 0) {
-  // Create small clusters of noise points or individual noise points
-  const noiseClusterSize = Math.min(5, Math.floor(noise.length / 10));
-  for (let i = 0; i < noise.length; i += noiseClusterSize) {
-    clusters.push(noise.slice(i, i + noiseClusterSize));
-  }
+
+// Handle outliers
+const outliers = dbscan.noise;
+if (outliers.length > 0) {
+    const outlierClusterSize = Math.min(5, Math.ceil(outliers.length / 20));
+    for (let i = 0; i < outliers.length; i += outlierClusterSize) {
+        clusters.push(outliers.slice(i, i + outlierClusterSize));
+    }
 }
 
   self.postMessage({

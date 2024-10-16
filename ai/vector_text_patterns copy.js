@@ -1,9 +1,12 @@
+
+
+
 import * as THREE from "three";
 import indexDBOverlay from '../memory/local/file_worker';
 import { performUMAPOnly, sendSceneBoundingBoxToWorker } from './umap.js';
-import { clearScenesAndHideObjects, reorientCamera, rescalePositions } from '../ui/graph_v2/reorientScene.js';
+import { adjustCameraToFitScene, clearScenesAndHideObjects, reorientCamera, rescalePositions } from '../ui/graph_v2/reorientScene.js';
 import { share3dDat, markNeedsRender } from '../ui/graph_v2/create.js'
-import { createFloatingElement, createVisualConnections, addInteractivity, initCSS3DRenderer, updateRendererSizes } from '../ui/graph_v2/createTextProjections.js';
+import { createFloatingTextPlane, addInteractivity, adjustTextPlaneOrientations } from '../ui/graph_v2/createTextProjections.js';
 
 async function fetchAndValidateData() {
     await indexDBOverlay.openDB('vectorDB_new', 2);
@@ -41,18 +44,13 @@ async function performUMAPAndCreateCoordMap(embeddings, labels) {
     const { reducedData } = await performUMAPOnly(embeddings, labels);
     const keyToCoords = {};
     labels.forEach((key, index) => {
-        keyToCoords[key] = new THREE.Vector3(
-            reducedData[index][0] * 800 - 1500,
-            -reducedData[index][1] * 800 + 990,
-            reducedData[index][2] * 800
-        );
+        keyToCoords[key] = reducedData[index];
     });
     console.log("keyToCoords:", keyToCoords);
     return keyToCoords;
 }
 
-function createElements(scene, hashIndexData, vectorMap, keyToCoords) {
-    const objectMap = new Map();
+function createTextPlanes(scene, hashIndexData, vectorMap, keyToCoords) {
     Object.entries(hashIndexData).forEach(([hashKey, bucketObjects]) => {
         console.log(`Processing hash bucket ${hashKey}:`, bucketObjects);
 
@@ -64,20 +62,42 @@ function createElements(scene, hashIndexData, vectorMap, keyToCoords) {
         bucketObjects.forEach((key) => {
             const vectorData = vectorMap.get(String(key));
             if (vectorData && keyToCoords[key]) {
-                const element = createFloatingElement(vectorData.text, keyToCoords[key], key, vectorData.fileId, hashKey);
-                objectMap.set(String(key), element);
-                scene.add(element);
-                console.log(`Added element for key: ${key}, fileId: ${vectorData.fileId}, position: ${keyToCoords[key].toArray()}`);
+                const position = new THREE.Vector3(
+                    keyToCoords[key][0],
+                    keyToCoords[key][1],
+                    keyToCoords[key][2]
+                );
+                const textPlane = createFloatingTextPlane(vectorData.text.substring(0, 100), position);
+                textPlane.userData = { fullText: vectorData.text, key: key, fileId: vectorData.fileId };
+                scene.add(textPlane);
+                console.log(`Added text plane for key: ${key}, fileId: ${vectorData.fileId}, position: ${position.toArray()}`);
             } else {
                 console.warn('Missing data for key:', key);
             }
         });
     });
-    return objectMap;
+}
+
+function createVisualConnections(scene, hashIndexData) {
+    Object.values(hashIndexData).forEach((bucketObjects) => {
+        for (let i = 0; i < bucketObjects.length - 1; i++) {
+            for (let j = i + 1; j < bucketObjects.length; j++) {
+                const obj1 = scene.getObjectByProperty('userData', { key: String(bucketObjects[i]) });
+                const obj2 = scene.getObjectByProperty('userData', { key: String(bucketObjects[j]) });
+                if (obj1 && obj2) {
+                    const line = new THREE.Line(
+                        new THREE.BufferGeometry().setFromPoints([obj1.position, obj2.position]),
+                        new THREE.LineBasicMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.3 })
+                    );
+                    scene.add(line);
+                }
+            }
+        }
+    });
 }
 
 export async function setupTextProjectionVisualization() {
-    const { scene, camera, controls, renderer, container } = share3dDat();
+    const { scene, camera, controls } = share3dDat();
   
     try {
         clearScenesAndHideObjects();
@@ -86,8 +106,8 @@ export async function setupTextProjectionVisualization() {
         const { vectorMap, embeddings, labels } = prepareDataForUMAP(vectorsData);
         const keyToCoords = await performUMAPAndCreateCoordMap(embeddings, labels);
 
-        const objectMap = createElements(scene, hashIndexData, vectorMap, keyToCoords);
-        createVisualConnections(scene, hashIndexData, objectMap);
+        createTextPlanes(scene, hashIndexData, vectorMap, keyToCoords);
+        createVisualConnections(scene, hashIndexData);
 
         // Rescale positions
         const { center, scale } = rescalePositions(scene);
@@ -98,21 +118,17 @@ export async function setupTextProjectionVisualization() {
         console.log('Reoriented camera');
 
         sendSceneBoundingBoxToWorker();
+        adjustTextPlaneOrientations();
 
         addInteractivity();
-        initCSS3DRenderer(container); // Pass the container element
-        updateRendererSizes();
-
-        window.addEventListener('resize', updateRendererSizes);
-
-        // Override the render function to include CSS3DRenderer
-        const originalRender = share3dDat().render;
-        share3dDat().render = () => {
-            originalRender();
-            share3dDat().css3dRenderer.render(scene, camera);
-        };
-
         markNeedsRender();
+
+        // Log the new positions of some objects for debugging
+        scene.traverse((object) => {
+            if (object.isObject3D && object.userData.key) {
+                console.log(`Object ${object.userData.key} position: ${object.position.toArray()}`);
+            }
+        });
 
     } catch (error) {
         console.error('Error setting up visualization:', error);

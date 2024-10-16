@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Raycaster, Vector2 } from 'three'; // Import Raycaster and Vector2
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { share3dDat, markNeedsRender } from './create.js';
+import {throttle} from '../../utils/utils'
 
 let labelRenderer;
 let currentLabel = null;
@@ -56,9 +57,11 @@ function createAnimatedPointCloud(reducedData, keywords, fileIds, clusters, file
   const pointClouds = [];
   const clusterColors = generateDistinctColors(clusters.length);
 
-  clusterColors.forEach((color, index) => {
-    console.log(`Cluster ${index} color:`, color);
-  });
+  // Scale factor to increase separation between points
+  const scaleFactor = 1;
+
+  // Jitter amount
+  const jitterAmount = 0.05;
 
   clusters.forEach((cluster, clusterIndex) => {
     if (cluster.length === 0) return;
@@ -72,7 +75,14 @@ function createAnimatedPointCloud(reducedData, keywords, fileIds, clusters, file
       if (pointIndex >= reducedData.length) return;
 
       const coords = reducedData[pointIndex];
-      positions.set(coords, index * 3);
+      
+      // Apply scaling and jittering
+      const scaledCoords = coords.map(coord => coord * scaleFactor);
+      const jitteredCoords = scaledCoords.map(coord => 
+        coord + (Math.random() - 0.5) * jitterAmount
+      );
+
+      positions.set(jitteredCoords, index * 3);
 
       const color = clusterColors[clusterIndex];
       colors.set([color.r, color.g, color.b], index * 3);
@@ -398,7 +408,8 @@ function verifySceneScale() {
   console.log("Camera Position:", camera.position);
   console.log("Camera Look At:", camera.getWorldDirection(new THREE.Vector3()));
 }
-window.addEventListener('mousemove', onPointCloudInteraction, false);
+// window.addEventListener('mousemove', onPointCloudInteraction, false);
+window.addEventListener('mousemove', throttle(onPointCloudInteraction, 50), false);
 window.addEventListener('resize', () => {
   const { camera, renderer } = share3dDat();
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -411,6 +422,39 @@ window.addEventListener('resize', () => {
 
 import gsap from 'gsap';
 
+// function adjustCameraAndRaycaster() {
+//   const { camera, scene } = share3dDat();
+//   const boundingBox = new THREE.Box3().setFromObject(scene);
+//   const center = boundingBox.getCenter(new THREE.Vector3());
+//   const size = boundingBox.getSize(new THREE.Vector3());
+
+//   // Calculate new camera position
+//   const maxDim = Math.max(size.x, size.y, size.z);
+//   const fov = camera.fov * (Math.PI / 180);
+//   const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+//   const newPosition = new THREE.Vector3(center.x, center.y, center.z + cameraZ);
+
+//   // Animate camera position
+//   gsap.to(camera.position, {
+//     duration: 2,
+//     x: newPosition.x,
+//     y: newPosition.y,
+//     z: newPosition.z,
+//     ease: "power2.inOut",
+//     onUpdate: () => {
+//       camera.lookAt(center);
+//       camera.updateProjectionMatrix();
+//     }
+//   });
+
+//   // Adjust raycaster threshold
+//   const raycaster = getRaycaster();
+//   raycaster.params.Points.threshold = maxDim / 200;
+
+//   console.log("Animating camera to position:", newPosition);
+//   console.log("Adjusted raycaster threshold:", raycaster.params.Points.threshold);
+// }
+
 function adjustCameraAndRaycaster() {
   const { camera, scene } = share3dDat();
   const boundingBox = new THREE.Box3().setFromObject(scene);
@@ -420,7 +464,7 @@ function adjustCameraAndRaycaster() {
   // Calculate new camera position
   const maxDim = Math.max(size.x, size.y, size.z);
   const fov = camera.fov * (Math.PI / 180);
-  const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+  const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 5; // Increased multiplier from 1.5 to 5
   const newPosition = new THREE.Vector3(center.x, center.y, center.z + cameraZ);
 
   // Animate camera position
@@ -438,7 +482,7 @@ function adjustCameraAndRaycaster() {
 
   // Adjust raycaster threshold
   const raycaster = getRaycaster();
-  raycaster.params.Points.threshold = maxDim / 200;
+  raycaster.params.Points.threshold = maxDim / 100; // Increased divisor from 200 to 100
 
   console.log("Animating camera to position:", newPosition);
   console.log("Adjusted raycaster threshold:", raycaster.params.Points.threshold);

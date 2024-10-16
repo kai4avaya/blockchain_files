@@ -14,11 +14,11 @@ import {
   createSceneSnapshot,
   getObjectById,
   getCubeContainingSphere,
-  // findSpheresInCube,
+
 } from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
 import * as THREE from "three";
-import { convertToThreeJSFormat } from "../../utils/utils";
+import { convertToThreeJSFormat, throttle } from "../../utils/utils";
 import { diffSceneChanges } from "../../memory/collaboration/scene_colab";
 import {updateConnectedLines} from './lineGraphs.js'
 
@@ -849,7 +849,7 @@ function setupPointerEvents() {
 
   canvas.addEventListener("pointerdown", onPointerDown);
 
-  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("pointermove", throttle(onPointerMove, 100));
   canvas.addEventListener("pointerup", onPointerUp);
 }
 

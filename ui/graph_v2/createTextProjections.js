@@ -1,214 +1,193 @@
-// createTextProjection.js
-
 import * as THREE from "three";
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { share3dDat, markNeedsRender } from './create.js';
-export function createFloatingTextPlane(text, position) {
-    const { scene, camera } = share3dDat();
-  
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = 1024;  // Increased size for better resolution
-    canvas.height = 1024;
-  
-    context.fillStyle = 'rgba(0, 0, 0, 0.9)';  // More opaque background
-    context.fillRect(0, 0, canvas.width, canvas.height);
-  
-    context.font = '24px Arial';  // Increased font size
-    context.fillStyle = 'white';
-    context.textAlign = 'left';
-    context.textBaseline = 'top';
-  
-    const maxWidth = canvas.width - 40;
-    const lineHeight = 30;
-    const words = text.split(' ');
-    let line = '';
-    let y = 20;
-  
-    for (let i = 0; i < words.length; i++) {
-      const testLine = line + words[i] + ' ';
-      const metrics = context.measureText(testLine);
-      if (metrics.width > maxWidth) {
-        context.fillText(line, 20, y);
-        line = words[i] + ' ';
-        y += lineHeight;
-        if (y > canvas.height - lineHeight) break;  // Stop if we've run out of space
-      } else {
-        line = testLine;
-      }
-    }
-    context.fillText(line, 20, y);
-  
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.MeshBasicMaterial({ 
-      map: texture, 
-      transparent: true, 
-      side: THREE.DoubleSide,
-      depthWrite: false  // This can help with rendering order issues
-    });
-    const geometry = new THREE.PlaneGeometry(10, 10);  // Adjust size as needed
-    const plane = new THREE.Mesh(geometry, material);
-  
-    plane.position.copy(position);
-    plane.lookAt(camera.position);
-  
-    scene.add(plane);
-    console.log(`Added plane at position: ${position.x}, ${position.y}, ${position.z}`);
-    markNeedsRender();
-  
-    return plane;
-  }
+let css3dRenderer;
 
-  export function addInteractivity() {
-    const { scene, camera, raycaster, mouse, controls } = share3dDat();
-  
-    window.addEventListener('click', (event) => {
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-  
-        raycaster.setFromCamera(mouse, camera);
-  
-        const intersects = raycaster.intersectObjects(scene.children, true);
-  
-        if (intersects.length > 0) {
-            const object = intersects[0].object;
-            if (object.userData.fullText) {
-                displayFullText(object.userData.fullText, object.userData.fileId, object.position);
-            }
-        }
-    });
-  
-    // Add event listener to update plane orientations
-    window.addEventListener('resize', adjustTextPlaneOrientations);
-    controls.addEventListener('change', adjustTextPlaneOrientations);
+export function initCSS3DRenderer(container) {
+  if (!container) {
+    console.error('Container element is undefined');
+    return;
+  }
+  css3dRenderer = new CSS3DRenderer();
+  css3dRenderer.setSize(window.innerWidth, window.innerHeight);
+  css3dRenderer.domElement.style.position = 'absolute';
+  css3dRenderer.domElement.style.top = '0px';
+  container.appendChild(css3dRenderer.domElement);
+  share3dDat().css3dRenderer = css3dRenderer;
 }
-  
-  export function adjustTextPlaneOrientations() {
-    const { scene, camera } = share3dDat();
-  
-    scene.traverse((object) => {
-      if (object.isMesh && object.geometry.type === 'PlaneGeometry') {
-        object.lookAt(camera.position);
-      }
-    });
-    markNeedsRender();
-  }
-  
+export function createFloatingElement(text, position, key, fileId, hashKey) {
+  const element = document.createElement('div');
+  element.className = 'element';
+  element.style.backgroundColor = `rgba(0,127,127,${Math.random() * 0.5 + 0.25})`;
+  element.style.width = '120px';
+  element.style.height = '160px';
+  element.style.boxShadow = '0px 0px 12px rgba(0,255,255,0.5)';
+  element.style.border = '1px solid rgba(127,255,255,0.25)';
+  element.style.fontFamily = 'Helvetica, sans-serif';
+  element.style.textAlign = 'center';
+  element.style.cursor = 'default';
 
-  let currentFileId = null;
+  const symbol = document.createElement('div');
+  symbol.className = 'symbol';
+  symbol.textContent = text.substring(0, 2).toUpperCase();
+  symbol.style.position = 'absolute';
+  symbol.style.top = '40px';
+  symbol.style.left = '0px';
+  symbol.style.right = '0px';
+  symbol.style.fontSize = '60px';
+  symbol.style.fontWeight = 'bold';
+  symbol.style.color = 'rgba(255,255,255,0.75)';
+  symbol.style.textShadow = '0 0 10px rgba(0,255,255,0.95)';
+  element.appendChild(symbol);
 
-  function displayFullText(text, fileId, position) {
-    const { camera } = share3dDat();
-    currentFileId = fileId;
-  
-    // Update modal content
-    const modal = document.getElementById('textModal-text3d');
-    const modalTitle = document.getElementById('modalTitle-text3d');
-    const modalText = document.getElementById('modalText-text3d');
-    const editText = document.getElementById('editText-text3d');
-  
-    modalTitle.textContent = `File ID: ${fileId}`;
-    modalText.textContent = text;
-    editText.value = text;
-  
-    // Position the modal next to the clicked panel
-    const vector = new THREE.Vector3(position.x, position.y, position.z);
-    vector.project(camera);
-  
-    const widthHalf = window.innerWidth / 2;
-    const heightHalf = window.innerHeight / 2;
-  
-    const modalX = (vector.x * widthHalf) + widthHalf;
-    const modalY = -(vector.y * heightHalf) + heightHalf;
-  
-    modal.style.left = `${modalX}px`;
-    modal.style.top = `${modalY}px`;
-  
-    // Show the modal
-    modal.style.display = 'block';
-  
-    // Add event listeners
-    const closeBtn = document.getElementsByClassName('close-text3d')[0];
-    closeBtn.onclick = closeModal;
-  
-    const sendButton = document.getElementById('sendButton-text3d');
-    sendButton.onclick = sendEditedText;
-  
-    // Close modal if clicked outside
-    window.onclick = function(event) {
-      if (event.target == modal) {
-        closeModal();
+  const details = document.createElement('div');
+  details.className = 'details';
+  details.textContent = `${key} (${hashKey})`;
+  details.style.position = 'absolute';
+  details.style.bottom = '15px';
+  details.style.left = '0px';
+  details.style.right = '0px';
+  details.style.fontSize = '12px';
+  details.style.color = 'rgba(127,255,255,0.75)';
+  element.appendChild(details);
+
+  element.addEventListener('mouseover', () => {
+    element.style.boxShadow = '0px 0px 12px rgba(0,255,255,0.75)';
+    element.style.border = '1px solid rgba(127,255,255,0.75)';
+  });
+
+  element.addEventListener('mouseout', () => {
+    element.style.boxShadow = '0px 0px 12px rgba(0,255,255,0.5)';
+    element.style.border = '1px solid rgba(127,255,255,0.25)';
+  });
+
+  const object = new CSS3DObject(element);
+  object.position.copy(position);
+  object.userData = { fullText: text, key, fileId, hashKey };
+
+  return object;
+}
+
+export function createVisualConnections(scene, hashIndexData, objectMap) {
+  Object.values(hashIndexData).forEach((bucketObjects) => {
+    const lineGeometry = new THREE.BufferGeometry();
+    const positions = [];
+
+    for (let i = 0; i < bucketObjects.length; i++) {
+      const obj = objectMap.get(String(bucketObjects[i]));
+      if (obj) {
+        positions.push(obj.position.x, obj.position.y, obj.position.z);
       }
     }
-  }
-  
-  function closeModal() {
-    const modal = document.getElementById('textModal-text3d');
-    modal.style.display = 'none';
-    currentFileId = null;
-  }
-  
-  function sendEditedText() {
-    const editText = document.getElementById('editText-text3d');
-    const newText = editText.value;
-  
-    // Here you would typically send the edited text to your backend or update your data structure
-    console.log(`Sending edited text for file ${currentFileId}:`, newText);
-  
-    // For this example, we'll just update the text on the panel
-    updateTextOnPanel(currentFileId, newText);
-  
-    closeModal();
-  }
-  function updateTextOnPanel(fileId, newText) {
-    const { scene } = share3dDat();
-    const textPlane = scene.getObjectByProperty('userData', { fileId: fileId });
-  
-    if (textPlane) {
-      // Get the existing canvas from the texture
-      const canvas = textPlane.material.map.image;
-      const context = canvas.getContext('2d');
-  
-      // Clear the canvas
-      context.clearRect(0, 0, canvas.width, canvas.height);
-  
-      // Redraw background
-      context.fillStyle = 'rgba(0, 0, 0, 0.8)';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-  
-      // Redraw text
-      context.font = '24px Arial';
-      context.fillStyle = 'white';
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
-  
-      const maxWidth = canvas.width - 40;
-      const lineHeight = 30;
-      const words = newText.split(' ');
-      let line = '';
-      let y = 40;
-  
-      for (let i = 0; i < words.length; i++) {
-        const testLine = line + words[i] + ' ';
-        const metrics = context.measureText(testLine);
-        if (metrics.width > maxWidth && i > 0) {
-          context.fillText(line, canvas.width / 2, y);
-          line = words[i] + ' ';
-          y += lineHeight;
-        } else {
-          line = testLine;
-        }
+
+    lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.3 });
+    const line = new THREE.LineLoop(lineGeometry, lineMaterial);
+    scene.add(line);
+  });
+}
+
+export function addInteractivity() {
+  const { scene, camera, raycaster, mouse } = share3dDat();
+
+  window.addEventListener('click', (event) => {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersects = raycaster.intersectObjects(scene.children, true);
+
+    if (intersects.length > 0) {
+      const object = intersects[0].object;
+      if (object.isCSS3DObject && object.userData.fullText) {
+        displayFullText(object.userData.fullText, object.userData.fileId, object.userData.hashKey, object.position);
       }
-      context.fillText(line, canvas.width / 2, y);
+    }
+  });
+}
+
+export function updateRendererSizes() {
+  const { renderer, camera } = share3dDat();
   
-      // Update the texture
-      textPlane.material.map.needsUpdate = true;
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  if (css3dRenderer) {
+    css3dRenderer.setSize(window.innerWidth, window.innerHeight);
+  }
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
   
-      // Update the userData
-      textPlane.userData.fullText = newText;
+  markNeedsRender();
+}
+
+function displayFullText(text, fileId, hashKey, position) {
+  const { camera } = share3dDat();
   
-      markNeedsRender();
-      console.log(`Updated text plane for fileId: ${fileId}`);
-    } else {
-      console.warn(`No text plane found for fileId: ${fileId}`);
+  const modal = document.getElementById('textModal-text3d');
+  const modalTitle = document.getElementById('modalTitle-text3d');
+  const modalText = document.getElementById('modalText-text3d');
+  const editText = document.getElementById('editText-text3d');
+
+  modalTitle.textContent = `File ID: ${fileId} | Hash Key: ${hashKey}`;
+  modalText.textContent = text;
+  editText.value = text;
+
+  const vector = new THREE.Vector3(position.x, position.y, position.z);
+  vector.project(camera);
+
+  const widthHalf = window.innerWidth / 2;
+  const heightHalf = window.innerHeight / 2;
+
+  const modalX = (vector.x * widthHalf) + widthHalf;
+  const modalY = -(vector.y * heightHalf) + heightHalf;
+
+  modal.style.left = `${modalX}px`;
+  modal.style.top = `${modalY}px`;
+  modal.style.display = 'block';
+
+  const closeBtn = document.getElementsByClassName('close-text3d')[0];
+  closeBtn.onclick = closeModal;
+
+  const sendButton = document.getElementById('sendButton-text3d');
+  sendButton.onclick = () => sendEditedText(fileId, hashKey);
+
+  window.onclick = function(event) {
+    if (event.target == modal) {
+      closeModal();
     }
   }
+}
+
+function closeModal() {
+  const modal = document.getElementById('textModal-text3d');
+  modal.style.display = 'none';
+}
+
+function sendEditedText(fileId, hashKey) {
+  const editText = document.getElementById('editText-text3d');
+  const newText = editText.value;
+
+  console.log(`Sending edited text for file ${fileId}, hash key ${hashKey}:`, newText);
+
+  updateTextOnElement(fileId, hashKey, newText);
+
+  closeModal();
+}
+
+function updateTextOnElement(fileId, hashKey, newText) {
+  const { scene } = share3dDat();
+  const element = scene.children.find(child => 
+    child.isCSS3DObject && 
+    child.userData.fileId === fileId && 
+    child.userData.hashKey === hashKey
+  );
+
+  if (element) {
+    const symbol = element.element.querySelector('.symbol');
+    symbol.textContent = newText.substring(0, 2).toUpperCase();
+    element.userData.fullText = newText;
+    console.log(`Updated text element for fileId: ${fileId}, hashKey: ${hashKey}`);
+  } else {
+    console.warn(`No text element found for fileId: ${fileId}, hashKey: ${hashKey}`);
+  }
+}
