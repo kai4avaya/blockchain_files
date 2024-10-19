@@ -733,6 +733,9 @@ function toggleBloom(object) {
   // object.layers.enable(0); // Ensure the object is always visible in the main scene
   object.layers.toggle(BLOOM_SCENE);
   console.log("After toggle:", object.layers.mask);
+
+  if (object.layers.mask === 1) console.log("HELLO 1 BLOOM")
+  else console.log("HELLO 0 BLOOM")
   markNeedsRender();
 }
 
