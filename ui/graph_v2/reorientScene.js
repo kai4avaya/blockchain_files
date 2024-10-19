@@ -808,3 +808,11 @@ export function rescalePositions(scene, targetSize = 100) {
 
   return { center, scale };
 }
+
+export function getScaleFactorForDistance(distance, minDistance = 1, maxDistance = 10000, minScale = 0.01, maxScale = 2) {
+  return THREE.MathUtils.clamp(
+      THREE.MathUtils.mapLinear(distance, minDistance, maxDistance, maxScale, minScale),
+      minScale,
+      maxScale
+  );
+}

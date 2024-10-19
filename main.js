@@ -12,6 +12,7 @@ import embeddingWorker from "./ai/embeddings.js";
 import { initiate } from "./memory/vectorDB/vectorDbGateway.js"; // Assuming your initiate function is exported
 import {initiate_gui_controls} from './ui/gui.listens.js'
 import indexDBOverlay from './memory/local/file_worker'
+import {throttle} from './utils/utils'
 const userId = "kai";
 localStorage.setItem("login_block", userId);
 
@@ -82,20 +83,20 @@ async function main() {
 //     }
 //   }
 // }
-async function handleQuickClick(event) {
+const handleQuickClick = throttle(async (event) => {
   const selectedObject = getObjectUnderPointer(event, "sphere");
   if (selectedObject) {
-    console.log("GOT ME A QUICK CLICK main.js");
+    console.log("GOT ME A double QUICK CLICK main.js");
     const nodeId = selectedObject.userData.id;
     const fileSystem = getFileSystem();
     const fileMetadata = await fileSystem.getMetadata(nodeId, "file");
 
     if (fileMetadata) {
-      console.log("GOT ME A QUICK  fileMetadata CLICK in main.js", fileMetadata);
+      console.log("GOT ME A QUICK  DBL fileMetadata CLICK in main.js", fileMetadata);
       showPopup(fileMetadata, event.clientX, event.clientY);
     }
   }
-}
+}, 300);
 
 export async function initializeDatabases() {
   try {
@@ -116,25 +117,22 @@ export async function initializeDatabases() {
 
 function addEventListeners(canvas) {
   let pointerDownTime = null;
-  let isDragging = false;
-  const CLICK_DURATION_THRESHOLD = 300; // milliseconds
   const DRAG_THRESHOLD = 10; // pixels
 
-  let startX = 0;
-  let startY = 0;
+  // let startX = 0;
+  // let startY = 0;
 
-  canvas.addEventListener(
-    "pointerdown",
-    (event) => {
-      console.log("he done clicky in main.js");
-      pointerDownTime = Date.now();
-      startX = event.clientX;
-      startY = event.clientY;
-      isDragging = false;
-      // userActionStore.setMouseDown(userId, true, event.clientX, event.clientY, event.target);
-    },
-    { capture: true }
-  );
+  // canvas.addEventListener(
+  //   "pointerdown",
+  //   (event) => {
+  //     console.log("he done clicky in main.js");
+  //     pointerDownTime = Date.now();
+  //     startX = event.clientX;
+  //     startY = event.clientY;
+  //     // userActionStore.setMouseDown(userId, true, event.clientX, event.clientY, event.target);
+  //   },
+  //   { capture: true }
+  // );
 
   // canvas.addEventListener(
   //   "pointerup",
@@ -171,25 +169,47 @@ canvas.addEventListener("dblclick", (event) => {
 });
 
 
-  canvas.addEventListener("pointermove", (event) => {
-    if (pointerDownTime !== null) {
-      const moveX = event.clientX - startX;
-      const moveY = event.clientY - startY;
-      const distance = Math.sqrt(moveX * moveX + moveY * moveY);
+  // canvas.addEventListener("pointermove", (event) => {
+  //   if (pointerDownTime !== null) {
+  //     const moveX = event.clientX - startX;
+  //     const moveY = event.clientY - startY;
+  //     const distance = Math.sqrt(moveX * moveX + moveY * moveY);
 
-      if (distance > DRAG_THRESHOLD) {
-        isDragging = true;
-      }
-    }
+  //     if (distance > DRAG_THRESHOLD) {
+  //       // isDragging = true;
+  //     }
+  //   }
+  //   if (p2pSync.isConnected()) {
+  //     const rect = canvas.getBoundingClientRect();
+  //     const x = event.clientX - rect.left;
+  //     const y = event.clientY - rect.top;
+  //     p2pSync.updateMousePosition(x, y);
+  //   }
+
+  //   // userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
+  // });
+
+  
+  const throttledPointerMove = throttle((event) => {
+    // if (pointerDownTime !== null) {
+    //   const moveX = event.clientX - startX;
+    //   const moveY = event.clientY - startY;
+    //   const distance = Math.sqrt(moveX * moveX + moveY * moveY);
+
+    //   if (distance > DRAG_THRESHOLD) {
+    //     // isDragging = true;
+    //   }
+    // }
     if (p2pSync.isConnected()) {
       const rect = canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
       p2pSync.updateMousePosition(x, y);
     }
+  }, 16); // Throttle to roughly 60fps
 
-    // userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
-  });
+  canvas.addEventListener("pointermove", throttledPointerMove);
+
 
   // Key events can remain on the window object
   window.addEventListener("keydown", (event) => {
@@ -204,12 +224,3 @@ main().catch((error) => {
   console.error("Error in main function:", error);
 });
 
-// async function initializeEmbeddingModel() {
-//   try {
-//     await embeddingWorker.initialize();
-//     console.log('Embedding worker initialized successfully');
-//     // Continue with your app initialization
-// } catch (error) {
-//     console.error('Failed to initialize embedding worker:', error);
-// }
-// }

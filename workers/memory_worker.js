@@ -2,13 +2,11 @@
 const dbs = {}; // Map of dbName to dbInstance
 async function openDB(dbName, version = undefined) {
   return new Promise((resolve, reject) => {
-    console.log(`Attempting to open database: ${dbName}, Version: ${version || 'current'}`);
     
     const request = version ? indexedDB.open(dbName, version) : indexedDB.open(dbName);
 
     request.onupgradeneeded = function (event) {
       const db = event.target.result;
-      console.log(`Upgrading database: ${dbName}, New Version: ${db.version}`);
       
       // Define the object stores based on dbName
       if (dbName === 'fileGraphDB') {
@@ -23,7 +21,6 @@ async function openDB(dbName, version = undefined) {
         db.createObjectStore('graph', { keyPath: 'uuid' });
       } else if (dbName === 'summarizationDB') {
         if (db.objectStoreNames.contains('summaries')) {
-          console.log(`Deleting existing object store: summaries`);
           db.deleteObjectStore('summaries');
         }
         db.createObjectStore('summaries', { keyPath: 'fileId' }); // Assuming 'fileId' as keyPath
@@ -33,11 +30,9 @@ async function openDB(dbName, version = undefined) {
     request.onsuccess = function (event) {
       const db = event.target.result;
       dbs[dbName] = db;
-      console.log(`Database ${dbName} opened successfully with version ${db.version}`);
       
       // Listen for close events
       db.onclose = () => {
-        console.log(`Database ${dbName} connection closed`);
         delete dbs[dbName];
       };
       
@@ -130,7 +125,6 @@ async function getData(storeName, dbName = 'fileGraphDB') {
 async function saveData(storeName, data, dbName = 'fileGraphDB', retries = 3) {
   try {
     if (!dbs[dbName] || dbs[dbName].closePending) {
-      console.log(`Database ${dbName} is not open or is closing. Attempting to reopen...`);
       await openDB(dbName);
     }
     
@@ -142,7 +136,6 @@ async function saveData(storeName, data, dbName = 'fileGraphDB', retries = 3) {
         tx = db.transaction([storeName], 'readwrite');
       } catch (error) {
         if (error.name === 'InvalidStateError' && retries > 0) {
-          console.log(`Database connection is closing. Retrying... (${retries} attempts left)`);
           setTimeout(() => {
             saveData(storeName, data, dbName, retries - 1).then(resolve).catch(reject);
           }, 1000); // Wait for 1 second before retrying
@@ -166,7 +159,6 @@ async function saveData(storeName, data, dbName = 'fileGraphDB', retries = 3) {
 
       if (Array.isArray(data)) {
         data.forEach(item => {
-          console.log("PUT item from memory_worker", item);
           store.put(item);
         });
       } else {

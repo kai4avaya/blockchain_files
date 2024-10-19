@@ -39,50 +39,6 @@ export function initLabelRenderer() {
   return labelRenderer;
 }
 
-// export function createFloatingElement(text, position, key, fileId, hashKey) {
-//   const element = document.createElement('div');
-//   element.className = 'element';
-//   element.style.backgroundColor = `rgba(0,127,127,${Math.random() * 0.5 + 0.25})`;
-//   element.style.width = '120px';
-//   element.style.height = '160px';
-//   element.style.boxShadow = '0px 0px 12px rgba(0,255,255,0.5)';
-//   element.style.border = '1px solid rgba(127,255,255,0.25)';
-//   element.style.fontFamily = 'Helvetica, sans-serif';
-//   element.style.textAlign = 'center';
-//   element.style.cursor = 'default';
-
-//   const symbol = document.createElement('div');
-//   symbol.className = 'symbol';
-//   symbol.textContent = text.substring(0, 2).toUpperCase();
-//   symbol.style.position = 'absolute';
-//   symbol.style.top = '40px';
-//   symbol.style.left = '0px';
-//   symbol.style.right = '0px';
-//   symbol.style.fontSize = '60px';
-//   symbol.style.fontWeight = 'bold';
-//   symbol.style.color = 'rgba(255,255,255,0.75)';
-//   symbol.style.textShadow = '0 0 10px rgba(0,255,255,0.95)';
-//   element.appendChild(symbol);
-
-//   const details = document.createElement('div');
-//   details.className = 'details';
-//   details.textContent = `${key} (${hashKey})`;
-//   details.style.position = 'absolute';
-//   details.style.bottom = '15px';
-//   details.style.left = '0px';
-//   details.style.right = '0px';
-//   details.style.fontSize = '12px';
-//   details.style.color = 'rgba(127,255,255,0.75)';
-//   element.appendChild(details);
-
-//   const object = new CSS3DObject(element);
-//   object.position.copy(position);
-//   object.userData = { fullText: text, key, fileId, hashKey };
-
-//   console.log(`Created CSS3D object for ${fileId} at position: ${position.toArray()}`);
-
-//   return object;
-// }
 
 export function createFloatingElement(text, position, key, fileId, hashKey) {
   const element = document.createElement('div');

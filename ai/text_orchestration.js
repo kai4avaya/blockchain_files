@@ -67,25 +67,15 @@ import { summarizeText } from './summary'
 
 export async function orchestrateTextProcessing(content, file, id) {
     try {
-        console.log(`Starting text processing for file ${id}, type: ${file.type}`);
-        console.log("Content length:", content.length);
 
         if (!textProcessorWorker) {
             console.log("Initializing TextProcessorWorker");
         }
 
         const { chunks, text } = await textProcessorWorker.processText(content, file.type, id);
-        console.log(`Text processing completed for file ${id}`);
-        console.log("Processed text length:", text.length);
-        console.log("Number of chunks:", chunks.length);
-
-        console.log(`Starting embedding for file ${id}`);
         embeddingResult(text, chunks, file, id);
-        console.log(`Embedding completed for file ${id}`);
 
-        console.log(`Starting summarization for file ${id}`);
         summarizeTextAndStore(text, file, id);
-        console.log(`Summarization completed for file ${id}`);
     } catch (error) {
         console.error(`Error processing file ${id}:`, error);
         console.error("Error stack:", error.stack);
@@ -94,8 +84,6 @@ export async function orchestrateTextProcessing(content, file, id) {
 }
 async function embeddingResult(content, chunks, file, id) {
     try {
-        console.log(`Starting embedding generation for file ${id}`);
-        console.log(`Number of chunks to process: ${chunks.length}`);
         
         const embeddingResult = await vectorDBGateway.quickStart({
             text: content,

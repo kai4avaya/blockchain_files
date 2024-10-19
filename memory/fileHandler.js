@@ -25,7 +25,6 @@ let isProcessing = false;
 
 async function processFile(fileEntry, id) {
 
-    console.log("i am processing File", fileEntry)
     return new Promise((resolve, reject) => {
         fileEntry.file(async file => {
             try {
@@ -90,7 +89,6 @@ async function processFiles(files, uuids) {
 
     try {
         await Promise.all(processPromises);
-        console.log('All files processed successfully');
         refreshFileTree();
     } catch (error) {
         console.error('Error processing files:', error);

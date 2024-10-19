@@ -33,7 +33,6 @@ export class FileStore {
     this.loadInitialState();
 
     autorun(() => {
-      console.log("Files updated", this.files);
       this.saveFiles();
       if (isRendererReady()) {
         this.updateGraphNodes();
@@ -41,7 +40,6 @@ export class FileStore {
     });
 
     autorun(() => {
-      console.log("Directories updated", this.directories);
       this.saveDirectories();
     });
   }

@@ -119,7 +119,6 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Import nlp from compromise if you're using it
 import nlp from 'compromise';
 
-console.log("WORKER text_processor_worker is initializing");
 
 async function extractTextFromPDF(arrayBuffer) {
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -168,11 +167,8 @@ async function processContent(content, fileType) {
         if (typeof text !== 'string') {
             throw new Error(`Expected text to be a string, but got ${typeof text}`);
         }
-        console.log("Text received in text_processor_worker", text.substring(0, 100) + "...");
         const textWithoutStopWords = removeStopWords(text);
-        console.log("Text without stop words", textWithoutStopWords.substring(0, 100) + "...");
         const chunks = chunkText(textWithoutStopWords);
-        console.log("Number of chunks created:", chunks.length);
         return { chunks, text }; // text is the original full text
     } catch (error) {
         console.error("Error in processContent:", error);
@@ -206,12 +202,9 @@ function processNextTask() {
 self.onmessage = function(e) {
     const { type, data, fileType, fileId } = e.data;
     if (type === 'processText') {
-        console.log(`Received task for file ${fileId}, type: ${fileType}`);
         taskQueue.push({ data, fileType, fileId });
         if (!isProcessing) {
             processNextTask();
         }
     }
 };
-
-console.log("WORKER text_processor_worker initialization complete");

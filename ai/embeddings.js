@@ -25,7 +25,6 @@ class EmbeddingWorker {
 
     handleWorkerMessage(e) {
         const { type, data, fileId } = e.data;
-        console.log("GOT ME A MESSAGE",  type, fileId)
         if (type === 'ready') {
             this.isReady = true;
             this.processQueuedTasks();

@@ -33,10 +33,8 @@ function processText(text) {
   try {
     const summary = summarizeText(text);
 
-    console.log("I am summary: " + summary);
     const keywords = extractKeywords(text);
     
-    console.log("I am keywords: " + keywords);
     return { summary, keywords };
   } catch (error) {
     console.error("Error in processText:", error);
@@ -45,7 +43,6 @@ function processText(text) {
 }
 
 function summarizeText(text) {
-  console.log("Summarize text in summary worker:", text);
   try {
     const doc = nlp.readDoc(text);
     const sentences = doc.sentences();
@@ -79,7 +76,6 @@ function summarizeText(text) {
       summary = summary.substring(0, CHARACTER_LIMIT - 3) + '...';
     }
 
-    console.log("Generated summary:", summary);
     return summary;
   } catch (error) {
     console.error("Error in summarizeText:", error);

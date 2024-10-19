@@ -3,6 +3,8 @@ import { Raycaster, Vector2 } from 'three'; // Import Raycaster and Vector2
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { share3dDat, markNeedsRender } from './create.js';
 import {throttle} from '../../utils/utils'
+import gsap from 'gsap';
+
 
 let labelRenderer;
 let currentLabel = null;
@@ -305,94 +307,6 @@ function onPointCloudInteraction(event) {
   markNeedsRender();
 }
 
-// function onPointCloudInteraction(event) {
-//   const now = Date.now();
-//   if (now - lastCall < throttleMs) return;
-//   lastCall = now;
-
-//   const { camera, scene, renderer } = share3dDat();
-//   if (!camera || !scene || !renderer) {
-//     console.warn('Camera, scene, or renderer is not available.');
-//     return;
-//   }
-
-//   const raycaster = getRaycaster();
-
-//   const mouse = new Vector2(
-//     (event.clientX / window.innerWidth) * 2 - 1,
-//     -(event.clientY / window.innerHeight) * 2 + 1
-//   );
-//   raycaster.setFromCamera(mouse, camera);
-
-//   const pointClouds = scene.children.filter(child => child instanceof THREE.Points);
-//   const intersects = raycaster.intersectObjects(pointClouds);
-
-//   console.log("Number of point clouds:", pointClouds.length);
-//   console.log("Number of intersections:", intersects.length);
-
-//   if (intersects.length > 0) {
-//     const intersectedPoint = intersects[0].object;
-//     const index = intersects[0].index;
-
-//     if (index !== undefined && intersectedPoint.userData.fileIds && 
-//         intersectedPoint.userData.keywords && intersectedPoint.userData.fileNames) {
-//       const fileId = intersectedPoint.userData.fileIds[index];
-//       const keyword = intersectedPoint.userData.keywords[index];
-//       const fileName = intersectedPoint.userData.fileNames[index];
-
-//       console.log("Hovered over point:", { fileId, keyword, fileName });
-
-//       if (currentLabel) {
-//         scene.remove(currentLabel);
-//       }
-
-//       currentLabel = createLabel(`File: ${fileName}<br>Keyword: ${keyword}`);
-//       currentLabel.position.copy(intersects[0].point);
-//       scene.add(currentLabel);
-//       console.log("Label added to scene at position:", currentLabel.position);
-//     } else {
-//       console.log("Missing user data for intersection");
-//     }
-//   } else if (currentLabel) {
-//     scene.remove(currentLabel);
-//     currentLabel = null;
-//     console.log("Label removed");
-//   }
-  
-//   if (labelRenderer) {
-//     labelRenderer.render(scene, camera);
-//   }
-//   renderer.render(scene, camera);
-//   markNeedsRender();
-// }
-
-// let debugObjects = [];
-
-// function addDebugVisualization() {
-//   const { scene } = share3dDat();
-  
-//   // Clear existing debug objects
-//   debugObjects.forEach(obj => scene.remove(obj));
-//   debugObjects = [];
-
-//   // Add debug spheres for each point
-//   scene.children.filter(child => child instanceof THREE.Points).forEach(pointCloud => {
-//     const positions = pointCloud.geometry.attributes.position.array;
-//     for (let i = 0; i < positions.length; i += 3) {
-//       const geometry = new THREE.SphereGeometry(5, 32, 32);
-//       const material = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.5 });
-//       const sphere = new THREE.Mesh(geometry, material);
-//       sphere.position.set(positions[i], positions[i+1], positions[i+2]);
-//       scene.add(sphere);
-//       debugObjects.push(sphere);
-//     }
-//   });
-
-//   console.log("Debug visualization added");
-// }
-
-
-
 function verifySceneScale() {
   const { scene, camera } = share3dDat();
   const boundingBox = new THREE.Box3().setFromObject(scene);
@@ -408,52 +322,7 @@ function verifySceneScale() {
   console.log("Camera Position:", camera.position);
   console.log("Camera Look At:", camera.getWorldDirection(new THREE.Vector3()));
 }
-// window.addEventListener('mousemove', onPointCloudInteraction, false);
-window.addEventListener('mousemove', throttle(onPointCloudInteraction, 50), false);
-window.addEventListener('resize', () => {
-  const { camera, renderer } = share3dDat();
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  if (labelRenderer) {
-    labelRenderer.setSize(window.innerWidth, window.innerHeight);
-  }
-}, false);
 
-import gsap from 'gsap';
-
-// function adjustCameraAndRaycaster() {
-//   const { camera, scene } = share3dDat();
-//   const boundingBox = new THREE.Box3().setFromObject(scene);
-//   const center = boundingBox.getCenter(new THREE.Vector3());
-//   const size = boundingBox.getSize(new THREE.Vector3());
-
-//   // Calculate new camera position
-//   const maxDim = Math.max(size.x, size.y, size.z);
-//   const fov = camera.fov * (Math.PI / 180);
-//   const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
-//   const newPosition = new THREE.Vector3(center.x, center.y, center.z + cameraZ);
-
-//   // Animate camera position
-//   gsap.to(camera.position, {
-//     duration: 2,
-//     x: newPosition.x,
-//     y: newPosition.y,
-//     z: newPosition.z,
-//     ease: "power2.inOut",
-//     onUpdate: () => {
-//       camera.lookAt(center);
-//       camera.updateProjectionMatrix();
-//     }
-//   });
-
-//   // Adjust raycaster threshold
-//   const raycaster = getRaycaster();
-//   raycaster.params.Points.threshold = maxDim / 200;
-
-//   console.log("Animating camera to position:", newPosition);
-//   console.log("Adjusted raycaster threshold:", raycaster.params.Points.threshold);
-// }
 
 function adjustCameraAndRaycaster() {
   const { camera, scene } = share3dDat();
@@ -488,16 +357,18 @@ function adjustCameraAndRaycaster() {
   console.log("Adjusted raycaster threshold:", raycaster.params.Points.threshold);
 }
 function initializeEventListeners() {
-  window.addEventListener('mousemove', onPointCloudInteraction, false);
-  window.addEventListener('resize', () => {
-    const { camera, renderer } = share3dDat();
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    if (labelRenderer) {
-      labelRenderer.setSize(window.innerWidth, window.innerHeight);
-    }
-  }, false);
+// window.addEventListener('mousemove', onPointCloudInteraction, false);
+window.addEventListener('mousemove', throttle(onPointCloudInteraction, 50), false);
+window.addEventListener('resize', () => {
+  const { camera, renderer } = share3dDat();
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  if (labelRenderer) {
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+  }
+}, false);
+
   
   console.log("Event listeners initialized.");
 }

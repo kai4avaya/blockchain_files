@@ -31,11 +31,9 @@ export async function quickStart(
   storeName = "vectors",
   dbName = "vectorDB_new"
 ) {
-  console.log("QUICKSTART metaData", metaData);
   const { text, ...otherMetaData } = metaData;
   const fileId = metaData.fileId;
 
-  console.log("QUICKSTART fileid", fileId, metaData.fileId);
   const dbKey = `${dbName}_${storeName}`;
   if (!dbs[dbKey]) {
     throw new Error(

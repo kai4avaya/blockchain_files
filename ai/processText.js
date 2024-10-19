@@ -85,7 +85,6 @@ class TextProcessorWorker {
     constructor() {
         if (!TextProcessorWorker.instance) {
             try {
-                console.log("Initializing TextProcessorWorker");
                 this.worker = new Worker(new URL('../workers/text_processor_worker.js', import.meta.url), { type: 'module' });
                 this.taskQueue = [];
                 this.isProcessing = false;
@@ -115,7 +114,6 @@ class TextProcessorWorker {
                 };
 
                 TextProcessorWorker.instance = this;
-                console.log("TextProcessorWorker initialized successfully");
             } catch (error) {
                 console.error("Error in TextProcessorWorker constructor:", error);
                 throw error;
@@ -142,7 +140,6 @@ class TextProcessorWorker {
         this.isProcessing = true;
         const { content, fileType, fileId, resolve, reject } = this.taskQueue.shift();
 
-        console.log(`Processing task for file ${fileId}, type: ${fileType}`);
         this.worker.postMessage({
             type: 'processText',
             data: content,
@@ -154,7 +151,6 @@ class TextProcessorWorker {
     }
 
     onTextProcessed(fileId, processedText) {
-        console.log(`Text processed for file ${fileId}`);
         if (this.currentTask && this.currentTask.fileId === fileId) {
             this.currentTask.resolve(processedText);
             this.currentTask = null;
@@ -177,7 +173,6 @@ class TextProcessorWorker {
 let textProcessorWorker;
 try {
     textProcessorWorker = new TextProcessorWorker();
-    console.log("TextProcessorWorker instance created successfully");
 } catch (error) {
     console.error("Failed to create TextProcessorWorker instance:", error);
 }

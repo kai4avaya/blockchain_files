@@ -50,7 +50,6 @@ class P2PSync {
     this.peer = new Peer(peerId);
 
     this.peer.on('open', (id) => {
-      console.log('My peer ID is:', id);
       localStorage.setItem('myPeerId', id);
       updateStatus(`Initialized with peer ID: ${id}`);
       this.updateUserIdInput(id);  // Update the user ID input instead
@@ -68,7 +67,6 @@ class P2PSync {
     });
 
     this.peer.on('disconnected', () => {
-      console.log('Peer disconnected');
       updateStatus('Peer disconnected. Attempting to reconnect...');
       if (this.peer && !this.peer.destroyed) {
         this.peer.reconnect();
@@ -76,7 +74,6 @@ class P2PSync {
     });
 
     this.peer.on('close', () => {
-      console.log('Peer connection closed');
       updateStatus('Peer connection closed');
       this.stopHeartbeat();
     });
@@ -88,12 +85,10 @@ class P2PSync {
   }
   setMouseOverlay(overlay: MouseOverlayCanvas): void {
     this.mouseOverlay = overlay;
-    console.log('MouseOverlayCanvas set in P2PSync');
   }
 
   setMousePositionManager(manager: MousePositionManager): void {
     this.mousePositionManager = manager;
-    console.log('MousePositionManager set in P2PSync');
   }
 
   // updateMousePosition(x: number, y: number): void {
@@ -107,17 +102,14 @@ class P2PSync {
   // }
 
   updateMousePosition(x: number, y: number): void {
-    console.log("this.mouseOverlay, this.peer", this.mouseOverlay, this.peer)
     if (this.connections.size === 0 || !this.mouseOverlay || !this.peer) return;
 
-    console.log(`Sending mouse position: (${x}, ${y})`);
     this.broadcastMousePosition(x, y);
   }
 
   private broadcastMousePosition(x: number, y: number): void {
     this.connections.forEach((conn) => {
       if (conn.open) {
-        console.log(`Broadcasting mouse position to peer ${conn.peer}: (${x}, ${y})`);
         conn.send({ type: 'mouse_position', data: { x, y } });
       }
     });
@@ -134,17 +126,14 @@ class P2PSync {
       return;
     }
     if (this.connections.has(peerId) || peerId === this.peer.id) {
-      console.log('Already connected to peer or attempting to connect to self.');
       updateStatus('Already connected or trying to connect to self');
       return;
     }
-    console.log(`Attempting to connect to peer: ${peerId}`);
     updateStatus(`Attempting to connect to peer: ${peerId}`);
 
     const conn = this.peer.connect(peerId, { reliable: true });
 
     conn.on('open', () => {
-      console.log(`Connection to peer ${peerId} opened`);
       this.handleConnection(conn);
       this.clearReconnectTimer(peerId);
     });
@@ -170,7 +159,6 @@ class P2PSync {
 
 
   private handleConnection(conn: DataConnection): void {
-    console.log('Handling connection for peer:', conn.peer);
     this.connections.set(conn.peer, conn);
     updateStatus(`Connected to peer: ${conn.peer}`);
     this.saveKnownPeer(conn.peer);
@@ -187,16 +175,12 @@ class P2PSync {
           this.sendCurrentState(conn);
           break;
         case 'full_state':
-          console.log('Received full state from peer. Syncing...');
-          console.log('Full state data:', data.data);
           this.sceneState?.syncWithPeer(data.data);
           break;
         case 'update':
-          console.log('Received update from peer. Updating objects...', data.data);
           this.sceneState?.syncWithPeer(data.data);
           break;
         case 'mouse_position':
-            console.log(`Received mouse position from peer ${conn.peer}: (${data.data.x}, ${data.data.y})`);
             if (this.mouseOverlay) {
               this.mouseOverlay.updateMousePosition(conn.peer, data.data.x, data.data.y);
             }
@@ -211,7 +195,6 @@ class P2PSync {
     });
   
     conn.on('close', () => {
-      console.log(`Connection closed with peer: ${conn.peer}`);
       this.connections.delete(conn.peer);
       updateStatus(`Disconnected from peer: ${conn.peer}`);
       this.scheduleReconnect(conn.peer);
@@ -234,7 +217,6 @@ class P2PSync {
   private handleKnownPeers(peerIds: string[]): void {
     peerIds.forEach((peerId) => {
       if (peerId !== this.peer.id && !this.knownPeers.has(peerId) && !this.connections.has(peerId)) {
-        console.log(`Discovered new peer from connected peer: ${peerId}`);
         this.saveKnownPeer(peerId);
         this.connectToSpecificPeer(peerId);
       }
@@ -244,13 +226,11 @@ class P2PSync {
   
   private sendCurrentState(conn: DataConnection): void {
     const currentState = this.sceneState.getCurrentState();
-    console.log('Sending current state to peer:', currentState);
     conn.send({ type: 'full_state', data: currentState });
   }
 
   private updateConnectionStatus(): void {
     const isConnected = this.connections.size > 0;
-    console.log(`Connection status updated. Connected: ${isConnected}`);
     if (isConnected && this.mousePositionManager) {
       this.mousePositionManager.startTracking();
     } else if (!isConnected && this.mousePositionManager) {
@@ -333,7 +313,6 @@ class P2PSync {
   }
 
   broadcastUpdate(state: any): void {
-    console.log("i send you my data! peer", state)
     this.connections.forEach((conn) => {
       if (conn.open) {
         conn.send({ type: 'update', data: state });
@@ -375,7 +354,6 @@ function updateStatus(message: string): void {
   if (statusDiv) {
     statusDiv.textContent = message;
   }
-  console.log('Status update:', message);
 }
 
 // Auto-populate user ID input if stored peer ID exists
@@ -387,7 +365,6 @@ if (storedPeerId && userIdInput) {
 // Initialize P2PSync when user enters their ID or when the page loads with a stored ID
 function initializeP2PSync() {
   if (isInitialized) {
-    console.log('P2PSync already initialized. Skipping.');
     return;
   }
 
@@ -440,6 +417,5 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-console.log('P2PSync and UI integration initialized');
 
 export { p2pSync };
