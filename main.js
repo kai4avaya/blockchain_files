@@ -1,4 +1,4 @@
-import { editor } from "./quillEditor.js";
+// import { editor } from "./quillEditor.js";
 import { showPopup } from "./ui/popup.js";
 import { getObjectUnderPointer } from "./ui/graph_v2/move";
 import {
@@ -13,17 +13,34 @@ import { initiate } from "./memory/vectorDB/vectorDbGateway.js"; // Assuming you
 import {initiate_gui_controls} from './ui/gui.listens.js'
 import indexDBOverlay from './memory/local/file_worker'
 import {throttle} from './utils/utils'
+// import {state} from './ui/components/codemirror_md/codemirror-rich-markdoc/editor/index'
+// import { initializeBlockSuiteEditor, getBlockSuiteEditor } from './ui/components/blocksSuiteText/blockSuiteEditor.js';
+
+// import { initializeMarkdownEditor, getMarkdownEditor, getMarkdownContent, setMarkdownContent } from './ui/components/codemirror_md/markdownEditor.js';
+import { initializeEditor } from './ui/components/codemirror_md/codemirror-rich-markdoc/editor/index.ts'
+
 const userId = "kai";
 localStorage.setItem("login_block", userId);
-
+// let editorInitialized = false;
 // Initialize Quill editor
-editor();
-
+// editor();
+// initializeBlockSuiteEditor()
+// getBlockSuiteEditor()
 const p2pSync_instance = p2pSync;
 
 async function main() {
   embeddingWorker.initialize();
+  // Preload the BlockSuite editor
+  // await preloadBlockSuiteEditor();
 
+  
+  try {
+    await setupMarkdownEditor();
+    console.log("Markdown editor setup completed");
+  } catch (error) {
+    console.error("Error setting up Markdown editor:", error);
+  }
+  // setupBlockSuiteEditor();
   // Initialize the default database (vectorDB_new)
   await initiate();
 
@@ -62,27 +79,10 @@ async function main() {
   p2pSync_instance.setMouseOverlay(mouseOverlay);
 
   // initializeDatabases()
-
+// setupBlockSuiteEditor()
   addEventListeners(canvas);
 }
 
-// function handleQuickClick(event) {
-//   const selectedObject = getObjectUnderPointer(event, "sphere");
-//   if (selectedObject) {
-//     console.log("GOT ME A QUICK CLICK main.js");
-//     const nodeId = selectedObject.userData.id;
-//     const fileSystem = getFileSystem();
-//     const fileMetadata = fileSystem.getMetadata(nodeId, "file");
-
-//     if (fileMetadata) {
-//       console.log(
-//         "GOT ME A QUICK  fileMetadata CLICK in main.js",
-//         fileMetadata
-//       );
-//       showPopup(fileMetadata, event.clientX, event.clientY);
-//     }
-//   }
-// }
 const handleQuickClick = throttle(async (event) => {
   const selectedObject = getObjectUnderPointer(event, "sphere");
   if (selectedObject) {
@@ -116,52 +116,9 @@ export async function initializeDatabases() {
 
 
 function addEventListeners(canvas) {
-  let pointerDownTime = null;
-  const DRAG_THRESHOLD = 10; // pixels
+  // let pointerDownTime = null;
+  // const DRAG_THRESHOLD = 10; // pixels
 
-  // let startX = 0;
-  // let startY = 0;
-
-  // canvas.addEventListener(
-  //   "pointerdown",
-  //   (event) => {
-  //     console.log("he done clicky in main.js");
-  //     pointerDownTime = Date.now();
-  //     startX = event.clientX;
-  //     startY = event.clientY;
-  //     // userActionStore.setMouseDown(userId, true, event.clientX, event.clientY, event.target);
-  //   },
-  //   { capture: true }
-  // );
-
-  // canvas.addEventListener(
-  //   "pointerup",
-  //   (event) => {
-  //     if (pointerDownTime === null) {
-  //       return;
-  //     }
-
-  //     const pointerUpTime = Date.now();
-  //     const clickDuration = pointerUpTime - pointerDownTime;
-
-  //     // userActionStore.setMouseDown(userId, false, event.clientX, event.clientY, event.target);
-
-  //     if (!isDragging && clickDuration <= CLICK_DURATION_THRESHOLD) {
-  //       handleQuickClick(event);
-  //     } else {
-  //       if (isDragging) {
-  //       } else {
-  //       }
-  //     }
-
-  //     // Log user action
-  //     // userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
-
-  //     // Reset pointerDownTime
-  //     pointerDownTime = null;
-  //   },
-  //   { capture: true }
-  // );
 
   // Add this new event listener for double-clicks
 canvas.addEventListener("dblclick", (event) => {
@@ -169,37 +126,9 @@ canvas.addEventListener("dblclick", (event) => {
 });
 
 
-  // canvas.addEventListener("pointermove", (event) => {
-  //   if (pointerDownTime !== null) {
-  //     const moveX = event.clientX - startX;
-  //     const moveY = event.clientY - startY;
-  //     const distance = Math.sqrt(moveX * moveX + moveY * moveY);
-
-  //     if (distance > DRAG_THRESHOLD) {
-  //       // isDragging = true;
-  //     }
-  //   }
-  //   if (p2pSync.isConnected()) {
-  //     const rect = canvas.getBoundingClientRect();
-  //     const x = event.clientX - rect.left;
-  //     const y = event.clientY - rect.top;
-  //     p2pSync.updateMousePosition(x, y);
-  //   }
-
-  //   // userActionStore.updateMousePosition(userId, event.clientX, event.clientY, event.target);
-  // });
-
   
   const throttledPointerMove = throttle((event) => {
-    // if (pointerDownTime !== null) {
-    //   const moveX = event.clientX - startX;
-    //   const moveY = event.clientY - startY;
-    //   const distance = Math.sqrt(moveX * moveX + moveY * moveY);
-
-    //   if (distance > DRAG_THRESHOLD) {
-    //     // isDragging = true;
-    //   }
-    // }
+   
     if (p2pSync.isConnected()) {
       const rect = canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
@@ -211,16 +140,153 @@ canvas.addEventListener("dblclick", (event) => {
   canvas.addEventListener("pointermove", throttledPointerMove);
 
 
-  // Key events can remain on the window object
-  window.addEventListener("keydown", (event) => {
-    // userActionStore.addKeyPressed(userId, event.key);
-  });
-  window.addEventListener("keyup", (event) => {
-    // userActionStore.removeKeyPressed(userId, event.key);
-  });
+  // // Key events can remain on the window object
+  // window.addEventListener("keydown", (event) => {
+  //   // userActionStore.addKeyPressed(userId, event.key);
+  // });
+  // window.addEventListener("keyup", (event) => {
+  //   // userActionStore.removeKeyPressed(userId, event.key);
+  // });
 }
 
 main().catch((error) => {
   console.error("Error in main function:", error);
 });
 
+
+
+// function setupBlockSuiteEditor() {
+//   // const pencilIcon = document.querySelector('.sidebar-icon:nth-child(7)'); // Adjust this selector if needed
+//   const toggleButton = document.getElementById('toggleButton');
+        
+//   // toggleButton.addEventListener('click', async () => {
+//         //     chatSlideout.classList.toggle('active');
+//         //     if (chatSlideout.classList.contains('active')) {
+//         //         editorContainer.classList.add('active');
+//         //         fileTree.classList.remove('active');
+//         //         await initializeBlockSuiteEditor();
+//         //     } else {
+//         //         editorContainer.classList.remove('active');
+//         //     }
+//         // });
+  
+//   const chatSlideout = document.getElementById('chatSlideout');
+
+//   toggleButton.addEventListener('click', async () => {
+//     chatSlideout.innerHTML = '<div id="editor-container"></div>';
+//     console.log("toggleButton clicked");
+//     chatSlideout.classList.toggle('active');
+//     if (chatSlideout.classList.contains('active')) {
+//       // Initialize BlockSuite editor when the slideout is opened
+//       await initializeBlockSuiteEditor();
+//     }
+//   });
+// }
+
+
+async function preloadBlockSuiteEditor() {
+  console.log("Preloading BlockSuite editor");
+  try {
+    await initializeBlockSuiteEditor();
+    editorInitialized = true;
+    console.log("BlockSuite editor preloaded successfully");
+  } catch (error) {
+    console.error("Failed to preload BlockSuite editor:", error);
+  }
+}
+
+function setupBlockSuiteEditor() {
+  const toggleButton = document.getElementById('toggleButton');
+  const chatSlideout = document.getElementById('chatSlideout');
+
+  toggleButton.addEventListener('click', () => {
+    console.log("Toggle button clicked");
+    chatSlideout.classList.toggle('active');
+
+    if (chatSlideout.classList.contains('active')) {
+      console.log("Slideout is active, showing BlockSuite editor");
+      if (editorInitialized) {
+        const editorInstance = getBlockSuiteEditor();
+        if (editorInstance) {
+          chatSlideout.innerHTML = '<div id="editor-container"></div>';
+          const editorContainer = document.getElementById('editor-container');
+          editorContainer.appendChild(editorInstance);
+          console.log("BlockSuite editor displayed");
+        } else {
+          console.warn("BlockSuite editor instance not available");
+          chatSlideout.innerHTML = '<div>Editor not available. Please refresh the page.</div>';
+        }
+      } else {
+        console.warn("BlockSuite editor not initialized");
+        chatSlideout.innerHTML = '<div>Editor not initialized. Please refresh the page.</div>';
+      }
+    } else {
+      console.log("Slideout is inactive, hiding BlockSuite editor");
+      chatSlideout.innerHTML = ''; // Clear the content when hiding
+    }
+  });
+}
+
+
+// async function setupMarkdownEditor() {
+//   const toggleButton = document.getElementById('toggleButton');
+//   const chatSlideout = document.getElementById('chatSlideout');
+
+//   toggleButton.addEventListener('click', () => {
+//     console.log("Toggle button clicked");
+//     chatSlideout.innerHTML = '<div id="editor-container"></div>';
+//     chatSlideout.classList.toggle('active');
+
+//     if (chatSlideout.classList.contains('active')) {
+//       console.log("Slideout is active, initializing Markdown editor");
+//       try {
+//         const editorContainer = document.getElementById('editor-container');
+//         if (!editorContainer) {
+//           throw new Error("Editor container not found");
+//         }
+
+//         // Use the imported initializeEditor function
+//         const editorView = initializeEditor(editorContainer);
+//         console.log("Markdown editor initialized successfully", editorView);
+//       } catch (error) {
+//         console.error("Failed to initialize Markdown editor:", error);
+//         chatSlideout.innerHTML = '<div>Failed to load editor. Please try again.</div>';
+//       }
+//     } else {
+//       console.log("Slideout is inactive");
+//     }
+//   });
+// }
+
+
+function setupMarkdownEditor() {
+  const toggleButton = document.getElementById('toggleButton');
+  const chatSlideout = document.getElementById('chatSlideout');
+  let tabManager = null;
+
+  toggleButton.addEventListener('click', () => {
+    console.log("Toggle button clicked");
+    chatSlideout.classList.toggle('active');
+
+    if (chatSlideout.classList.contains('active')) {
+      console.log("Slideout is active, initializing or showing Markdown editor");
+      if (!tabManager) {
+        chatSlideout.innerHTML = `
+          <div id="editor-app">
+            <div id="editor-tabs">
+              <div id="tab-list"></div>
+              <button id="add-tab">+</button>
+            </div>
+            <div id="editor-container"></div>
+          </div>
+        `;
+        const editorApp = document.getElementById('editor-app');
+        tabManager = initializeEditor(editorApp);
+      }
+      chatSlideout.style.transform = 'translateX(0)';
+    } else {
+      console.log("Slideout is inactive, hiding editor");
+      chatSlideout.style.transform = 'translateX(100%)';
+    }
+  });
+}

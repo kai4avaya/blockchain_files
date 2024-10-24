@@ -99,60 +99,88 @@
 
 // embedding_worker.js
 
+
 import { pipeline, env } from '@xenova/transformers';
 
 env.allowLocalModels = false;
 
 let extractor = null;
-let threadsChecked = false;
-let threadsSupported = false;
+
 
 async function isWasmThreadsSupported() {
-    if (threadsChecked) {
-        return threadsSupported;
-    }
+  if (typeof SharedArrayBuffer === 'undefined') {
+      return false;
+  }
 
-    if (typeof SharedArrayBuffer === 'undefined') {
-        threadsChecked = true;
-        threadsSupported = false;
-        return false;
-    }
+  // Attempt to compile a minimal WebAssembly module that uses threads
+  const wasmCode = new Uint8Array([
+      0x00, 0x61, 0x73, 0x6d, // WASM binary magic
+      0x01, 0x00, 0x00, 0x00, // WASM version
+      // Type section
+      0x01, // section code
+      0x07, // section size
+      0x01, // one type
+      0x60, // func type
+      0x00, // param count
+      0x00, // result count
+      // Import section
+      0x02, // section code
+      0x07, // section size
+      0x01, // one import
+      0x06, // module name length
+      0x61, 0x73, 0x6d, 0x65, 0x74, 0x69, // "asm"
+      0x01, // field name length
+      0x66, // "f"
+      0x00, // kind (func)
+      0x00, // func index
+      // Export section
+      0x07, // section code
+      0x05, // section size
+      0x01, // one export
+      0x01, // name length
+      0x66, // "f"
+      0x00, // kind (func)
+      0x00, // func index
+      // Code section
+      0x0a, // section code
+      0x02, // section size
+      0x00, // function count
+      0x0b  // end
+  ]);
 
-    const wasmCode = new Uint8Array([
-        0x00, 0x61, 0x73, 0x6d, // WASM binary magic
-        0x01, 0x00, 0x00, 0x00, // WASM version
-        0x01, 0x07, 0x01, 0x60, 0x00, 0x00, 
-        0x02, 0x07, 0x01, 0x06, 0x61, 0x73, 0x6d, 0x65, 0x74, 0x69,
-        0x01, 0x66, 0x00, 0x00, 0x07, 0x05, 0x01, 0x01, 0x66, 0x00, 0x00,
-        0x0a, 0x02, 0x00, 0x0b
-    ]);
-
-    try {
-        const module = new WebAssembly.Module(wasmCode);
-        const instance = await WebAssembly.instantiate(module, {});
-        threadsChecked = true;
-        threadsSupported = true;
-        return true;
-    } catch (e) {
-        console.warn("WebAssembly threads are not supported:", e);
-        threadsChecked = true;
-        threadsSupported = false;
-        return false;
-    }
+  try {
+      const module = new WebAssembly.Module(wasmCode);
+      const instance = await WebAssembly.instantiate(module, {});
+      return true;
+  } catch (e) {
+      console.warn("WebAssembly threads are not supported:", e);
+      return false;
+  }
 }
 
+
+// Initialize the extractor
 async function initializeExtractor() {
-    if (!extractor) {
-        const threadsSupported = await isWasmThreadsSupported();
-        env.useBrowserThreads = threadsSupported;
-        
-        extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-            quantized: true,
-            cache: 'localStorage',
-        });
-    }
-    return extractor;
+
+  if (!extractor) {
+      // Perform feature detection
+      const threadsSupported = await isWasmThreadsSupported();
+
+      if (threadsSupported) {
+          env.useBrowserThreads = true;
+      } else {
+          env.useBrowserThreads = false;
+      }
+
+      extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+          quantized: true, // Use quantized model for better performance
+          cache: 'localStorage', // Cache model locally
+      });
+  }
+  return extractor;
 }
+
+
 
 /**
  * Generates embeddings for a batch of text chunks.

@@ -54,20 +54,15 @@ renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ReinhardToneMapping;
 document.body.appendChild(renderer.domElement);
-// const scene = new THREE.Scene();
-// const camera = new THREE.PerspectiveCamera(
-//   40,
-//   window.innerWidth / window.innerHeight,
-//   1,
-//   200
-// );
+
+
+
 const camera = new THREE.PerspectiveCamera(
   40,
   window.innerWidth / window.innerHeight,
   1,
   1000 // Increased Far Clipping Plane
 );
-
 
 
 camera.position.set(0, 0, 20);
@@ -84,9 +79,11 @@ document.body.appendChild(labelRenderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement, labelRenderer.domElement);
 
 controls.maxPolarAngle = Math.PI * 0.5;
-controls.minDistance = 1;
+// controls.minDistance = 1;
+controls.minDistance = 0.1;
+
 // controls.maxDistance = 100;
-controls.maxDistance = 500; // Increased Max Distance
+controls.maxDistance = 1000; // Increased Max Distance
 let needsRender = false;
 let renderCount = 0;
 
@@ -188,17 +185,27 @@ const mouse = new THREE.Vector2();
 // setupScene();
 let cubes = [];
 let mousePositionManager;
-// Cache for geometries and materials
-// const geometryCache = {
-//   sphere: null,
-//   cube: null
-// };
 
-// const materialCache = {
-//   sphere: {},
-//   wireframe: {},
-//   solid: {}
-// };
+const materialCache = new Map();
+const geometryCache = new Map();
+
+function getCachedMaterial(type, params) {
+  const key = `${type}-${JSON.stringify(params)}`;
+  if (!materialCache.has(key)) {
+    let material;
+    switch(type) {
+      case 'basic':
+        material = new THREE.MeshBasicMaterial(params);
+        break;
+      case 'line':
+        material = new THREE.LineBasicMaterial(params);
+        break;
+    }
+    materialCache.set(key, material);
+  }
+  return materialCache.get(key);
+}
+
 
 const updateMiniMap = createMiniMap(scene, nonBloomScene, camera, renderer);
 
@@ -548,18 +555,28 @@ const sphereGeometry = new THREE.IcosahedronGeometry(1, 15);
 // const sphereGeometry = new THREE.SphereGeometry(1, 16, 12); // Less detailed sphere
 let sphereMaterial;
 
-export function createSphere(convertedData) {
+// export function createSphere(convertedData) {
 
-  // Update material with the new color
+//   // Update material with the new color
+//   const color = convertedData.color || new THREE.Color().setHSL(
+//     Math.random(),
+//     0.7,
+//     Math.random() * 0.2 + 0.05
+//   );
+//   sphereMaterial = new THREE.MeshBasicMaterial({ color });
+
+export function createSphere(convertedData) {
   const color = convertedData.color || new THREE.Color().setHSL(
     Math.random(),
     0.7,
     Math.random() * 0.2 + 0.05
   );
-  sphereMaterial = new THREE.MeshBasicMaterial({ color });
+  
+  const material = getCachedMaterial('basic', { color });
+  const sphere = new THREE.Mesh(sphereGeometry, material);
 
   // Create sphere using the global geometry and updated material
-  const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+  // const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
   makeObjectWritable(sphere);
 
   sphere.version = 0;
@@ -748,35 +765,132 @@ export function render_cull() {
 // }, 16);
 
 
-const throttledRender = throttle(() => {
-  camera.updateMatrixWorld();
+// const throttledRender = throttle(() => {
+//   camera.updateMatrixWorld();
 
-  // **1. Render Bloom Pass**
+//   // **1. Render Bloom Pass**
+//   renderer.setClearColor(0x000000, 0);
+//   bloomComposer.renderToScreen = false;
+  
+//   // **Set camera to render only BLOOM_SCENE layer**
+//   camera.layers.set(BLOOM_SCENE);
+//   bloomComposer.render();
+
+//   // **2. Render Normal Scene**
+//   renderer.setClearColor(0x000000, 1);
+  
+//   // **Set camera to render only ENTIRE_SCENE layer**
+//   camera.layers.set(ENTIRE_SCENE);
+//   renderer.setRenderTarget(null);
+//   renderer.render(scene, camera);
+
+//   // **3. Render Non-Bloom Scene if Applicable**
+//   renderer.setRenderTarget(nonBloomRT);
+//   renderer.clear();
+//   renderer.render(nonBloomScene, camera);
+
+//   // **4. Final Composite**
+//   finalComposer.render();
+
+//   // **5. Render Labels**
+//   labelRenderer.render(scene, camera);
+// }, 16);
+
+// Near your other global variables
+const RENDER_STATES = {
+  NONE: 0,
+  NEEDS_MATRIX_UPDATE: 1,
+  NEEDS_FULL_RENDER: 2
+};
+
+let renderState = RENDER_STATES.NONE;
+let needsLabelUpdate = false;
+
+// Replace your current throttledRender
+const throttledRender = throttle(() => {
+  // Skip if no updates needed
+  if (renderState === RENDER_STATES.NONE && !needsRender && renderCount <= 0) {
+    return;
+  }
+
+  // Update matrices only when needed
+  if (camera.matrixWorldNeedsUpdate) {
+    camera.updateMatrixWorld();
+    projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    frustum.setFromProjectionMatrix(projScreenMatrix);
+  }
+
+  // Store layer states
+  const bloomObjects = new Map();
+  const nonBloomObjects = new Map();
+
+  // Efficient frustum culling
+  const visibleObjects = new Set();
+  
+  scene.traverse(object => {
+    if (object.isMesh) {
+      // Update bounding sphere only when needed
+      if (!object.boundingSphere || object.matrixWorldNeedsUpdate) {
+        if (!object.boundingSphere) {
+          object.boundingSphere = new THREE.Sphere();
+        }
+        object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
+      }
+
+      // Frustum culling with buffer
+      const isVisible = frustum.intersectsSphere(object.boundingSphere);
+      object.visible = isVisible;
+
+      if (isVisible) {
+        visibleObjects.add(object);
+        if (object.layers.test(BLOOM_SCENE)) {
+          bloomObjects.set(object, object.layers.mask);
+        } else {
+          nonBloomObjects.set(object, object.layers.mask);
+        }
+      }
+    }
+  });
+
+  // Render bloom pass only for visible objects
   renderer.setClearColor(0x000000, 0);
   bloomComposer.renderToScreen = false;
+
+  bloomObjects.forEach((layerMask, obj) => {
+    obj.layers.mask = BLOOM_SCENE;
+  });
   
-  // **Set camera to render only BLOOM_SCENE layer**
   camera.layers.set(BLOOM_SCENE);
   bloomComposer.render();
 
-  // **2. Render Normal Scene**
+  // Restore layers and render main scene
+  bloomObjects.forEach((layerMask, obj) => {
+    obj.layers.mask = layerMask;
+  });
+
   renderer.setClearColor(0x000000, 1);
-  
-  // **Set camera to render only ENTIRE_SCENE layer**
   camera.layers.set(ENTIRE_SCENE);
   renderer.setRenderTarget(null);
   renderer.render(scene, camera);
 
-  // **3. Render Non-Bloom Scene if Applicable**
-  renderer.setRenderTarget(nonBloomRT);
-  renderer.clear();
-  renderer.render(nonBloomScene, camera);
+  // Handle non-bloom scene
+  if (nonBloomScene.children.length > 0) {
+    renderer.setRenderTarget(nonBloomRT);
+    renderer.clear();
+    renderer.render(nonBloomScene, camera);
+  }
 
-  // **4. Final Composite**
+  // Final composite
   finalComposer.render();
 
-  // **5. Render Labels**
-  labelRenderer.render(scene, camera);
+  // Update labels only when needed
+  if (needsLabelUpdate || renderState === RENDER_STATES.NEEDS_FULL_RENDER) {
+    labelRenderer.render(scene, camera);
+    needsLabelUpdate = false;
+  }
+
+  // Reset render state
+  renderState = RENDER_STATES.NONE;
 }, 16);
 
 export function render() {
@@ -865,10 +979,28 @@ function restoreMaterial(obj) {
   }
 }
 
-export function markNeedsRender() {
-  needsRender = true;
-  renderCount = 1; // Render for the next 2 frames
-  updateMiniMap();
+// export function markNeedsRender() {
+//   needsRender = true;
+//   renderCount = 1; // Render for the next 2 frames
+//   updateMiniMap();
+// }
+
+export function markNeedsRender(type = 'full') {
+  switch(type) {
+    case 'matrix':
+      renderState = Math.max(renderState, RENDER_STATES.NEEDS_MATRIX_UPDATE);
+      break;
+    case 'labels':
+      needsLabelUpdate = true;
+      break;
+    case 'full':
+    default:
+      renderState = RENDER_STATES.NEEDS_FULL_RENDER;
+      renderCount = 1;
+      if (updateMiniMap) {
+        updateMiniMap();
+      }
+  }
 }
 
 function animate() {
@@ -1180,7 +1312,7 @@ function createSphereWrapper(objectState) {
 }
 
 function addAxesHelper() {
-  const axesHelper = new THREE.AxesHelper(500); // Adjust size as needed
+  const axesHelper = new THREE.AxesHelper(2); // Adjust size as needed
   
   // Update vertex colors for each axis: 6 vertices (2 per axis)
   const colors = axesHelper.geometry.attributes.color;

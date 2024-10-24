@@ -16,3 +16,9 @@ need to center the 3d space -
 - we should be able to drag to select multiple nodes
 if we drag nodes into boxes they will then be selected as a whole (so when we click one all nodes in that cube will be selected)
 - this is not a final product writing tool, but rather a way to do research
+
+---
+
+working on collaborative text
+Affine blocks
+ unerlying datalayer

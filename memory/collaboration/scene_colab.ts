@@ -1,3 +1,5 @@
+// scene_colab.ts
+
 import * as THREE from "three";
 import { reconstructScene } from "../../ui/graph_v2/create";
 import indexDBOverlay from "../local/file_worker";
@@ -21,8 +23,9 @@ interface ObjectState {
   color: number;
   size?: number;
   userData: {
-    id: string; // links back to file id
+    id: string;
     filename: string;
+    selected?: number; // Add this line
   };
 }
 
@@ -39,6 +42,8 @@ class SceneState {
   private updateQueue: ObjectState[] = [];
   private isProcessingQueue: boolean = false;
   private scenes: THREE.Scene[] = [];
+  private selectedSpheres: Set<string> = new Set(); // Add this line
+  
 
 
   private constructor() {
@@ -67,6 +72,20 @@ class SceneState {
   // Method to get the scenes array
   getScenes(): THREE.Scene[] {
     return this.scenes;
+  }
+
+  // Add this method to track selected spheres
+  updateSelectedSpheres(sphereId: string, isSelected: boolean) {
+    if (isSelected) {
+      this.selectedSpheres.add(sphereId);
+    } else {
+      this.selectedSpheres.delete(sphereId);
+    }
+  }
+
+  // Add this method to get selected spheres
+  getSelectedSpheres(): string[] {
+    return Array.from(this.selectedSpheres);
   }
 
   private handleBroadcastMessage(event: MessageEvent) {
@@ -113,56 +132,22 @@ class SceneState {
     p2pSync.setSceneState(this);
   }
 
-  // syncWithPeer(peerObjects: ObjectState[]): void {
-  //   console.log("I am peer objects", peerObjects)
-  //   if (!peerObjects || !peerObjects.length) return;
-  //   peerObjects.forEach((peerObject) => {
-  //     const existingObject = this.objects.get(peerObject.uuid);
-  //     if (!existingObject || this.isNewerState(peerObject, existingObject)) {
-  //       this.mergeUpdate(peerObject, { fromPeer: true });
-  //     }
-  //   });
-  //   this.reconstructScene();
-  // // }
-  // syncWithPeer(peerObjects: ObjectState[]): void {
-  //   if (!peerObjects || !peerObjects.length) {
-  //     return;
-  //   }
-  //   peerObjects.forEach((peerObject) => {
-  //     // console.log("Processing peer object:", peerObject);
-  //     const existingObject = this.objects.get(peerObject.uuid);
-  //     if (!existingObject || this.isNewerState(peerObject, existingObject)) {
-  //       // console.log("Merging update for object:", peerObject.uuid);
-  //       this.mergeUpdate(peerObject, { fromPeer: true });
-  //     }
-  //   });
-  //   this.reconstructScene();
-  // }
+ 
   syncWithPeer(peerObjects: ObjectState[]): void {
     if (!peerObjects || !peerObjects.length) {
       return;
     }
 
-    // const updatesToApply: ObjectState[] = [];
 
     peerObjects.forEach((peerObject) => {
-      // const existingObject = this.objects.get(peerObject.uuid);
-      // if (!existingObject || this.isNewerState(peerObject, existingObject)) {
-      //   updatesToApply.push(peerObject);
-      // }
+   
       this.updateObject(peerObject, {
         fromPeer: true,
         deferReconstruct: true,
       });
     });
 
-    // Batch update all objects
-    // updatesToApply.forEach((objectState) => {
-    //   this.updateObject(objectState, {
-    //     fromPeer: true,
-    //     deferReconstruct: true,
-    //   });
-    // });
+ 
 
     // Reconstruct the scene once after all updates
     this.reconstructScene();
@@ -398,16 +383,6 @@ class SceneState {
     }
   }
 
-  // private async saveStateToDBImmediate(state: ObjectState) {
-  //   try {
-  //     await indexDBOverlay.saveData(this.STORAGE_KEY, [state]);
-  //     this.savedObjects.add(state.uuid);
-  //   } catch (error) {
-  //     console.error('Error saving state to IndexedDB:', error);
-  //     // Optionally, re-enqueue the failed update
-  //     this.updateQueue.unshift(state);
-  //   }
-  // }
 
    async saveStateToDB() {
     try {
@@ -469,7 +444,11 @@ function serializeThreeObject(objectData){
     type: objectData.type,
     shape: objectData.shape,
     uuid: objectData.uuid,
-    userData: objectData.userData || {},
+    // userData: objectData.userData || {},
+    userData: {
+      ...objectData.userData,
+      selected: objectData.layers?.test?.(1) ? 1 : 0,
+    },
     position: convertToArray(objectData.position),
     rotation: convertToArray(objectData.rotation),
     scale: convertToArray(objectData.scale),
@@ -579,6 +558,7 @@ function areObjectsEqual(obj1, obj2) {
   // Compare color (if applicable)
   if (obj1.color && obj2.color && !obj1.color.equals(obj2.color)) return false;
   if (obj1.isDeleted !== obj2.isDeleted) return false;
+  if (obj1.userData?.selected !== obj2.userData?.selected) return false;
 
   return true;
 }

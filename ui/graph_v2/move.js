@@ -723,22 +723,28 @@ function getRandomOffset(cubeSize) {
   const offsetZ = (Math.random() - 0.5) * maxOffset;
   return new THREE.Vector3(offsetX, offsetY, offsetZ);
 }
-function toggleBloom(object) {
-  console.log("Before toggle:", object.layers.mask);
-  // if (object.layers.test(BLOOM_SCENE)) {
-  //   object.layers.disable(BLOOM_SCENE);
-  // } else {
-  //   object.layers.enable(BLOOM_SCENE);
-  // }
-  // object.layers.enable(0); // Ensure the object is always visible in the main scene
-  object.layers.toggle(BLOOM_SCENE);
-  console.log("After toggle:", object.layers.mask);
 
-  if (object.layers.mask === 1) console.log("HELLO 1 BLOOM")
-  else console.log("HELLO 0 BLOOM")
+
+function toggleBloom(object) {
+
+  let isBloomEnabled = object.layers.test(BLOOM_SCENE);
+
+  
+  console.log("i have toggleBloom PRE", isBloomEnabled)
+
+  object.layers.toggle(BLOOM_SCENE);
+  
+  isBloomEnabled = object.layers.test(BLOOM_SCENE);
+
+  console.log("i have toggleBloom POST", isBloomEnabled)
+  
+  // Update selection state
+  object.userData.selected = isBloomEnabled ? 1 : 0;
+  
+  // Update global selection tracking KAI CHECK this!!
+  
   markNeedsRender();
 }
-
 // Update the onPointerUp function to use this new handleSphereDragEnd
 async function onPointerUp(event) {
   console.log("Pointer up event triggered");
@@ -770,7 +776,6 @@ async function onPointerUp(event) {
     console.log("Click detected on sphere:", selectedSphere);
     toggleBloom(selectedSphere);
     console.log("After toggling, layers.mask:", selectedSphere.layers.mask);
-    markNeedsRender();
   } else if (isDragging || isFileDragging) {
     console.log("Drag or file drag detected");
     isDragging = false;
