@@ -30,6 +30,7 @@
     "@visualsource/selective-unrealbloompass": "^1.0.1",
     "@vitejs/plugin-react": "^4.3.1",
     "@xenova/transformers": "^2.14.2",
+    "codemirror": "^6.0.1",
     "compromise": "^14.14.2",
     "d3": "^7.9.0",
     "d3-force-3d": "^3.0.5",
@@ -54,14 +55,26 @@
     "y-indexeddb": "^9.0.12",
     "y-protocols": "^1.0.6",
     "y-webrtc": "^10.3.0",
-    "yjs": "^13.6.20"
+    "yjs": "^13.6.7"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.5",
     "typescript": "^5.5.3",
-    "vite": "^5.3.3",
+    "vite": "^5.4.10",
+    "vite-plugin-markdown": "^2.2.0",
+    "vite-plugin-singlefile": "^2.0.2",
     "vite-plugin-static-copy": "^1.0.6",
     "vite-plugin-top-level-await": "^1.4.4",
     "vite-plugin-wasm": "^3.3.0"
+  },
+  "resolutions": {
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.34.1",
+    "@codemirror/language": "^6.10.3"
+  },
+  "overrides": {
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.34.1",
+    "@codemirror/language": "^6.10.3"
   }
 }

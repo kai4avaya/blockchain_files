@@ -1250,120 +1250,119 @@
   <div id="canvas-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
     <!-- Three.js canvas will render here -->
   </div>
+
   <script>
     const toggleButton = document.getElementById('toggleButton');
     const fileTreeBtn = document.getElementById('fileTreeBtn');
     const fileTree = document.getElementById('fileTree');
     const tests = document.getElementById('tests');
     const peerConnBtn = document.getElementById('peer-btn-connect');
-    const modal = document.querySelector('.modal'); // Used by peer-btn-connect
+    const modal = document.querySelector('.modal');
     const leftSlideout = document.getElementById('leftSlideout');
     const chatSlideout = document.getElementById('chatSlideout');
     const homeIcon = document.getElementById('homeIcon');
     const icons = document.querySelectorAll('.sidebar-icon');
-  
-    // Create a separate modal for homeIcon
-    const homeModal = document.createElement('div');
-    homeModal.classList.add('modal');
-    homeModal.style.display = 'none';
-    document.body.appendChild(homeModal);
-  
+
+    let isShowingMenu = false;
     let activeIcon = null;
-  
+    let isHomeModalActive = false;
+
+    const originalModalContent = modal.innerHTML;
+    // Initially hide the modal
+    modal.style.display = 'none';
     leftSlideout.classList.remove('active');
-  
+
     fileTreeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-  
+
       // Toggle the left slideout
       leftSlideout.classList.toggle('active');
-  
+
       // Close other slideouts if open
       if (chatSlideout.classList.contains('active')) {
         chatSlideout.classList.remove('active');
       }
+
     });
-  
-    // Functions for peer-btn-connect modal
-    function showPeerModal() {
-      const iconRect = peerConnBtn.getBoundingClientRect();
+
+    function showModal(icon, isHomeModal = false) {
+      const iconRect = icon.getBoundingClientRect();
       modal.style.top = `${iconRect.top - 15}px`;
       modal.style.display = 'flex';
-  
+
+      if (isHomeModal) {
+        modal.innerHTML = getHomeModalContent();
+        attachActionListeners();
+      }
+
       modal.offsetHeight; // Trigger reflow
-  
+
       requestAnimationFrame(() => {
         modal.classList.add('active');
       });
-  
+
       const arrowOffset = iconRect.height / 2;
       modal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
-      activeIcon = peerConnBtn;
+      activeIcon = icon;
     }
-  
-    function hidePeerModal() {
+
+
+    function hideModal() {
       modal.style.display = 'none';
-      modal.classList.remove('active');
       activeIcon = null;
+      if (isHomeModalActive) {
+        modal.innerHTML = originalModalContent;
+        isHomeModalActive = false;
+      }
     }
-  
-    // Functions for homeIcon modal
-    function showHomeModal() {
-      const iconRect = homeIcon.getBoundingClientRect();
-      homeModal.style.top = `${iconRect.top - 15}px`;
-      homeModal.style.display = 'flex';
-  
-      homeModal.innerHTML = getHomeModalContent();
-      attachHomeModalListeners();
-  
-      homeModal.offsetHeight; // Trigger reflow
-  
-      requestAnimationFrame(() => {
-        homeModal.classList.add('active');
-      });
-  
-      const arrowOffset = iconRect.height / 2;
-      homeModal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
-      activeIcon = homeIcon;
-    }
-  
-    function hideHomeModal() {
-      homeModal.style.display = 'none';
-      homeModal.classList.remove('active');
-      activeIcon = null;
-    }
-  
+
     // Event Listeners for Icons
     peerConnBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
-  
+
       if (modal.style.display === 'none') {
-        showPeerModal();
+        showModal(peerConnBtn, false);
       } else {
-        hidePeerModal();
+        hideModal();
       }
-  
+
       // Close slideouts if open
       leftSlideout.classList.remove('active');
       chatSlideout.classList.remove('active');
     });
-  
+
+
     homeIcon.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
-  
-      if (homeModal.style.display === 'none') {
-        showHomeModal();
+
+      if (modal.style.display === 'none' || !isHomeModalActive) {
+        showModal(homeIcon, true);
+        isHomeModalActive = true;
       } else {
-        hideHomeModal();
+        hideModal();
       }
     });
-  
-    // Function to get homeModal content
+
+
+  </script>
+
+  <script>
+    icons.forEach(icon => {
+      icon.addEventListener('mouseenter', () => {
+        icon.querySelector('.tooltip').style.opacity = '1';
+      });
+      icon.addEventListener('mouseleave', () => {
+        icon.querySelector('.tooltip').style.opacity = '0';
+      });
+    });
+
+
+
     function getHomeModalContent() {
       return `
-       <div class="modal-icons">
+    <div class="modal-icons">
       <div class="modal-icon" data-action="visualize-embeddings">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
@@ -1389,12 +1388,17 @@
         <span class="tooltip">Filter for specific ideas</span>
       </div>
     </div>
-      `;
+  `;
     }
-  
-    // Event Handlers for homeModal Icons
-    function attachHomeModalListeners() {
-      homeModal.querySelectorAll('.modal-icon').forEach(icon => {
+    function setOriginalModalContent() {
+      modal.innerHTML = originalModalContent;
+      isHomeModalActive = false;
+      attachTooltipListeners();
+    }
+
+    // Event Handlers for Modal Icons
+    function attachActionListeners() {
+      modal.querySelectorAll('.modal-icon').forEach(icon => {
         icon.addEventListener('click', (e) => {
           e.stopPropagation();
           const action = e.currentTarget.dataset.action;
@@ -1405,7 +1409,7 @@
             document.dispatchEvent(event);
           }
         });
-  
+
         const tooltip = icon.querySelector('.tooltip');
         if (tooltip) {
           icon.addEventListener('mouseenter', () => {
@@ -1417,37 +1421,45 @@
         }
       });
     }
-  
+
     function showSpinner(iconElement) {
       const svgIcon = iconElement.querySelector('svg');
       const spinner = document.createElement('div');
       spinner.className = 'spinner';
       svgIcon.style.display = 'none';
       iconElement.insertBefore(spinner, svgIcon);
-  
+
       setTimeout(() => {
         spinner.remove();
         svgIcon.style.display = '';
       }, 4000);
     }
-  
-    // Hide modals when clicking outside
+
+    function toggleHomeModal() {
+      setHomeModalContent();
+    }
+
+
+
+
+    function attachTooltipListeners() {
+      modal.querySelectorAll('.modal-icon').forEach(icon => {
+        const tooltip = icon.querySelector('.tooltip');
+        icon.addEventListener('mouseenter', () => {
+          tooltip.style.opacity = '1';
+        });
+        icon.addEventListener('mouseleave', () => {
+          tooltip.style.opacity = '0';
+        });
+      });
+    }
+
     document.addEventListener('click', (e) => {
       if (!modal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
-        hidePeerModal();
-      }
-      if (!homeModal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
-        hideHomeModal();
+        hideModal();
       }
     });
-  
-    // Ensure modal events don't propagate
-    modal.addEventListener('pointerdown', (e) => e.stopPropagation());
-    modal.addEventListener('click', (e) => e.stopPropagation());
-    homeModal.addEventListener('pointerdown', (e) => e.stopPropagation());
-    homeModal.addEventListener('click', (e) => e.stopPropagation());
-  
-    // Tooltips for sidebar icons
+
     document.querySelectorAll('.sidebar-icon').forEach(icon => {
       icon.addEventListener('mouseenter', () => {
         icon.querySelector('.tooltip').style.opacity = '1';
@@ -1456,10 +1468,73 @@
         icon.querySelector('.tooltip').style.opacity = '0';
       });
     });
+
+
+    modal.addEventListener('pointerdown', (e) => e.stopPropagation());
+
   </script>
-  
   <script type="module" src="/main.js"></script>
-  
+
+
+  <!-- Add this to your JavaScript -->
+  <script>
+    // After Three.js initializes
+    document.addEventListener('DOMContentLoaded', () => {
+      const canvasContainer = document.getElementById('canvas-container');
+      const canvas = document.querySelector('canvas[data-engine="three.js"]');
+      if (canvas && canvasContainer) {
+        canvasContainer.appendChild(canvas);
+      }
+    });
+
+    // Ensure modal events don't propagate to canvas
+    modal.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+    });
+
+    modal.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Add specific handler for connect button
+    const connectButton = document.getElementById('connectButton');
+    connectButton?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Connect button clicked');
+      // Your connection logic here
+    });
+  </script>
+
+  <script>
+    // Add this to your JavaScript, after Three.js initialization
+    document.addEventListener('DOMContentLoaded', () => {
+      const canvasContainer = document.getElementById('canvas-container');
+      const uiLayer = document.getElementById('ui-layer');
+
+      // Wait a short moment to ensure Three.js has created the canvas
+      setTimeout(() => {
+        // Find the Three.js canvas
+        const canvas = document.querySelector('canvas[data-engine="three.js"]');
+        if (canvas && canvasContainer) {
+          // Move the canvas out of ui-layer and into canvas-container
+          if (uiLayer.contains(canvas)) {
+            canvasContainer.appendChild(canvas);
+          }
+
+          // Also move any other Three.js related elements (like the stats panel)
+          const threejsElements = document.querySelectorAll('div[style*="position: absolute"]');
+          threejsElements.forEach(element => {
+            if (uiLayer.contains(element) &&
+              (element.innerHTML.includes('canvas') ||
+                element.style.pointerEvents === 'none')) {
+              canvasContainer.appendChild(element);
+            }
+          });
+        }
+      }, 100); // Small delay to ensure Three.js has initialized
+    });
+  </script>
 </body>
 
 </html>

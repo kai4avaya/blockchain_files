@@ -502,22 +502,39 @@ function loadCameraState() {
 }
 
 // Modify your setupScene function
+// function setupScene() {
+//   scene.traverse(disposeMaterial);
+//   scene.children.length = 0;
+//   nonBloomScene.traverse(disposeMaterial);
+//   nonBloomScene.children.length = 0;
+//   // const container = renderer.domElement.parentElement;
+//   // mouseOverlay = new MouseOverlayCanvas(container);
+//   loadCameraState();
+
+//   const container = renderer.domElement.parentElement;
+//   mouseOverlay = new MouseOverlayCanvas(container);
+
 function setupScene() {
   scene.traverse(disposeMaterial);
   scene.children.length = 0;
   nonBloomScene.traverse(disposeMaterial);
   nonBloomScene.children.length = 0;
-  // const container = renderer.domElement.parentElement;
-  // mouseOverlay = new MouseOverlayCanvas(container);
-  loadCameraState();
 
-  // setLightingBasedOnTime(scene, nonBloomScene);
-  // setBackgroundBasedOnTime(scene, nonBloomScene);
+  // Get the canvas container
+  const canvasContainer = document.getElementById('canvas-container');
+  if (!canvasContainer) {
+    console.error('Canvas container not found');
+    return;
+  }
 
-  // createEnvironment();
+  // Move the renderer's canvas to the container if it's not already there
+  const canvas = renderer.domElement;
+  if (canvas.parentElement !== canvasContainer) {
+    canvasContainer.appendChild(canvas);
+  }
 
-  const container = renderer.domElement.parentElement;
-  mouseOverlay = new MouseOverlayCanvas(container);
+  // Initialize mouse overlay with the canvas container
+  mouseOverlay = new MouseOverlayCanvas(canvasContainer);
 
     // Add helpers
     addAxesHelper();
@@ -552,18 +569,6 @@ controls.addEventListener("change", () => {
 
 // Define global variables for geometry and material
 const sphereGeometry = new THREE.IcosahedronGeometry(1, 15);
-// const sphereGeometry = new THREE.SphereGeometry(1, 16, 12); // Less detailed sphere
-let sphereMaterial;
-
-// export function createSphere(convertedData) {
-
-//   // Update material with the new color
-//   const color = convertedData.color || new THREE.Color().setHSL(
-//     Math.random(),
-//     0.7,
-//     Math.random() * 0.2 + 0.05
-//   );
-//   sphereMaterial = new THREE.MeshBasicMaterial({ color });
 
 export function createSphere(convertedData) {
   const color = convertedData.color || new THREE.Color().setHSL(

@@ -572,64 +572,22 @@ function getObjectType(object) {
   }
 }
 
-// export function onPointerDown(event) {
-//   const { mouse, raycaster, renderer, scene, nonBloomScene, camera, controls } = share3dDat();
-//   const canvas = renderer.domElement;
-//   const rect = canvas.getBoundingClientRect();
-
-//   // Calculate mouse position relative to the canvas
-//   mouse.x = (event.clientX - rect.left) / rect.width * 2 - 1;
-//   mouse.y = -(event.clientY - rect.top) / rect.height * 2 + 1;
-//   raycaster.setFromCamera(mouse, camera);
-//   const intersectsBloom = raycaster.intersectObjects(scene.children, true);
-//   const intersectsNonBloom = raycaster.intersectObjects(nonBloomScene.children, true);
-
-//   // Record initial pointer position and time
-//   initialPointerPosition = { x: event.clientX, y: event.clientY };
-//   initialPointerTime = Date.now();
-//   isDragging = false; // Reset isDragging
-
-//     const sphereIntersect = intersectsBloom.find(
-//     (intersect) => getObjectType(intersect.object) === "Sphere"
-//   );
-
-//   if (sphereIntersect) {
-//     isDragging = true;
-//     controls.enabled = false;
-//     selectedSphere = sphereIntersect.object;
-//     selectedObject = selectedSphere;
-//     sphereIntersect.object.layers.toggle(BLOOM_SCENE);
-//   } else if(intersectsNonBloom?.length > 0) {
-
-//     const selectedCube = getCubeUnderPointer(event, intersectsNonBloom);
-//     if (selectedCube) {
-//       isDragging = true;
-//       controls.enabled = false;
-//       selectedObject = selectedCube;
-
-//       // Initialize the previousIntersectPoint for cube dragging
-//       plane.setFromNormalAndCoplanarPoint(
-//         new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion),
-//         selectedObject.wireframeCube.position
-//       );
-//       raycaster.ray.intersectPlane(plane, previousIntersectPoint);
-//     }
-//   }
-
-//   if (isDragging) {
-//     // Prevent default behavior when dragging starts
-//     event.preventDefault();
-//     event.stopPropagation();
-//   }
-//   event.target.setPointerCapture(event.pointerId);
-//   markNeedsRender();
-// }
-
 let clickStartTime = 0;
 // const CLICK_DURATION_THRESHOLD = 200; // milliseconds
 const CLICK_DURATION_THRESHOLD = 300;
 // In move.js, modify the onPointerDown function:
 export function onPointerDown(event) {
+  if (event.target.closest('.modal') || 
+  event.target.closest('.p2p_peer_input') || 
+  event.target.id === 'connectButton' || 
+  event.target.id === 'userIdInput' || 
+  event.target.id === 'peerIdInput') {
+
+    console.log("by by mover ")
+return; // Let the event handle normally for UI elements
+}
+
+
   const { mouse, raycaster, renderer, scene, nonBloomScene, camera, controls } =
     share3dDat();
   const canvas = renderer.domElement;
@@ -723,8 +681,6 @@ function getRandomOffset(cubeSize) {
   const offsetZ = (Math.random() - 0.5) * maxOffset;
   return new THREE.Vector3(offsetX, offsetY, offsetZ);
 }
-
-
 function toggleBloom(object) {
 
   let isBloomEnabled = object.layers.test(BLOOM_SCENE);
@@ -748,6 +704,16 @@ function toggleBloom(object) {
 // Update the onPointerUp function to use this new handleSphereDragEnd
 async function onPointerUp(event) {
   console.log("Pointer up event triggered");
+  if (event.target.closest('.modal') || 
+  event.target.closest('.p2p_peer_input') || 
+  event.target.id === 'connectButton' || 
+  event.target.id === 'userIdInput' || 
+  event.target.id === 'peerIdInput') {
+
+    console.log("by by mover ")
+return; // Let the event handle normally for UI elements
+}
+
   const { controls, scene, nonBloomScene, ghostCube, sceneSnapshot } =
     share3dDat();
   controls.enabled = true;
@@ -937,7 +903,7 @@ function setupPointerEvents() {
     : 16;
   canvas.addEventListener("pointermove", throttle(onPointerMove, throttleTime));
   canvas.addEventListener("pointerup", onPointerUp);
-  document.addEventListener("pointerup", onPointerUp);
+  // document.addEventListener("pointerup", onPointerUp);
 }
 
 setupPointerEvents();

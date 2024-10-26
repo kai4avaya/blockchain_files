@@ -344,118 +344,112 @@
       height: 16px;
       width: 16px;
     }
-
     .modal {
-      /* Positioning */
-      position: fixed;
-      left: 5rem;
-      top: 50%;
-      transform: translateY(-50%);
-      z-index: 2001;
-      /* Consistently higher than canvas */
+  /* Positioning */
+  position: fixed;
+  left: 5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2001;  /* Consistently higher than canvas */
 
-      /* Dimensions */
-      width: 15.625rem;
+  /* Dimensions */
+  width: 15.625rem;
+  
+  /* Visual styling */
+  background-color: white;
+  padding: 1.25rem;
+  box-shadow: 0.125rem 0 0.3125rem rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  
+  /* Layout */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;  /* Consistent spacing between elements */
+  
+  /* Interaction */
+  pointer-events: all !important;
+  
+  /* Animation */
+  opacity: 0;
+  visibility: hidden;
+  transition: 
+    opacity 0.3s ease-out,
+    transform 0.3s ease-out,
+    visibility 0.3s ease-out;
+}
 
-      /* Visual styling */
-      background-color: white;
-      padding: 1.25rem;
-      box-shadow: 0.125rem 0 0.3125rem rgba(0, 0, 0, 0.1);
-      border-radius: 4px;
+/* Arrow decoration */
+.modal::before {
+  content: '';
+  position: absolute;
+  left: -0.625rem;
+  top: 1.25rem;  /* Align with first element */
+  width: 0;
+  height: 0;
+  border-top: 0.625rem solid transparent;
+  border-bottom: 0.625rem solid transparent;
+  border-right: 0.625rem solid white;
+  pointer-events: none;  /* Ensure arrow doesn't interfere with clicks */
+}
 
-      /* Layout */
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.75rem;
-      /* Consistent spacing between elements */
+/* Active state */
+.modal.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
 
-      /* Interaction */
-      pointer-events: all !important;
+/* Form elements */
+.modal input {
+  /* width: 90%; */
+  padding: 0.75rem;
+  margin: 0;  /* Remove margin, use gap instead */
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+  pointer-events: all !important;
+}
 
-      /* Animation */
-      opacity: 0;
-      visibility: hidden;
-      transition:
-        opacity 0.3s ease-out,
-        transform 0.3s ease-out,
-        visibility 0.3s ease-out;
-    }
+.modal input:focus {
+  outline: 2px solid #007bff;
+  border-color: #007bff;
+}
 
-    /* Arrow decoration */
-    .modal::before {
-      content: '';
-      position: absolute;
-      left: -0.625rem;
-      top: 1.25rem;
-      /* Align with first element */
-      width: 0;
-      height: 0;
-      border-top: 0.625rem solid transparent;
-      border-bottom: 0.625rem solid transparent;
-      border-right: 0.625rem solid white;
-      pointer-events: none;
-      /* Ensure arrow doesn't interfere with clicks */
-    }
+.modal button {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  pointer-events: all !important;
+  transition: background-color 0.2s ease;
+}
 
-    /* Active state */
-    .modal.active {
-      opacity: 1;
-      visibility: visible;
-      transform: translateY(0);
-    }
+.modal button:hover {
+  background-color: #0056b3;
+}
 
-    /* Form elements */
-    .modal input {
-      /* width: 90%; */
-      padding: 0.75rem;
-      margin: 0;
-      /* Remove margin, use gap instead */
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 1rem;
-      pointer-events: all !important;
-    }
+.modal button:active {
+  background-color: #004085;
+}
 
-    .modal input:focus {
-      outline: 2px solid #007bff;
-      border-color: #007bff;
-    }
+/* Status element */
+.modal #status {
+  width: 100%;
+  min-height: 1.5rem;
+  font-size: 0.875rem;
+  color: #666;
+}
 
-    .modal button {
-      width: 100%;
-      padding: 0.75rem 1.25rem;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 1rem;
-      font-weight: 500;
-      pointer-events: all !important;
-      transition: background-color 0.2s ease;
-    }
-
-    .modal button:hover {
-      background-color: #0056b3;
-    }
-
-    .modal button:active {
-      background-color: #004085;
-    }
-
-    /* Status element */
-    .modal #status {
-      width: 100%;
-      min-height: 1.5rem;
-      font-size: 0.875rem;
-      color: #666;
-    }
-
-    /* Ensure all children are interactive */
-    .modal * {
-      pointer-events: all !important;
-    }
+/* Ensure all children are interactive */
+.modal * {
+  pointer-events: all !important;
+}
 
     .tooltip {
       position: absolute;
@@ -1075,6 +1069,7 @@
       height: 100%;
       z-index: 1;
     }
+
   </style>
   <script type="x-shader/x-vertex" id="vertexshader">
       varying vec2 vUv;
@@ -1226,10 +1221,8 @@
       </div>
     </div>
     <div class="modal active" style=" pointer-events: all !important;">
-      <input type="text" class="p2p_peer_input" id="userIdInput" placeholder="Enter your user ID"
-        style="pointer-events: all !important;">
-      <input type="text" class="p2p_peer_input" id="peerIdInput" placeholder="Enter peer ID to connect"
-        style="pointer-events: all !important;">
+      <input type="text" class="p2p_peer_input" id="userIdInput" placeholder="Enter your user ID" style="pointer-events: all !important;">
+      <input type="text" class="p2p_peer_input" id="peerIdInput" placeholder="Enter peer ID to connect" style="pointer-events: all !important;">
       <button id="connectButton" style="pointer-events: all !important;">
         Connect
         <span class="tooltip">Click to connect to the peer</span>
@@ -1250,120 +1243,97 @@
   <div id="canvas-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
     <!-- Three.js canvas will render here -->
   </div>
+
   <script>
+    let isShowingMenu = false
     const toggleButton = document.getElementById('toggleButton');
+
     const fileTreeBtn = document.getElementById('fileTreeBtn');
+
     const fileTree = document.getElementById('fileTree');
+
     const tests = document.getElementById('tests');
+
     const peerConnBtn = document.getElementById('peer-btn-connect');
-    const modal = document.querySelector('.modal'); // Used by peer-btn-connect
-    const leftSlideout = document.getElementById('leftSlideout');
-    const chatSlideout = document.getElementById('chatSlideout');
-    const homeIcon = document.getElementById('homeIcon');
-    const icons = document.querySelectorAll('.sidebar-icon');
+    const modal = document.querySelector('.modal');
+
+
+// Initially hide the modal
+modal.style.display = 'none';
+
+function showModal() {
+  const iconRect = peerConnBtn.getBoundingClientRect();
+  modal.style.top = `${iconRect.top - 15}px`;
+  modal.style.display = 'flex';
   
-    // Create a separate modal for homeIcon
-    const homeModal = document.createElement('div');
-    homeModal.classList.add('modal');
-    homeModal.style.display = 'none';
-    document.body.appendChild(homeModal);
+  // Trigger reflow for smooth transition
+  modal.offsetHeight;
   
-    let activeIcon = null;
+  requestAnimationFrame(() => {
+    modal.classList.add('active');
+  });
+
+  const arrowOffset = iconRect.height / 2;
+  modal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
+}
+
+function hideModal() {
+  modal.style.display = 'none';
+  activeIcon = null;
+}
+
+// Only add click listener to peer-btn-connect
+peerConnBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  e.preventDefault();
   
+  if (modal.style.display === 'none') {
+    showModal();
+  } else {
+    hideModal();
+  }
+});
+
+    // Ensure left slideout starts hidden
     leftSlideout.classList.remove('active');
-  
+
     fileTreeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-  
+
       // Toggle the left slideout
       leftSlideout.classList.toggle('active');
-  
+
       // Close other slideouts if open
       if (chatSlideout.classList.contains('active')) {
         chatSlideout.classList.remove('active');
       }
+
     });
-  
-    // Functions for peer-btn-connect modal
-    function showPeerModal() {
-      const iconRect = peerConnBtn.getBoundingClientRect();
-      modal.style.top = `${iconRect.top - 15}px`;
-      modal.style.display = 'flex';
-  
-      modal.offsetHeight; // Trigger reflow
-  
-      requestAnimationFrame(() => {
-        modal.classList.add('active');
-      });
-  
-      const arrowOffset = iconRect.height / 2;
-      modal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
-      activeIcon = peerConnBtn;
-    }
-  
-    function hidePeerModal() {
-      modal.style.display = 'none';
-      modal.classList.remove('active');
-      activeIcon = null;
-    }
-  
-    // Functions for homeIcon modal
-    function showHomeModal() {
-      const iconRect = homeIcon.getBoundingClientRect();
-      homeModal.style.top = `${iconRect.top - 15}px`;
-      homeModal.style.display = 'flex';
-  
-      homeModal.innerHTML = getHomeModalContent();
-      attachHomeModalListeners();
-  
-      homeModal.offsetHeight; // Trigger reflow
-  
-      requestAnimationFrame(() => {
-        homeModal.classList.add('active');
-      });
-  
-      const arrowOffset = iconRect.height / 2;
-      homeModal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
-      activeIcon = homeIcon;
-    }
-  
-    function hideHomeModal() {
-      homeModal.style.display = 'none';
-      homeModal.classList.remove('active');
-      activeIcon = null;
-    }
-  
-    // Event Listeners for Icons
-    peerConnBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-  
-      if (modal.style.display === 'none') {
-        showPeerModal();
-      } else {
-        hidePeerModal();
-      }
-  
-      // Close slideouts if open
-      leftSlideout.classList.remove('active');
-      chatSlideout.classList.remove('active');
-    });
-  
-    homeIcon.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-  
-      if (homeModal.style.display === 'none') {
-        showHomeModal();
-      } else {
-        hideHomeModal();
-      }
-    });
-  
-    // Function to get homeModal content
-    function getHomeModalContent() {
-      return `
-       <div class="modal-icons">
+
+  </script>
+
+  <script>
+    const icons = document.querySelectorAll('.sidebar-icon');
+    let activeIcon = null;
+    // const homeModal = document.getElementById('homeModal');
+    const homeIcon = document.getElementById('homeIcon');
+    let isHomeModalActive = false;
+    const originalModalContent = modal.innerHTML;
+
+    icons.forEach(icon => {
+  icon.addEventListener('mouseenter', () => {
+    icon.querySelector('.tooltip').style.opacity = '1';
+  });
+  icon.addEventListener('mouseleave', () => {
+    icon.querySelector('.tooltip').style.opacity = '0';
+  });
+});
+
+
+
+    function setHomeModalContent() {
+      modal.innerHTML = `
+    <div class="modal-icons">
       <div class="modal-icon" data-action="visualize-embeddings">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
@@ -1389,65 +1359,87 @@
         <span class="tooltip">Filter for specific ideas</span>
       </div>
     </div>
-      `;
+  `;
+      isHomeModalActive = true;
+      attachTooltipListeners();
+      attachActionListeners();
     }
-  
-    // Event Handlers for homeModal Icons
-    function attachHomeModalListeners() {
-      homeModal.querySelectorAll('.modal-icon').forEach(icon => {
+
+    function setOriginalModalContent() {
+      modal.innerHTML = originalModalContent;
+      isHomeModalActive = false;
+      attachTooltipListeners();
+    }
+
+    function attachActionListeners() {
+      modal.querySelectorAll('.modal-icon').forEach(icon => {
         icon.addEventListener('click', (e) => {
-          e.stopPropagation();
           const action = e.currentTarget.dataset.action;
           if (action) {
             showSpinner(e.currentTarget);
+            // Dispatch a custom event
             console.log("Dispatching", action);
             const event = new CustomEvent('modalAction', { detail: { action } });
             document.dispatchEvent(event);
           }
         });
-  
-        const tooltip = icon.querySelector('.tooltip');
-        if (tooltip) {
-          icon.addEventListener('mouseenter', () => {
-            tooltip.style.opacity = '1';
-          });
-          icon.addEventListener('mouseleave', () => {
-            tooltip.style.opacity = '0';
-          });
-        }
       });
     }
-  
+
     function showSpinner(iconElement) {
       const svgIcon = iconElement.querySelector('svg');
       const spinner = document.createElement('div');
       spinner.className = 'spinner';
       svgIcon.style.display = 'none';
       iconElement.insertBefore(spinner, svgIcon);
-  
+
       setTimeout(() => {
         spinner.remove();
         svgIcon.style.display = '';
       }, 4000);
     }
-  
-    // Hide modals when clicking outside
+
+    function toggleHomeModal() {
+      setHomeModalContent();
+    }
+    // icons.forEach((icon, index) => {
+    //   if (icon === fileTreeBtn || icon === toggleButton || icon === tests || icon === peerConnBtn) {
+    //     return;
+    //   }
+    //   icon.addEventListener('click', (e) => {
+    //     if (activeIcon === icon) {
+    //       hideModal();
+    //     } else {
+    //       if (activeIcon) {
+    //         hideModal();
+    //         setTimeout(() => showModal(icon), 300);
+    //       } else {
+    //         showModal(icon);
+    //       }
+    //     }
+    //   });
+    // });
+
+
+
+    function attachTooltipListeners() {
+      modal.querySelectorAll('.modal-icon').forEach(icon => {
+        const tooltip = icon.querySelector('.tooltip');
+        icon.addEventListener('mouseenter', () => {
+          tooltip.style.opacity = '1';
+        });
+        icon.addEventListener('mouseleave', () => {
+          tooltip.style.opacity = '0';
+        });
+      });
+    }
+
     document.addEventListener('click', (e) => {
       if (!modal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
-        hidePeerModal();
-      }
-      if (!homeModal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
-        hideHomeModal();
+        hideModal();
       }
     });
-  
-    // Ensure modal events don't propagate
-    modal.addEventListener('pointerdown', (e) => e.stopPropagation());
-    modal.addEventListener('click', (e) => e.stopPropagation());
-    homeModal.addEventListener('pointerdown', (e) => e.stopPropagation());
-    homeModal.addEventListener('click', (e) => e.stopPropagation());
-  
-    // Tooltips for sidebar icons
+
     document.querySelectorAll('.sidebar-icon').forEach(icon => {
       icon.addEventListener('mouseenter', () => {
         icon.querySelector('.tooltip').style.opacity = '1';
@@ -1456,10 +1448,78 @@
         icon.querySelector('.tooltip').style.opacity = '0';
       });
     });
+
+    // connectButton = document.getElementById("connectButton")
+
+    // connectButton.addEventListener('click', () => {
+    //   // Simulate a network request
+    //   console.log("TURD FART connectbutton clicked")
+    // });
+    modal.addEventListener('pointerdown', (e) => e.stopPropagation());
+
   </script>
-  
   <script type="module" src="/main.js"></script>
-  
+
+
+  <!-- Add this to your JavaScript -->
+  <script>
+    // After Three.js initializes
+    document.addEventListener('DOMContentLoaded', () => {
+      const canvasContainer = document.getElementById('canvas-container');
+      const canvas = document.querySelector('canvas[data-engine="three.js"]');
+      if (canvas && canvasContainer) {
+        canvasContainer.appendChild(canvas);
+      }
+    });
+
+    // Ensure modal events don't propagate to canvas
+    modal.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+    });
+
+    modal.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Add specific handler for connect button
+    const connectButton = document.getElementById('connectButton');
+    connectButton?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Connect button clicked');
+      // Your connection logic here
+    });
+  </script>
+
+  <script>
+    // Add this to your JavaScript, after Three.js initialization
+    document.addEventListener('DOMContentLoaded', () => {
+      const canvasContainer = document.getElementById('canvas-container');
+      const uiLayer = document.getElementById('ui-layer');
+
+      // Wait a short moment to ensure Three.js has created the canvas
+      setTimeout(() => {
+        // Find the Three.js canvas
+        const canvas = document.querySelector('canvas[data-engine="three.js"]');
+        if (canvas && canvasContainer) {
+          // Move the canvas out of ui-layer and into canvas-container
+          if (uiLayer.contains(canvas)) {
+            canvasContainer.appendChild(canvas);
+          }
+
+          // Also move any other Three.js related elements (like the stats panel)
+          const threejsElements = document.querySelectorAll('div[style*="position: absolute"]');
+          threejsElements.forEach(element => {
+            if (uiLayer.contains(element) &&
+              (element.innerHTML.includes('canvas') ||
+                element.style.pointerEvents === 'none')) {
+              canvasContainer.appendChild(element);
+            }
+          });
+        }
+      }, 100); // Small delay to ensure Three.js has initialized
+    });
+  </script>
 </body>
 
 </html>

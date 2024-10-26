@@ -346,115 +346,71 @@
     }
 
     .modal {
-      /* Positioning */
       position: fixed;
       left: 5rem;
-      top: 50%;
-      transform: translateY(-50%);
-      z-index: 2001;
-      /* Consistently higher than canvas */
-
-      /* Dimensions */
-      width: 15.625rem;
-
-      /* Visual styling */
+      /* Converted from 80px */
       background-color: white;
       padding: 1.25rem;
+      /* Converted from 20px */
       box-shadow: 0.125rem 0 0.3125rem rgba(0, 0, 0, 0.1);
-      border-radius: 4px;
-
-      /* Layout */
+      /* Converted from 2px 0 5px */
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 0.75rem;
-      /* Consistent spacing between elements */
-
-      /* Interaction */
-      pointer-events: all !important;
-
-      /* Animation */
+      width: 15.625rem;
+      /* Converted from 250px */
+      transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+      transform: translateY(1.25rem);
+      /* Converted from 20px */
       opacity: 0;
-      visibility: hidden;
-      transition:
-        opacity 0.3s ease-out,
-        transform 0.3s ease-out,
-        visibility 0.3s ease-out;
+      /* pointer-events: none; */
+      pointer-events: auto !important;
+z-index: 2000; /* Higher than canvas */
     }
 
-    /* Arrow decoration */
     .modal::before {
       content: '';
       position: absolute;
       left: -0.625rem;
-      top: 1.25rem;
-      /* Align with first element */
+      /* Converted from -10px */
       width: 0;
       height: 0;
       border-top: 0.625rem solid transparent;
+      /* Converted from 10px */
       border-bottom: 0.625rem solid transparent;
+      /* Converted from 10px */
       border-right: 0.625rem solid white;
-      pointer-events: none;
-      /* Ensure arrow doesn't interfere with clicks */
+      /* Converted from 10px */
     }
 
-    /* Active state */
     .modal.active {
-      opacity: 1;
-      visibility: visible;
       transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
     }
 
-    /* Form elements */
+    .modal.active {
+      display: flex;
+      transform: translateY(0);
+      z-index: 999;
+    }
+
     .modal input {
-      /* width: 90%; */
-      padding: 0.75rem;
-      margin: 0;
-      /* Remove margin, use gap instead */
+      /* width: 100%; */
+      padding: 10px;
+      margin-bottom: 10px;
       border: 1px solid #ccc;
       border-radius: 4px;
-      font-size: 1rem;
-      pointer-events: all !important;
-    }
-
-    .modal input:focus {
-      outline: 2px solid #007bff;
-      border-color: #007bff;
     }
 
     .modal button {
-      width: 100%;
-      padding: 0.75rem 1.25rem;
+      padding: 10px 20px;
       background-color: #007bff;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 1rem;
-      font-weight: 500;
-      pointer-events: all !important;
-      transition: background-color 0.2s ease;
-    }
-
-    .modal button:hover {
-      background-color: #0056b3;
-    }
-
-    .modal button:active {
-      background-color: #004085;
-    }
-
-    /* Status element */
-    .modal #status {
-      width: 100%;
-      min-height: 1.5rem;
-      font-size: 0.875rem;
-      color: #666;
-    }
-
-    /* Ensure all children are interactive */
-    .modal * {
-      pointer-events: all !important;
+      position: relative;
     }
 
     .tooltip {
@@ -1050,31 +1006,6 @@
       margin-right: 5px;
       vertical-align: middle;
     }
-
-
-    /* NEW CSS TO UPDATE CANVAS LAYER */
-    #ui-layer {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 2000;
-    }
-
-    #ui-layer>* {
-      pointer-events: auto;
-    }
-
-    #canvas-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 1;
-    }
   </style>
   <script type="x-shader/x-vertex" id="vertexshader">
       varying vec2 vUv;
@@ -1096,274 +1027,214 @@
 </head>
 
 <body>
-  <div id="ui-layer"
-    style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2000;">
-    <!-- Drop indicator -->
-    <div id="drop-indicator" class="drop-indicator" style="pointer-events: auto;"></div>
-
-    <!-- Text Modal -->
-    <div id="textModal-text3d" class="modal-text3d" style="pointer-events: auto;">
-      <div class="modal-content-text3d">
-        <span class="close-text3d">&times;</span>
-        <h2 id="modalTitle-text3d"></h2>
-        <p id="modalText-text3d"></p>
-        <textarea id="editText-text3d" rows="10" cols="50"></textarea>
-        <button id="sendButton-text3d">Send</button>
-      </div>
+  <div id="drop-indicator" class="drop-indicator"></div>
+  <div id="textModal-text3d" class="modal-text3d">
+    <div class="modal-content-text3d">
+      <span class="close-text3d">&times;</span>
+      <h2 id="modalTitle-text3d"></h2>
+      <p id="modalText-text3d"></p>
+      <textarea id="editText-text3d" rows="10" cols="50"></textarea>
+      <button id="sendButton-text3d">Send</button>
+    </div>
+  </div>
+  <div id="status-container"></div>
+  <div class="sidebar">
+    <div class="sidebar-icon" id="homeIcon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+      </svg>
+      <span class="tooltip">Home</span>
+    </div>
+    <div class="sidebar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <span class="tooltip">Search</span>
+    </div>
+    <div class="sidebar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+      <span class="tooltip" id="peer-btn-connect">Profile</span>
+    </div>
+    <div class="sidebar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path
+          d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+        </path>
+      </svg>
+      <span class="tooltip">Settings</span>
+    </div>
+    <div id='tests' class="sidebar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+        <polyline points="22,6 12,13 2,6"></polyline>
+      </svg>
+      <span class="tooltip">Messages</span>
     </div>
 
-    <!-- Status Container -->
-    <div id="status-container" style="pointer-events: auto;"></div>
-
-    <!-- Sidebar -->
-    <div class="sidebar" style="pointer-events: auto;">
-      <div class="sidebar-icon" id="homeIcon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
-        <span class="tooltip">Home</span>
-      </div>
-      <div class="sidebar-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <span class="tooltip">Search</span>
-      </div>
-      <div class="sidebar-icon" id="peer-btn-connect">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-          <circle cx="12" cy="7" r="4"></circle>
-        </svg>
-        <span class="tooltip">Profile</span>
-      </div>
-      <div class="sidebar-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path
-            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
-          </path>
-        </svg>
-        <span class="tooltip">Settings</span>
-      </div>
-      <div id='tests' class="sidebar-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-          <polyline points="22,6 12,13 2,6"></polyline>
-        </svg>
-        <span class="tooltip">Messages</span>
-      </div>
-
-      <div id="fileTreeBtn" class="sidebar-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round">
-          <path d="M3 3h18a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path>
-          <path d="M3 7h18"></path>
-          <path d="M3 11h18"></path>
-          <path d="M3 15h18"></path>
-        </svg>
-        <span class="tooltip">File directory</span>
-      </div>
-
-
-
-      <div id="toggleButton" class="sidebar-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-          <path d="M15 5l4 4" />
-        </svg>
-        <span class="tooltip">Chat with your docs</span>
-      </div>
-
+    <div id="fileTreeBtn" class="sidebar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M3 3h18a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path>
+        <path d="M3 7h18"></path>
+        <path d="M3 11h18"></path>
+        <path d="M3 15h18"></path>
+      </svg>
+      <span class="tooltip">File directory</span>
     </div>
 
-    <!-- Separate left slideout -->
-    <div class="left-slideout" id="leftSlideout">
-      <div id="fileTreeContainer">
-        <div class="tree" id="fileTree">
-          <div class="mt-5 pl-3">
-            <a href="http://blockchain.org">⿻ create story</a> |
-            <a href="http://blockchain.org">⿻ create quest</a> |
-            <a href="http://blockchain.org">⿻ create friend</a> <br> <br>
-            <strong>File Viewer:</strong> File structure viewable in a TREE
-          </div>
-          <div class="tree">
-            <ul>
-              <li><i class="fa fa-folder-open"></i> Project
-                <ul>
-                  <li><i class="fa fa-folder-open"></i> Opened Folder <span>- 15kb</span>
-                    <ul>
-                      <li><i class="fa fa-folder-open"></i> css
-                        <ul>
-                          <li><i class="fa fa-code"></i> CSS Files <span>- 3kb</span>
-                          </li>
-
-                        </ul>
-                      </li>
-                      <li><i class="fa fa-folder"></i> Folder close <span>- 10kb</span>
-                      </li>
-                      <li><i class="fab fa-html5"></i> index.html</li>
-                      <li><i class="fa fa-picture-o"></i> favicon.ico</li>
-                    </ul>
-                  </li>
-                  <li><i class="fa fa-folder"></i> Folder close <span>- 420kb</span>
-
-                  </li>
-                </ul>
-              </li>
-            </ul>
-          </div>
 
 
+    <div id="toggleButton" class="sidebar-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+        <path d="M15 5l4 4" />
+      </svg>
+      <span class="tooltip">Chat with your docs</span>
+    </div>
+
+  </div>
+
+  <!-- Separate left slideout -->
+  <div class="left-slideout" id="leftSlideout">
+    <div id="fileTreeContainer">
+      <div class="tree" id="fileTree">
+        <div class="mt-5 pl-3">
+          <a href="http://blockchain.org">⿻ create story</a> |
+          <a href="http://blockchain.org">⿻ create quest</a> |
+          <a href="http://blockchain.org">⿻ create friend</a> <br> <br>
+          <strong>File Viewer:</strong> File structure viewable in a TREE
         </div>
+        <div class="tree">
+          <ul>
+            <li><i class="fa fa-folder-open"></i> Project
+              <ul>
+                <li><i class="fa fa-folder-open"></i> Opened Folder <span>- 15kb</span>
+                  <ul>
+                    <li><i class="fa fa-folder-open"></i> css
+                      <ul>
+                        <li><i class="fa fa-code"></i> CSS Files <span>- 3kb</span>
+                        </li>
+
+                      </ul>
+                    </li>
+                    <li><i class="fa fa-folder"></i> Folder close <span>- 10kb</span>
+                    </li>
+                    <li><i class="fab fa-html5"></i> index.html</li>
+                    <li><i class="fa fa-picture-o"></i> favicon.ico</li>
+                  </ul>
+                </li>
+                <li><i class="fa fa-folder"></i> Folder close <span>- 420kb</span>
+
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+
+
       </div>
     </div>
-    <div class="modal active" style=" pointer-events: all !important;">
-      <input type="text" class="p2p_peer_input" id="userIdInput" placeholder="Enter your user ID"
-        style="pointer-events: all !important;">
-      <input type="text" class="p2p_peer_input" id="peerIdInput" placeholder="Enter peer ID to connect"
-        style="pointer-events: all !important;">
-      <button id="connectButton" style="pointer-events: all !important;">
-        Connect
-        <span class="tooltip">Click to connect to the peer</span>
-      </button>
-      <div id="status"></div>
-    </div>
-
-    <div id="popup"></div>
-    <div id="overlay" class="overlay" style="display: none;"></div>
-
-    <!-- <button id="toggleButton">Chat</button> -->
-    <div class="slideout" id="chatSlideout">
-      <div id="editor-container"></div>
-
-    </div>
   </div>
 
-  <div id="canvas-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
-    <!-- Three.js canvas will render here -->
+  <div class="modal">
+    <input type="text" class="p2p_peer_input" id="userIdInput" placeholder="Enter your user ID">
+    <input type="text" class="p2p_peer_input" id="peerIdInput" placeholder="Enter peer ID to connect">
+    <button id="connectButton">
+      Connect
+      <span class="tooltip">Click to connect to the peer</span>
+    </button>
+    <div id="status"></div>
   </div>
+
+  <div id="popup"></div>
+  <div id="overlay" class="overlay" style="display: none;"></div>
+
+  <!-- <button id="toggleButton">Chat</button> -->
+  <div class="slideout" id="chatSlideout">
+    <div id="editor-container"></div>
+
+
+  </div>
+
   <script>
+    let isShowingMenu = false
     const toggleButton = document.getElementById('toggleButton');
+
     const fileTreeBtn = document.getElementById('fileTreeBtn');
+
     const fileTree = document.getElementById('fileTree');
+
     const tests = document.getElementById('tests');
+
     const peerConnBtn = document.getElementById('peer-btn-connect');
-    const modal = document.querySelector('.modal'); // Used by peer-btn-connect
-    const leftSlideout = document.getElementById('leftSlideout');
-    const chatSlideout = document.getElementById('chatSlideout');
-    const homeIcon = document.getElementById('homeIcon');
-    const icons = document.querySelectorAll('.sidebar-icon');
-  
-    // Create a separate modal for homeIcon
-    const homeModal = document.createElement('div');
-    homeModal.classList.add('modal');
-    homeModal.style.display = 'none';
-    document.body.appendChild(homeModal);
-  
-    let activeIcon = null;
-  
+
+
+
+    // Ensure left slideout starts hidden
     leftSlideout.classList.remove('active');
-  
+
     fileTreeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-  
+
       // Toggle the left slideout
       leftSlideout.classList.toggle('active');
-  
+
       // Close other slideouts if open
       if (chatSlideout.classList.contains('active')) {
         chatSlideout.classList.remove('active');
       }
+
     });
-  
-    // Functions for peer-btn-connect modal
-    function showPeerModal() {
-      const iconRect = peerConnBtn.getBoundingClientRect();
+
+  </script>
+
+  <script>
+    const icons = document.querySelectorAll('.sidebar-icon');
+    const modal = document.querySelector('.modal');
+    let activeIcon = null;
+    // const homeModal = document.getElementById('homeModal');
+    const homeIcon = document.getElementById('homeIcon');
+    let isHomeModalActive = false;
+    const originalModalContent = modal.innerHTML;
+
+    function showModal(icon) {
+      const iconRect = icon.getBoundingClientRect();
       modal.style.top = `${iconRect.top - 15}px`;
-      modal.style.display = 'flex';
-  
-      modal.offsetHeight; // Trigger reflow
-  
-      requestAnimationFrame(() => {
-        modal.classList.add('active');
-      });
-  
+      modal.classList.add('active');
+
       const arrowOffset = iconRect.height / 2;
       modal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
-      activeIcon = peerConnBtn;
+
+      activeIcon = icon;
+
+      if (icon === homeIcon) {
+        toggleHomeModal();
+      } else {
+        setOriginalModalContent();
+      }
     }
-  
-    function hidePeerModal() {
-      modal.style.display = 'none';
+
+    function hideModal() {
       modal.classList.remove('active');
       activeIcon = null;
     }
-  
-    // Functions for homeIcon modal
-    function showHomeModal() {
-      const iconRect = homeIcon.getBoundingClientRect();
-      homeModal.style.top = `${iconRect.top - 15}px`;
-      homeModal.style.display = 'flex';
-  
-      homeModal.innerHTML = getHomeModalContent();
-      attachHomeModalListeners();
-  
-      homeModal.offsetHeight; // Trigger reflow
-  
-      requestAnimationFrame(() => {
-        homeModal.classList.add('active');
-      });
-  
-      const arrowOffset = iconRect.height / 2;
-      homeModal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
-      activeIcon = homeIcon;
-    }
-  
-    function hideHomeModal() {
-      homeModal.style.display = 'none';
-      homeModal.classList.remove('active');
-      activeIcon = null;
-    }
-  
-    // Event Listeners for Icons
-    peerConnBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-  
-      if (modal.style.display === 'none') {
-        showPeerModal();
-      } else {
-        hidePeerModal();
-      }
-  
-      // Close slideouts if open
-      leftSlideout.classList.remove('active');
-      chatSlideout.classList.remove('active');
-    });
-  
-    homeIcon.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-  
-      if (homeModal.style.display === 'none') {
-        showHomeModal();
-      } else {
-        hideHomeModal();
-      }
-    });
-  
-    // Function to get homeModal content
-    function getHomeModalContent() {
-      return `
-       <div class="modal-icons">
+
+
+    function setHomeModalContent() {
+      modal.innerHTML = `
+    <div class="modal-icons">
       <div class="modal-icon" data-action="visualize-embeddings">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
@@ -1389,65 +1260,87 @@
         <span class="tooltip">Filter for specific ideas</span>
       </div>
     </div>
-      `;
+  `;
+      isHomeModalActive = true;
+      attachTooltipListeners();
+      attachActionListeners();
     }
-  
-    // Event Handlers for homeModal Icons
-    function attachHomeModalListeners() {
-      homeModal.querySelectorAll('.modal-icon').forEach(icon => {
+
+    function setOriginalModalContent() {
+      modal.innerHTML = originalModalContent;
+      isHomeModalActive = false;
+      attachTooltipListeners();
+    }
+
+    function attachActionListeners() {
+      modal.querySelectorAll('.modal-icon').forEach(icon => {
         icon.addEventListener('click', (e) => {
-          e.stopPropagation();
           const action = e.currentTarget.dataset.action;
           if (action) {
             showSpinner(e.currentTarget);
+            // Dispatch a custom event
             console.log("Dispatching", action);
             const event = new CustomEvent('modalAction', { detail: { action } });
             document.dispatchEvent(event);
           }
         });
-  
-        const tooltip = icon.querySelector('.tooltip');
-        if (tooltip) {
-          icon.addEventListener('mouseenter', () => {
-            tooltip.style.opacity = '1';
-          });
-          icon.addEventListener('mouseleave', () => {
-            tooltip.style.opacity = '0';
-          });
-        }
       });
     }
-  
+
     function showSpinner(iconElement) {
       const svgIcon = iconElement.querySelector('svg');
       const spinner = document.createElement('div');
       spinner.className = 'spinner';
       svgIcon.style.display = 'none';
       iconElement.insertBefore(spinner, svgIcon);
-  
+
       setTimeout(() => {
         spinner.remove();
         svgIcon.style.display = '';
       }, 4000);
     }
-  
-    // Hide modals when clicking outside
+
+    function toggleHomeModal() {
+      setHomeModalContent();
+    }
+    icons.forEach((icon, index) => {
+      if (icon === fileTreeBtn || icon === toggleButton || icon === tests || icon === peerConnBtn) {
+        return;
+      }
+      icon.addEventListener('click', (e) => {
+        if (activeIcon === icon) {
+          hideModal();
+        } else {
+          if (activeIcon) {
+            hideModal();
+            setTimeout(() => showModal(icon), 300);
+          } else {
+            showModal(icon);
+          }
+        }
+      });
+    });
+
+
+
+    function attachTooltipListeners() {
+      modal.querySelectorAll('.modal-icon').forEach(icon => {
+        const tooltip = icon.querySelector('.tooltip');
+        icon.addEventListener('mouseenter', () => {
+          tooltip.style.opacity = '1';
+        });
+        icon.addEventListener('mouseleave', () => {
+          tooltip.style.opacity = '0';
+        });
+      });
+    }
+
     document.addEventListener('click', (e) => {
       if (!modal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
-        hidePeerModal();
-      }
-      if (!homeModal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
-        hideHomeModal();
+        hideModal();
       }
     });
-  
-    // Ensure modal events don't propagate
-    modal.addEventListener('pointerdown', (e) => e.stopPropagation());
-    modal.addEventListener('click', (e) => e.stopPropagation());
-    homeModal.addEventListener('pointerdown', (e) => e.stopPropagation());
-    homeModal.addEventListener('click', (e) => e.stopPropagation());
-  
-    // Tooltips for sidebar icons
+
     document.querySelectorAll('.sidebar-icon').forEach(icon => {
       icon.addEventListener('mouseenter', () => {
         icon.querySelector('.tooltip').style.opacity = '1';
@@ -1456,10 +1349,18 @@
         icon.querySelector('.tooltip').style.opacity = '0';
       });
     });
+
+    // connectButton = document.getElementById("connectButton")
+
+    // connectButton.addEventListener('click', () => {
+    //   // Simulate a network request
+    //   console.log("TURD FART connectbutton clicked")
+    // });
+    modal.addEventListener('pointerdown', (e) => e.stopPropagation());
+
   </script>
-  
   <script type="module" src="/main.js"></script>
-  
+
 </body>
 
 </html>

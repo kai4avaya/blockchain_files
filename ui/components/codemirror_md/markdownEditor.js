@@ -1,60 +1,15 @@
-// import { EditorView, basicSetup } from "codemirror";
-// import { EditorState } from "@codemirror/state";
-// import { markdown } from "@codemirror/lang-markdown";
-// import { indentWithTab } from "@codemirror/commands";
-// import { keymap } from "@codemirror/view";
-// import { richMarkdocExtension } from "codemirror-rich-markdoc";
-
-// let editor;
-
-// export function initializeMarkdownEditor(initialContent = '') {
-//   const editorContainer = document.getElementById('editor-container');
-//   if (!editorContainer) {
-//     console.error("Editor container not found");
-//     return;
-//   }
-
-//   editor = new EditorView({
-//     state: EditorState.create({
-//       doc: initialContent,
-//       extensions: [
-//         basicSetup,
-//         markdown(),
-//         keymap.of([indentWithTab]),
-//         richMarkdocExtension(),
-//       ]
-//     }),
-//     parent: editorContainer
-//   });
-
-//   console.log("Markdown editor initialized");
-//   return editor;
-// }
-
-// export function getMarkdownEditor() {
-//   return editor;
-// }
-
-// export function getMarkdownContent() {
-//   return editor ? editor.state.doc.toString() : '';
-// }
-
-// export function setMarkdownContent(content) {
-//   if (editor) {
-//     editor.dispatch({
-//       changes: { from: 0, to: editor.state.doc.length, insert: content }
-//     });
-//   }
-// }
 import * as Y from 'yjs'
-import { EditorView, basicSetup } from "codemirror"
+import { keymap, EditorView } from '@codemirror/view'
+import { basicSetup } from 'codemirror'
 import { EditorState } from "@codemirror/state"
-import { markdown } from "@codemirror/lang-markdown"
 import { indentWithTab } from "@codemirror/commands"
-import { keymap } from "@codemirror/view"
-import { richMarkdocExtension } from "codemirror-rich-markdoc"
+import richEditor from "./codemirror-rich-markdoc/src"
 import { YjsPeerProvider } from './providers/YjsPeerProvider'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
+import { languages } from '@codemirror/language-data'
+import { Table } from '@lezer/markdown'
+import config from './codemirror-rich-markdoc/editor/markdoc'
+import './codemirror-rich-markdoc/editor/style.css'
 
 let editor;
 const ydoc = new Y.Doc();
@@ -66,8 +21,8 @@ const cursorContainer = document.createElement('div');
 cursorContainer.className = 'cursor-container';
 document.body.appendChild(cursorContainer);
 
-export function initializeMarkdownEditor(initialContent = '', roomName = 'default-room') {
-  const editorContainer = document.getElementById('editor-container');
+export function initializeMarkdownEditor(initialContent = '', roomName = 'default-room', container = null) {
+  const editorContainer = container || document.getElementById('editor-container');
   if (!editorContainer) {
     console.error("Editor container not found");
     return;
@@ -79,31 +34,24 @@ export function initializeMarkdownEditor(initialContent = '', roomName = 'defaul
   // Set initial content if provided
   if (initialContent && ytext.length === 0) {
     ytext.insert(0, initialContent);
-  }
+  }  
 
-  // Create editor extensions including collaboration features
   const extensions = [
     basicSetup,
-    markdown(),
-    keymap.of([indentWithTab]),
-    richMarkdocExtension(),
     yCollab(ytext, provider.awareness, { cursorContainer }),
+    keymap.of([indentWithTab]),
     keymap.of(yUndoManagerKeymap),
+    ...richEditor({
+      markdoc: config,
+      lezer: {
+        codeLanguages: languages,
+        extensions: [Table]
+      }
+    }),
     EditorView.updateListener.of(update => {
       if (update.selectionSet) {
         const selection = update.state.selection.main;
         provider.updateCursor(selection.anchor, selection.head);
-      }
-    }),
-    // Add version history widget
-    EditorView.domEventHandlers({
-      click: (event, view) => {
-        if (event.target.classList.contains('version-restore')) {
-          const version = event.target.getAttribute('data-version');
-          if (version) {
-            restoreVersion(version);
-          }
-        }
       }
     })
   ];
@@ -116,33 +64,15 @@ export function initializeMarkdownEditor(initialContent = '', roomName = 'defaul
     parent: editorContainer
   });
 
-  // Add version history UI
   setupVersionHistory(editorContainer);
-
   console.log("Markdown editor initialized");
   return editor;
 }
 
-function setupVersionHistory(container) {
-  const historyContainer = document.createElement('div');
-  historyContainer.className = 'version-history';
-  container.appendChild(historyContainer);
 
-  // Store version every minute
-  setInterval(() => {
-    const version = {
-      content: ytext.toString(),
-      timestamp: new Date().toISOString(),
-      id: Date.now().toString()
-    };
-    const versions = getVersionHistory();
-    versions.push(version);
-    localStorage.setItem('version-history', JSON.stringify(versions));
-    updateVersionHistoryUI(historyContainer);
-  }, 60000);
-
-  // Initial UI update
-  updateVersionHistoryUI(historyContainer);
+function getVersionHistory() {
+  const stored = localStorage.getItem('version-history');
+  return stored ? JSON.parse(stored) : [];
 }
 
 function updateVersionHistoryUI(container) {
@@ -158,19 +88,31 @@ function updateVersionHistoryUI(container) {
   `;
 }
 
-function getVersionHistory() {
-  const stored = localStorage.getItem('version-history');
-  return stored ? JSON.parse(stored) : [];
-}
 
-function restoreVersion(versionId) {
+function setupVersionHistory(container) {
+  const historyContainer = document.createElement('div');
+  historyContainer.className = 'version-history';
+  container.appendChild(historyContainer);
+
+  setInterval(() => {
+    saveVersion();
+    updateVersionHistoryUI(historyContainer);
+  }, 60000);
+
+  updateVersionHistoryUI(historyContainer);
+}
+function saveVersion() {
+  const version = {
+    content: ytext.toString(),
+    timestamp: new Date().toISOString(),
+    id: Date.now().toString()
+  };
   const versions = getVersionHistory();
-  const version = versions.find(v => v.id === versionId);
-  if (version) {
-    setMarkdownContent(version.content);
-  }
+  versions.push(version);
+  localStorage.setItem('version-history', JSON.stringify(versions));
 }
 
+// Export functions for external use
 export function getMarkdownEditor() {
   return editor;
 }
@@ -188,7 +130,6 @@ export function setMarkdownContent(content) {
   }
 }
 
-// Add undo/redo methods
 export function undo() {
   if (provider) {
     provider.undo();
@@ -201,11 +142,14 @@ export function redo() {
   }
 }
 
-window.addEventListener('beforeunload', () => {
+export function cleanup() {
   if (provider) {
     provider.destroy();
   }
   if (ydoc) {
     ydoc.destroy();
   }
-});
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', cleanup);

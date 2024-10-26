@@ -1,141 +1,122 @@
 import * as Y from 'yjs'
-import { Observable } from 'lib0/observable'
-import { p2pSync } from '../../../../network/peer2peer_simple'  // Import your existing P2P system
 import { Awareness } from 'y-protocols/awareness'
-import { IndexeddbPersistence } from 'y-indexeddb'
-import { UndoManager } from 'y-codemirror.next'
+import * as awarenessProtocol from 'y-protocols/awareness'
+import { UndoManager } from 'yjs'
+import { p2pSync } from '../../../../network/peer2peer_simple'
 
-export class YjsPeerProvider extends Observable<string> {
-  public doc: Y.Doc
-  public awareness: Awareness
-  private persistence: IndexeddbPersistence
+export class YjsPeerProvider {
+  private doc: Y.Doc
+  protected _awareness: Awareness
   private undoManager: UndoManager
-  private synced: boolean = false
 
   constructor(doc: Y.Doc, roomName: string) {
-    super()
     this.doc = doc
-    
-    // Initialize awareness
-    this.awareness = new Awareness(doc)
-    this.setupAwareness()
-    
-    // Setup persistence
-    this.persistence = new IndexeddbPersistence(roomName, doc)
-    this.persistence.once('synced', () => {
-      this.synced = true
-      this.emit('synced', [true])
-    })
-
-    // Initialize undo manager
+    this._awareness = new Awareness(doc)
     this.undoManager = new UndoManager(doc.getText('codemirror'), {
-      trackedOrigins: new Set([this.doc.clientID])
+      trackedOrigins: new Set([doc.clientID])
     })
 
-    // Set up message handlers
+    this.setupAwareness()
+    this.setupP2PSync(roomName)
+
+    // Handle window unload
+    window.addEventListener('beforeunload', () => {
+      awarenessProtocol.removeAwarenessStates(
+        this._awareness,
+        [this.doc.clientID],
+        'window unload'
+      )
+    })
+  }
+
+  private setupAwareness() {
+    if (this._awareness) {
+      this._awareness.setLocalState({
+        user: {
+          name: `User-${Math.floor(Math.random() * 10000)}`,
+          color: `#${Math.floor(Math.random() * 16777215).toString(16)}`
+        },
+        cursor: null
+      })
+    }
+  }
+
+  private setupP2PSync(roomName: string) {
     p2pSync.setCustomMessageHandler((message: any, peerId: string) => {
-      switch (message.type) {
-        case 'yjs_sync':
-          Y.applyUpdate(this.doc, new Uint8Array(message.data))
-          break
-        case 'yjs_sync_request':
-          this.sendStateUpdate(peerId)
-          break
-        case 'yjs_awareness':
-          this.awareness.applyUpdate(new Uint8Array(message.data))
-          break
+      if (message.type === 'yjs_update') {
+        Y.applyUpdate(this.doc, new Uint8Array(message.data))
+      } else if (message.type === 'yjs_awareness') {
+        awarenessProtocol.applyAwarenessUpdate(
+          this._awareness,
+          new Uint8Array(message.data),
+          peerId
+        )
       }
     })
 
-    // Subscribe to document updates
     this.doc.on('update', (update: Uint8Array) => {
-      if (p2pSync.isConnected()) {
-        p2pSync.broadcastCustomMessage({
-          type: 'yjs_sync',
-          data: Array.from(update)
-        })
-      }
+      p2pSync.broadcastCustomMessage({
+        type: 'yjs_update',
+        data: Array.from(update)
+      })
     })
 
-    // Handle awareness updates
-    this.awareness.on('update', ({ added, updated, removed }) => {
-      const awarenessUpdate = this.awareness.encodeUpdate(added.concat(updated))
-      if (awarenessUpdate.length > 0) {
-        p2pSync.broadcastCustomMessage({
-          type: 'yjs_awareness',
-          data: Array.from(awarenessUpdate)
-        })
-      }
+    // Send awareness updates using the correct protocol
+    this._awareness.on('update', ({ added, updated, removed }) => {
+      const changedClients = added.concat(updated).concat(removed)
+      const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(
+        this._awareness,
+        changedClients
+      )
+      p2pSync.broadcastCustomMessage({
+        type: 'yjs_awareness',
+        data: Array.from(awarenessUpdate)
+      })
     })
 
     // Handle new peer connections
     p2pSync.onPeerConnect((peerId: string) => {
-      this.sendStateUpdate(peerId)
-      this.sendAwarenessUpdate(peerId)
-    })
-  }
+      // Send document state
+      const state = Y.encodeStateAsUpdate(this.doc)
+      p2pSync.sendCustomMessage(peerId, {
+        type: 'yjs_update',
+        data: Array.from(state)
+      })
 
-  private setupAwareness(): void {
-    // Set default user data
-    this.awareness.setLocalStateField('user', {
-      name: 'User ' + Math.floor(Math.random() * 100),
-      color: '#' + Math.floor(Math.random() * 16777215).toString(16),
-      cursor: null
-    })
-
-    // Clean up awareness state when user leaves
-    window.addEventListener('beforeunload', () => {
-      this.awareness.setLocalStateField('user', null)
-    })
-  }
-
-  private sendStateUpdate(peerId: string): void {
-    const state = Y.encodeStateVector(this.doc)
-    p2pSync.sendCustomMessage(peerId, {
-      type: 'yjs_sync_request',
-      data: Array.from(state)
-    })
-  }
-
-  private sendAwarenessUpdate(peerId: string): void {
-    const awarenessUpdate = this.awareness.encodeUpdate([this.awareness.clientID])
-    if (awarenessUpdate.length > 0) {
+      // Send complete awareness state for all clients
+      const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(
+        this._awareness,
+        Array.from(this._awareness.getStates().keys())
+      )
       p2pSync.sendCustomMessage(peerId, {
         type: 'yjs_awareness',
         data: Array.from(awarenessUpdate)
       })
-    }
+    })
   }
 
-  updateCursor(anchor: number, head: number): void {
-    this.awareness.setLocalStateField('user', {
-      ...this.awareness.getLocalState().user,
+  updateCursor(anchor: number, head: number) {
+    const currentState = this._awareness.getLocalState()
+    this._awareness.setLocalState({
+      ...currentState,
       cursor: { anchor, head }
     })
   }
 
-  undo(): void {
-    this.undoManager.undo()
+  get awareness() {
+    return this._awareness
   }
 
-  redo(): void {
-    this.undoManager.redo()
-  }
-
-  destroy(): void {
-    this.awareness.destroy()
-    this.persistence.destroy()
+  destroy() {
+    // Mark all remote clients as offline
+    awarenessProtocol.removeAwarenessStates(
+      this._awareness,
+      Array.from(this._awareness.getStates().keys())
+        .filter(client => client !== this.doc.clientID),
+      'connection closed'
+    )
+    
     this.undoManager.destroy()
-    this.doc.off('update', this.broadcastUpdate)
-    super.destroy()
-  }
-
-  private broadcastUpdate = (update: Uint8Array): void => {
-    if (p2pSync.isConnected()) {
-      p2pSync.broadcastCustomMessage({
-        type: 'yjs_sync',
-        data: Array.from(update)
-      })
-    }
+    this._awareness.destroy()
   }
 }

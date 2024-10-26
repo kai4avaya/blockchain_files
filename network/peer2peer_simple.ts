@@ -383,6 +383,8 @@ const connectButton = document.getElementById(
 ) as HTMLButtonElement;
 const statusDiv = document.getElementById("status") as HTMLDivElement;
 
+console.log("I am connectButton", connectButton)
+
 function updateStatus(message: string): void {
   if (statusDiv) {
     statusDiv.textContent = message;
@@ -418,6 +420,7 @@ userIdInput?.addEventListener("change", initializeP2PSync);
 
 // Connect to peer when button is clicked
 connectButton?.addEventListener("click", () => {
+  console.log("hello connectbutton is clicked")
   const peerId = peerIdInput?.value.trim();
   if (peerId) {
     p2pSync.connectToSpecificPeer(peerId);
