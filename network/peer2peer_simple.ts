@@ -21,11 +21,10 @@ interface PeerConnectHandler {
   (peerId: string): void;
 }
 
-// interface MousePosition {
-//   x: number;
-//   y: number;
-// }
-
+interface CustomMessage {
+  type: string;
+  data: any;
+}
 class P2PSync {
   private static instance: P2PSync | null = null;
   private peer: Peer | null = null;
@@ -200,6 +199,19 @@ class P2PSync {
             handler(data, conn.peer)
           );
           break;
+        case "yjs_update":
+          this.customMessageHandlers.forEach((handler) =>
+            handler(data, conn.peer)
+          );
+          break;
+
+        case "create_tab":
+        case "close_tab":
+        case "rename_tab":
+          this.customMessageHandlers.forEach((handler) =>
+            handler(data, conn.peer)
+          );
+          break;
         default:
           console.warn(
             `Received unknown data type: ${data.type} from peer: ${conn.peer}`
@@ -348,6 +360,10 @@ class P2PSync {
     }
   }
 
+  // setCustomMessageHandler(handler: CustomMessageHandler): void {
+  //   this.customMessageHandlers.add(handler);
+  // }
+
   setCustomMessageHandler(handler: CustomMessageHandler): void {
     this.customMessageHandlers.add(handler);
   }
@@ -364,6 +380,7 @@ class P2PSync {
   }
 
   broadcastCustomMessage(message: any): void {
+    console.log("p2p sending message", message);
     this.connections.forEach((conn) => {
       if (conn.open) {
         conn.send(message);
@@ -383,7 +400,7 @@ const connectButton = document.getElementById(
 ) as HTMLButtonElement;
 const statusDiv = document.getElementById("status") as HTMLDivElement;
 
-console.log("I am connectButton", connectButton)
+console.log("I am connectButton", connectButton);
 
 function updateStatus(message: string): void {
   if (statusDiv) {
@@ -420,7 +437,7 @@ userIdInput?.addEventListener("change", initializeP2PSync);
 
 // Connect to peer when button is clicked
 connectButton?.addEventListener("click", () => {
-  console.log("hello connectbutton is clicked")
+  console.log("hello connectbutton is clicked");
   const peerId = peerIdInput?.value.trim();
   if (peerId) {
     p2pSync.connectToSpecificPeer(peerId);
