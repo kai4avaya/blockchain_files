@@ -1075,6 +1075,15 @@
       height: 100%;
       z-index: 1;
     }
+
+    #editor-container:focus {
+    outline: none;
+}
+
+#editor-container *:focus {
+    outline: none;
+}
+
   </style>
   <script type="x-shader/x-vertex" id="vertexshader">
       varying vec2 vUv;

@@ -1,3 +1,5 @@
+// network\yjs-peerjs-provider.ts
+
 import * as Y from 'yjs';
 import { p2pSync } from './peer2peer_simple'; // Adjust the import path accordingly
 
@@ -17,6 +19,10 @@ export class YjsPeerJSProvider {
   
       // Handle incoming messages
       this.p2pSync.setCustomMessageHandler(this.handlePeerMessage.bind(this));
+    }
+
+    public getDocId(): string {
+      return this.docId;
     }
   
     private handleLocalUpdate(update: Uint8Array) {

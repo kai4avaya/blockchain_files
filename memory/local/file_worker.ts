@@ -1,3 +1,5 @@
+// memory\local\file_worker.ts
+
 class IndexDBWorkerOverlay {
     private worker: Worker;
     private callbacks: Map<string, (data: any) => void> = new Map();
@@ -10,6 +12,11 @@ class IndexDBWorkerOverlay {
     constructor() {
       this.worker = new Worker('../../workers/memory_worker');
       this.worker.onmessage = this.handleWorkerMessage.bind(this);
+    }
+
+    async deleteItem(storeName: string, key: string, dbName: string = this.dbName): Promise<void> {
+      await this.ensureDBOpen();
+      return this.sendToWorkerWithRetry('deleteItem', { storeName, key, dbName });
     }
   
     private handleWorkerMessage(event: MessageEvent) {

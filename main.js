@@ -127,33 +127,163 @@ main().catch((error) => {
 });
 
 
-function setupMarkdownEditor() {
+// function setupMarkdownEditor() {
+//   const toggleButton = document.getElementById('toggleButton');
+//   const chatSlideout = document.getElementById('chatSlideout');
+//   let tabManager = null;
+
+//   toggleButton.addEventListener('click', () => {
+//     console.log("Toggle button clicked");
+//     chatSlideout.classList.toggle('active');
+
+//     if (chatSlideout.classList.contains('active')) {
+//       console.log("Slideout is active, initializing or showing Markdown editor");
+//       if (!tabManager) {
+//         chatSlideout.innerHTML = `
+//           <div id="editor-app">
+//             <div id="editor-tabs">
+//               <div id="tab-list"></div>
+//               <button id="add-tab">+</button>
+//             </div>
+//             <div id="editor-container"></div>
+//           </div>
+//         `;
+//         const editorApp = document.getElementById('editor-app');
+//         tabManager = initializeEditor(editorApp);
+//       }
+//       chatSlideout.style.transform = 'translateX(0)';
+//     } else {
+//       console.log("Slideout is inactive, hiding editor");
+//       chatSlideout.style.transform = 'translateX(100%)';
+//     }
+//   });
+// }
+async function setupMarkdownEditor() {
   const toggleButton = document.getElementById('toggleButton');
   const chatSlideout = document.getElementById('chatSlideout');
   let tabManager = null;
 
-  toggleButton.addEventListener('click', () => {
+  async function getCurrentVersion() {
+    return new Promise((resolve) => {
+      const request = indexedDB.open('editorDB');
+      request.onsuccess = (event) => {
+        const version = event.target.result.version;
+        event.target.result.close();
+        resolve(version);
+      };
+      request.onerror = () => resolve(1); // Default to 1 if database doesn't exist
+    });
+  }
+
+  async function initEditorDB() {
+    try {
+      // Get current version first
+      const currentVersion = await getCurrentVersion();
+      console.log('Current database version:', currentVersion);
+
+      // First, ensure the database is created with proper stores
+      const request = indexedDB.open('editorDB', currentVersion);
+      
+      await new Promise((resolve, reject) => {
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains('tabs')) {
+            db.createObjectStore('tabs', { keyPath: 'docId' });
+            console.log('Created tabs store');
+          }
+          if (!db.objectStoreNames.contains('docs')) {
+            db.createObjectStore('docs', { keyPath: 'docId' });
+            console.log('Created docs store');
+          }
+        };
+
+        request.onsuccess = () => {
+          // Check if we need stores but didn't get an upgrade
+          const db = request.result;
+          const needsStores = !db.objectStoreNames.contains('tabs') || 
+                            !db.objectStoreNames.contains('docs');
+          
+          db.close();
+          
+          if (needsStores) {
+            // If we need stores but didn't get an upgrade, try again with a new version
+            resolve(false);
+          } else {
+            resolve(true);
+          }
+        };
+
+        request.onerror = () => reject(request.error);
+      });
+
+      // If we need to create stores, try again with a new version
+      const storesCreated = await new Promise((resolve, reject) => {
+        const newRequest = indexedDB.open('editorDB', currentVersion + 1);
+        
+        newRequest.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains('tabs')) {
+            db.createObjectStore('tabs', { keyPath: 'docId' });
+            console.log('Created tabs store in upgrade');
+          }
+          if (!db.objectStoreNames.contains('docs')) {
+            db.createObjectStore('docs', { keyPath: 'docId' });
+            console.log('Created docs store in upgrade');
+          }
+        };
+
+        newRequest.onsuccess = () => {
+          newRequest.result.close();
+          resolve(true);
+        };
+
+        newRequest.onerror = () => reject(newRequest.error);
+      });
+
+      // Now initialize through the worker with the current version
+      await indexDBOverlay.openDB('editorDB');
+      console.log('Editor database initialized');
+    } catch (error) {
+      console.error('Failed to initialize editor database:', error);
+      throw error;
+    }
+  }
+
+  toggleButton.addEventListener('click', async () => {
     console.log("Toggle button clicked");
     chatSlideout.classList.toggle('active');
 
     if (chatSlideout.classList.contains('active')) {
-      console.log("Slideout is active, initializing or showing Markdown editor");
       if (!tabManager) {
-        chatSlideout.innerHTML = `
-          <div id="editor-app">
-            <div id="editor-tabs">
-              <div id="tab-list"></div>
-              <button id="add-tab">+</button>
+        try {
+          // Initialize database
+          await initEditorDB();
+
+          // Create DOM structure
+          chatSlideout.innerHTML = `
+            <div id="editor-app">
+              <div id="editor-tabs">
+                <div id="tab-list"></div>
+                <button id="add-tab">+</button>
+              </div>
+              <div id="editor-container"></div>
             </div>
-            <div id="editor-container"></div>
-          </div>
-        `;
-        const editorApp = document.getElementById('editor-app');
-        tabManager = initializeEditor(editorApp);
+          `;
+
+          // Small delay to ensure DOM is ready
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          const editorApp = document.getElementById('editor-app');
+          tabManager = await initializeEditor(editorApp);
+          
+          console.log('Editor initialized successfully');
+        } catch (error) {
+          console.error('Error initializing editor:', error);
+          chatSlideout.innerHTML = `<div class="error">Error loading editor: ${error.message}. Please try again.</div>`;
+        }
       }
       chatSlideout.style.transform = 'translateX(0)';
     } else {
-      console.log("Slideout is inactive, hiding editor");
       chatSlideout.style.transform = 'translateX(100%)';
     }
   });

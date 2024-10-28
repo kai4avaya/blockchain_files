@@ -1,5 +1,6 @@
+// network\peer2peer_simple.ts
+
 import { Peer, DataConnection } from "peerjs";
-// import { sceneState } from '../memory/collaboration/scene_colab';
 import MousePositionManager from "../memory/collaboration/mouse_colab";
 
 interface SceneState {
@@ -166,7 +167,6 @@ class P2PSync {
 
     // Send current state immediately after connection
     this.sendCurrentState(conn);
-    // Send known peers to the connected peer
     conn.send({ type: "known_peers", data: Array.from(this.knownPeers) });
 
     conn.on("data", (data: { type: string; data: any }) => {
@@ -360,9 +360,6 @@ class P2PSync {
     }
   }
 
-  // setCustomMessageHandler(handler: CustomMessageHandler): void {
-  //   this.customMessageHandlers.add(handler);
-  // }
 
   setCustomMessageHandler(handler: CustomMessageHandler): void {
     this.customMessageHandlers.add(handler);
