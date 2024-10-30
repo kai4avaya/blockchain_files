@@ -26,12 +26,10 @@ class MouseOverlayCanvas {
     const { width, height } = this.canvas.parentElement.getBoundingClientRect();
     this.canvas.width = width;
     this.canvas.height = height;
-    console.log(`Canvas resized to ${width}x${height}`);
   }
 
   updateMousePosition(peerId, x, y) {
     this.peerCursors.set(peerId, { x, y });
-    console.log(`Mouse position updated for peer ${peerId}: (${x}, ${y})`);
   }
 
   startRenderLoop() {

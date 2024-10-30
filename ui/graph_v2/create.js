@@ -611,15 +611,24 @@ export function createSphere(convertedData) {
 const filename = sphere.userData.filename || 'Unknown File';
 
  // Add label to the sphere
- const labelDiv = document.createElement('div');
- labelDiv.className = 'label';
- labelDiv.textContent = filename;
- labelDiv.style.color = 'white';
- labelDiv.style.fontFamily = 'sans-serif';
- labelDiv.style.fontSize = '16px';
- labelDiv.style.padding = '2px';
- labelDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
- labelDiv.style.pointerEvents = 'auto';
+//  const labelDiv = document.createElement('div');
+//  labelDiv.className = 'label';
+//  labelDiv.textContent = filename;
+//  labelDiv.style.color = 'white';
+//  labelDiv.style.fontFamily = 'sans-serif';
+//  labelDiv.style.fontSize = '16px';
+//  labelDiv.style.padding = '2px';
+//  labelDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+//  labelDiv.style.pointerEvents = 'auto';
+const labelDiv = document.createElement('div');
+labelDiv.className = 'label';
+labelDiv.textContent = filename;
+labelDiv.style.color = '#4169E1'; // Royal blue
+labelDiv.style.fontFamily = 'monospace';
+labelDiv.style.fontSize = '16px';
+labelDiv.style.padding = '2px';
+// Remove the backgroundColor style to make it fully transparent
+labelDiv.style.pointerEvents = 'auto';
  labelListerners(labelDiv, sphere)
  const label = new CSS2DObject(labelDiv);
 

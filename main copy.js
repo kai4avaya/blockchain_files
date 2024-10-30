@@ -10,13 +10,11 @@ import { initializeGraph, share3dDat } from "./ui/graph_v2/create";
 import { p2pSync } from "./network/peer2peer_simple"; // Import the P2PSync class
 import embeddingWorker from "./ai/embeddings.js";
 import { initiate } from "./memory/vectorDB/vectorDbGateway.js"; // Assuming your initiate function is exported
-import { initiate_gui_controls } from "./ui/gui.listens.js";
-import indexDBOverlay from "./memory/local/file_worker";
-import { throttle } from "./utils/utils";
-import { TabManager } from "./ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
-// import { initializeEditor } from './ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/index.ts'
+import {initiate_gui_controls} from './ui/gui.listens.js'
+import indexDBOverlay from './memory/local/file_worker'
+import {throttle} from './utils/utils'
+import { initializeEditor } from './ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/index.ts'
 
-let tabManager = null;
 const userId = "kai";
 localStorage.setItem("login_block", userId);
 
@@ -25,6 +23,7 @@ const p2pSync_instance = p2pSync;
 async function main() {
   embeddingWorker.initialize();
 
+  
   try {
     await setupMarkdownEditor();
     console.log("Markdown editor setup completed");
@@ -45,9 +44,14 @@ async function main() {
   // Initialize the graph and SceneState
   await initializeGraph();
 
-  initiate_gui_controls();
+  initiate_gui_controls()
 
-  const { renderer, scene, nonBloomScene, mouseOverlay } = share3dDat();
+  const {
+    renderer,
+    scene,
+    nonBloomScene,
+    mouseOverlay,
+  } = share3dDat();
 
   await sceneState.initialize(scene, nonBloomScene);
 
@@ -73,10 +77,7 @@ const handleQuickClick = throttle(async (event) => {
     const fileMetadata = await fileSystem.getMetadata(nodeId, "file");
 
     if (fileMetadata) {
-      console.log(
-        "GOT ME A QUICK  DBL fileMetadata CLICK in main.js",
-        fileMetadata
-      );
+      console.log("GOT ME A QUICK  DBL fileMetadata CLICK in main.js", fileMetadata);
       showPopup(fileMetadata, event.clientX, event.clientY);
     }
   }
@@ -85,29 +86,30 @@ const handleQuickClick = throttle(async (event) => {
 export async function initializeDatabases() {
   try {
     // Initialize 'fileGraphDB' with version 2
-    await indexDBOverlay.openDB("fileGraphDB", 2);
-    await indexDBOverlay.initializeDB(
-      ["directories", "files", "graph"],
-      "fileGraphDB"
-    );
+    await indexDBOverlay.openDB('fileGraphDB', 2);
+    await indexDBOverlay.initializeDB(['directories', 'files', 'graph'], 'fileGraphDB');
 
     // Initialize 'summarizationDB' with version 1
-    await indexDBOverlay.openDB("summarizationDB", 1);
-    await indexDBOverlay.initializeDB(["summaries"], "summarizationDB");
+    await indexDBOverlay.openDB('summarizationDB', 1);
+    await indexDBOverlay.initializeDB(['summaries'], 'summarizationDB');
 
-    console.log("Databases initialized successfully");
+    console.log('Databases initialized successfully');
   } catch (error) {
-    console.error("Error initializing databases:", error);
+    console.error('Error initializing databases:', error);
   }
 }
 
+
 function addEventListeners(canvas) {
   // Add this new event listener for double-clicks
-  canvas.addEventListener("dblclick", (event) => {
-    handleQuickClick(event);
-  });
+canvas.addEventListener("dblclick", (event) => {
+  handleQuickClick(event);
+});
 
+
+  
   const throttledPointerMove = throttle((event) => {
+   
     if (p2pSync.isConnected()) {
       const rect = canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
@@ -117,19 +119,53 @@ function addEventListeners(canvas) {
   }, 16); // Throttle to roughly 60fps
 
   canvas.addEventListener("pointermove", throttledPointerMove);
+
 }
 
 main().catch((error) => {
   console.error("Error in main function:", error);
 });
 
+
+// function setupMarkdownEditor() {
+//   const toggleButton = document.getElementById('toggleButton');
+//   const chatSlideout = document.getElementById('chatSlideout');
+//   let tabManager = null;
+
+//   toggleButton.addEventListener('click', () => {
+//     console.log("Toggle button clicked");
+//     chatSlideout.classList.toggle('active');
+
+//     if (chatSlideout.classList.contains('active')) {
+//       console.log("Slideout is active, initializing or showing Markdown editor");
+//       if (!tabManager) {
+//         chatSlideout.innerHTML = `
+//           <div id="editor-app">
+//             <div id="editor-tabs">
+//               <div id="tab-list"></div>
+//               <button id="add-tab">+</button>
+//             </div>
+//             <div id="editor-container"></div>
+//           </div>
+//         `;
+//         const editorApp = document.getElementById('editor-app');
+//         tabManager = initializeEditor(editorApp);
+//       }
+//       chatSlideout.style.transform = 'translateX(0)';
+//     } else {
+//       console.log("Slideout is inactive, hiding editor");
+//       chatSlideout.style.transform = 'translateX(100%)';
+//     }
+//   });
+// }
 async function setupMarkdownEditor() {
-  const toggleButton = document.getElementById("toggleButton");
-  const chatSlideout = document.getElementById("chatSlideout");
+  const toggleButton = document.getElementById('toggleButton');
+  const chatSlideout = document.getElementById('chatSlideout');
+  let tabManager = null;
 
   async function getCurrentVersion() {
     return new Promise((resolve) => {
-      const request = indexedDB.open("editorDB");
+      const request = indexedDB.open('editorDB');
       request.onsuccess = (event) => {
         const version = event.target.result.version;
         event.target.result.close();
@@ -139,51 +175,36 @@ async function setupMarkdownEditor() {
     });
   }
 
-  
- async function initializeEditor(containerElement) {
-  if (!containerElement) {
-    throw new Error('Editor container element not found');
-  }
-
-  // Initialize TabManager
-  const tabManager = new TabManager(containerElement);
-  await tabManager.initialize();
-
-  return { tabManager };
-}
-
-
   async function initEditorDB() {
     try {
       // Get current version first
       const currentVersion = await getCurrentVersion();
-      console.log("Current database version:", currentVersion);
+      console.log('Current database version:', currentVersion);
 
       // First, ensure the database is created with proper stores
-      const request = indexedDB.open("editorDB", currentVersion);
-
+      const request = indexedDB.open('editorDB', currentVersion);
+      
       await new Promise((resolve, reject) => {
         request.onupgradeneeded = (event) => {
           const db = event.target.result;
-          if (!db.objectStoreNames.contains("tabs")) {
-            db.createObjectStore("tabs", { keyPath: "docId" });
-            console.log("Created tabs store");
+          if (!db.objectStoreNames.contains('tabs')) {
+            db.createObjectStore('tabs', { keyPath: 'docId' });
+            console.log('Created tabs store');
           }
-          if (!db.objectStoreNames.contains("docs")) {
-            db.createObjectStore("docs", { keyPath: "docId" });
-            console.log("Created docs store");
+          if (!db.objectStoreNames.contains('docs')) {
+            db.createObjectStore('docs', { keyPath: 'docId' });
+            console.log('Created docs store');
           }
         };
 
         request.onsuccess = () => {
           // Check if we need stores but didn't get an upgrade
           const db = request.result;
-          const needsStores =
-            !db.objectStoreNames.contains("tabs") ||
-            !db.objectStoreNames.contains("docs");
-
+          const needsStores = !db.objectStoreNames.contains('tabs') || 
+                            !db.objectStoreNames.contains('docs');
+          
           db.close();
-
+          
           if (needsStores) {
             // If we need stores but didn't get an upgrade, try again with a new version
             resolve(false);
@@ -197,17 +218,17 @@ async function setupMarkdownEditor() {
 
       // If we need to create stores, try again with a new version
       const storesCreated = await new Promise((resolve, reject) => {
-        const newRequest = indexedDB.open("editorDB", currentVersion + 1);
-
+        const newRequest = indexedDB.open('editorDB', currentVersion + 1);
+        
         newRequest.onupgradeneeded = (event) => {
           const db = event.target.result;
-          if (!db.objectStoreNames.contains("tabs")) {
-            db.createObjectStore("tabs", { keyPath: "docId" });
-            console.log("Created tabs store in upgrade");
+          if (!db.objectStoreNames.contains('tabs')) {
+            db.createObjectStore('tabs', { keyPath: 'docId' });
+            console.log('Created tabs store in upgrade');
           }
-          if (!db.objectStoreNames.contains("docs")) {
-            db.createObjectStore("docs", { keyPath: "docId" });
-            console.log("Created docs store in upgrade");
+          if (!db.objectStoreNames.contains('docs')) {
+            db.createObjectStore('docs', { keyPath: 'docId' });
+            console.log('Created docs store in upgrade');
           }
         };
 
@@ -220,19 +241,19 @@ async function setupMarkdownEditor() {
       });
 
       // Now initialize through the worker with the current version
-      await indexDBOverlay.openDB("editorDB");
-      console.log("Editor database initialized");
+      await indexDBOverlay.openDB('editorDB');
+      console.log('Editor database initialized');
     } catch (error) {
-      console.error("Failed to initialize editor database:", error);
+      console.error('Failed to initialize editor database:', error);
       throw error;
     }
   }
 
-  toggleButton.addEventListener("click", async () => {
+  toggleButton.addEventListener('click', async () => {
     console.log("Toggle button clicked");
-    chatSlideout.classList.toggle("active");
+    chatSlideout.classList.toggle('active');
 
-    if (chatSlideout.classList.contains("active")) {
+    if (chatSlideout.classList.contains('active')) {
       if (!tabManager) {
         try {
           // Initialize database
@@ -250,35 +271,20 @@ async function setupMarkdownEditor() {
           `;
 
           // Small delay to ensure DOM is ready
-          await new Promise((resolve) => setTimeout(resolve, 100));
-
-          const editorApp = document.getElementById("editor-app");
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          const editorApp = document.getElementById('editor-app');
           tabManager = await initializeEditor(editorApp);
-
-          console.log("Editor initialized successfully");
-
-          // Pass TabManager to P2PSync
-          p2pSync_instance.setTabManager(tabManager);
+          
+          console.log('Editor initialized successfully');
         } catch (error) {
-          console.error("Error initializing editor:", error);
+          console.error('Error initializing editor:', error);
           chatSlideout.innerHTML = `<div class="error">Error loading editor: ${error.message}. Please try again.</div>`;
         }
-      } else if (p2pSync_instance.isConnected()) {
-        // If tabManager already exists, trigger a re-sync process
-        console.log("Re-syncing TabManager with peers...");
-        await tabManager?.requestResync();
       }
-
-      chatSlideout.style.transform = "translateX(0)";
+      chatSlideout.style.transform = 'translateX(0)';
     } else {
-      chatSlideout.style.transform = "translateX(100%)";
+      chatSlideout.style.transform = 'translateX(100%)';
     }
   });
-
-  // Add event listener for page focus
-  // window.addEventListener("focus", () => {
-  //   if (tabManager) {
-  //     tabManager.requestResync();
-  //   }
-  // });
 }

@@ -2,6 +2,7 @@
 
 import { Peer, DataConnection } from "peerjs";
 import MousePositionManager from "../memory/collaboration/mouse_colab";
+import { TabManager } from "../ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
 
 interface SceneState {
   getSerializableState: () => any;
@@ -28,6 +29,8 @@ interface CustomMessage {
 }
 class P2PSync {
   private static instance: P2PSync | null = null;
+  private tabManager: TabManager | null = null;
+
   private peer: Peer | null = null;
   private connections: Map<string, DataConnection> = new Map();
   private sceneState: SceneState | null = null;
@@ -40,7 +43,9 @@ class P2PSync {
   private mousePositionManager: MousePositionManager | null = null;
   private mouseOverlay: MouseOverlayCanvas | null = null;
 
-  private customMessageHandlers: Set<CustomMessageHandler> = new Set();
+  // private customMessageHandlers: Set<CustomMessageHandler> = new Set();
+  private customMessageHandlers: Array<(message: any, peerId: string) => void> = [];
+
   private peerConnectHandlers: Set<PeerConnectHandler> = new Set();
 
   private constructor() {}
@@ -98,6 +103,9 @@ class P2PSync {
     this.mouseOverlay = overlay;
   }
 
+  public setTabManager(tabManager: TabManager): void {
+    this.tabManager = tabManager;
+  }
   setMousePositionManager(manager: MousePositionManager): void {
     this.mousePositionManager = manager;
   }
@@ -158,6 +166,7 @@ class P2PSync {
     }
   }
 
+
   private handleConnection(conn: DataConnection): void {
     this.connections.set(conn.peer, conn);
     updateStatus(`Connected to peer: ${conn.peer}`);
@@ -169,14 +178,49 @@ class P2PSync {
     this.sendCurrentState(conn);
     conn.send({ type: "known_peers", data: Array.from(this.knownPeers) });
 
-    conn.on("data", (data: { type: string; data: any }) => {
+    conn.on("data", (data: { type: string; docId?: string; data?: any }) => {
+      this.customMessageHandlers.forEach((handler) => handler(data, conn.peer));
       switch (data.type) {
         case "request_current_state":
           this.sendCurrentState(conn);
+          const docId = data?.docId;
+          if (docId) {
+            const docState = this.tabManager?.getDocState(docId);
+            if (docState) {
+              conn.send({
+                type: "full_state",
+                docId: docId,
+                data: docState,
+              });
+            }
+          }
           break;
         case "full_state":
           this.sceneState?.syncWithPeer(data.data);
+          if (data.docId && data.data) {
+            this.tabManager?.handleFullState([
+              {
+                docId: data.docId,
+                state: data.data,
+              },
+            ]);
+          }
           break;
+          case "request_all_states":
+            if (this.tabManager) {
+              const allDocsState = this.tabManager.getAllDocsState();
+              conn.send({
+                type: 'full_state_all',
+                data: allDocsState,
+              });
+            }
+            break;
+    
+          case "full_state_all":
+            if (this.tabManager) {
+              this.tabManager.handleFullState(data.data);
+            }
+            break;
         case "update":
           this.sceneState?.syncWithPeer(data.data);
           break;
@@ -252,8 +296,13 @@ class P2PSync {
   }
 
   private sendCurrentState(conn: DataConnection): void {
-    const currentState = this.sceneState.getCurrentState();
-    conn.send({ type: "full_state", data: currentState });
+    if (!this.tabManager) {
+      console.warn("TabManager is not set in P2PSync. Cannot send document states.");
+      return;
+    }
+    
+    const docsState = this.tabManager.getAllDocsState();
+    conn.send({ type: "full_state_all", data: docsState });
   }
 
   private updateConnectionStatus(): void {
@@ -360,9 +409,8 @@ class P2PSync {
     }
   }
 
-
-  setCustomMessageHandler(handler: CustomMessageHandler): void {
-    this.customMessageHandlers.add(handler);
+  public setCustomMessageHandler(handler: (message: any, peerId: string) => void): void {
+    this.customMessageHandlers.push(handler);
   }
 
   onPeerConnect(handler: PeerConnectHandler): void {
@@ -377,7 +425,6 @@ class P2PSync {
   }
 
   broadcastCustomMessage(message: any): void {
-    console.log("p2p sending message", message);
     this.connections.forEach((conn) => {
       if (conn.open) {
         conn.send(message);
