@@ -227,19 +227,19 @@ async function setupMarkdownEditor() {
       throw error;
     }
   }
-
   toggleButton.addEventListener("click", async () => {
     console.log("Toggle button clicked");
     chatSlideout.classList.toggle("active");
-
+  
     if (chatSlideout.classList.contains("active")) {
       if (!tabManager) {
         try {
           // Initialize database
           await initEditorDB();
-
-          // Create DOM structure
-          chatSlideout.innerHTML = `
+  
+          // Update only the content container
+          const slideoutContent = document.getElementById('slideoutContent');
+          slideoutContent.innerHTML = `
             <div id="editor-app">
               <div id="editor-tabs">
                 <div id="tab-list"></div>
@@ -248,33 +248,33 @@ async function setupMarkdownEditor() {
               <div id="editor-container"></div>
             </div>
           `;
-
+  
           // Small delay to ensure DOM is ready
           await new Promise((resolve) => setTimeout(resolve, 100));
-
+  
           const editorApp = document.getElementById("editor-app");
-          tabManager = await initializeEditor(editorApp);
-
+          const { tabManager: newTabManager } = await initializeEditor(editorApp);
+          tabManager = newTabManager;
+  
           console.log("Editor initialized successfully");
-
+  
           // Pass TabManager to P2PSync
           p2pSync_instance.setTabManager(tabManager);
         } catch (error) {
           console.error("Error initializing editor:", error);
-          chatSlideout.innerHTML = `<div class="error">Error loading editor: ${error.message}. Please try again.</div>`;
+          const slideoutContent = document.getElementById('slideoutContent');
+          slideoutContent.innerHTML = `<div class="error">Error loading editor: ${error.message}. Please try again.</div>`;
         }
       } else if (p2pSync_instance.isConnected()) {
-        // If tabManager already exists, trigger a re-sync process
         console.log("Re-syncing TabManager with peers...");
-        await tabManager?.requestResync();
+        await tabManager.requestResync();
       }
-
+  
       chatSlideout.style.transform = "translateX(0)";
     } else {
       chatSlideout.style.transform = "translateX(100%)";
     }
   });
-
   // Add event listener for page focus
   // window.addEventListener("focus", () => {
   //   if (tabManager) {

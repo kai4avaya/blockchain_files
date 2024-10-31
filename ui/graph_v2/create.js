@@ -610,16 +610,6 @@ export function createSphere(convertedData) {
  // Assume that the filename is stored in sphere.userData.filename
 const filename = sphere.userData.filename || 'Unknown File';
 
- // Add label to the sphere
-//  const labelDiv = document.createElement('div');
-//  labelDiv.className = 'label';
-//  labelDiv.textContent = filename;
-//  labelDiv.style.color = 'white';
-//  labelDiv.style.fontFamily = 'sans-serif';
-//  labelDiv.style.fontSize = '16px';
-//  labelDiv.style.padding = '2px';
-//  labelDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-//  labelDiv.style.pointerEvents = 'auto';
 const labelDiv = document.createElement('div');
 labelDiv.className = 'label';
 labelDiv.textContent = filename;

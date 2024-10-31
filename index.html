@@ -99,28 +99,6 @@
       padding: 5px;
     }
 
-
-    /* INNER SLIDE */
-    .inner-slideout {
-      position: absolute;
-      right: 0px;
-      top: 0;
-      width: 300px;
-      height: 100%;
-      padding-top: 50px;
-      /* background-color: #e0e0e0; */
-      box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-      z-index: 1001;
-      /* Ensure inner-slideout is above the slideout */
-
-    }
-
-    .inner-slideout.active {
-      transform: translateX(-300px);
-    }
-
     /* TREE */
 
     .tree {
@@ -888,11 +866,6 @@
       transition: all 0.2s ease;
     }
 
-    /* end point textmodal 3d */
-
-
-    /* left slideout */
-
     /* Sidebar styles - ensure it stays fixed */
     .sidebar {
       position: fixed;
@@ -1077,13 +1050,108 @@
     }
 
     #editor-container:focus {
-    outline: none;
-}
+      outline: none;
+    }
 
-#editor-container *:focus {
-    outline: none;
-}
+    #editor-container *:focus {
+      outline: none;
+    }
 
+
+    /* Resize handle with visual indicator */
+    .resize-handle {
+      position: absolute;
+      left: -12px;
+      top: 0;
+      width: 12px;
+      height: 100%;
+      background-color: rgba(0, 123, 255, 0.1);
+      cursor: ew-resize;
+      transition: all 0.2s ease;
+      z-index: 2002;
+    }
+
+    /* Visual line indicator inside handle */
+    .handle-line {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 2px;
+      height: 50px;
+      background-color: rgba(0, 123, 255, 0.5);
+      border-radius: 1px;
+      box-shadow: 0 0 4px rgba(0, 123, 255, 0.3);
+    }
+
+    /* Active states */
+    .slideout.active .resize-handle {
+      opacity: 1;
+      /* Add subtle glow animation */
+      animation: handleGlow 2s infinite;
+    }
+
+    /* Hover effects */
+    .resize-handle:hover {
+      background-color: rgba(0, 123, 255, 0.2);
+      width: 16px;
+      left: -16px;
+    }
+
+    .resize-handle:hover .handle-line {
+      background-color: rgba(0, 123, 255, 0.8);
+      box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
+    }
+
+    /* Glow animation */
+    @keyframes handleGlow {
+      0% {
+        background-color: rgba(0, 123, 255, 0.1);
+      }
+
+      50% {
+        background-color: rgba(0, 123, 255, 0.2);
+        box-shadow: -2px 0 6px rgba(0, 123, 255, 0.2);
+      }
+
+      100% {
+        background-color: rgba(0, 123, 255, 0.1);
+      }
+    }
+
+
+    /* Optional: Add visual feedback for active state */
+    .slideout.active .resize-handle::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 4px;
+      height: 40px;
+      background-color: rgba(0, 123, 255, 0.3);
+      border-radius: 2px;
+    }
+
+    /* Optional: Add dots pattern for better visibility */
+    .resize-handle::after {
+      content: '⋮';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 20px;
+      color: rgba(0, 123, 255, 0.5);
+      line-height: 1;
+      text-shadow: 0 0 4px rgba(0, 123, 255, 0.3);
+    }
+
+    .slideout-content {
+  height: 100%;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
   </style>
   <script type="x-shader/x-vertex" id="vertexshader">
       varying vec2 vUv;
@@ -1249,16 +1317,20 @@
     <div id="popup"></div>
     <div id="overlay" class="overlay" style="display: none;"></div>
 
-    <!-- <button id="toggleButton">Chat</button> -->
     <div class="slideout" id="chatSlideout">
-      <div id="editor-container"></div>
-
+      <div class="resize-handle">
+        <div class="handle-line"></div>
+      </div>
+      <div class="slideout-content" id="slideoutContent">
+        <!-- Editor content will go here -->
+      </div>
     </div>
   </div>
 
   <div id="canvas-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
     <!-- Three.js canvas will render here -->
   </div>
+
   <script>
     const toggleButton = document.getElementById('toggleButton');
     const fileTreeBtn = document.getElementById('fileTreeBtn');
@@ -1270,105 +1342,105 @@
     const chatSlideout = document.getElementById('chatSlideout');
     const homeIcon = document.getElementById('homeIcon');
     const icons = document.querySelectorAll('.sidebar-icon');
-  
+
     // Create a separate modal for homeIcon
     const homeModal = document.createElement('div');
     homeModal.classList.add('modal');
     homeModal.style.display = 'none';
     document.body.appendChild(homeModal);
-  
+
     let activeIcon = null;
-  
+
     leftSlideout.classList.remove('active');
-  
+
     fileTreeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-  
+
       // Toggle the left slideout
       leftSlideout.classList.toggle('active');
-  
+
       // Close other slideouts if open
       if (chatSlideout.classList.contains('active')) {
         chatSlideout.classList.remove('active');
       }
     });
-  
+
     // Functions for peer-btn-connect modal
     function showPeerModal() {
       const iconRect = peerConnBtn.getBoundingClientRect();
       modal.style.top = `${iconRect.top - 15}px`;
       modal.style.display = 'flex';
-  
+
       modal.offsetHeight; // Trigger reflow
-  
+
       requestAnimationFrame(() => {
         modal.classList.add('active');
       });
-  
+
       const arrowOffset = iconRect.height / 2;
       modal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
       activeIcon = peerConnBtn;
     }
-  
+
     function hidePeerModal() {
       modal.style.display = 'none';
       modal.classList.remove('active');
       activeIcon = null;
     }
-  
+
     // Functions for homeIcon modal
     function showHomeModal() {
       const iconRect = homeIcon.getBoundingClientRect();
       homeModal.style.top = `${iconRect.top - 15}px`;
       homeModal.style.display = 'flex';
-  
+
       homeModal.innerHTML = getHomeModalContent();
       attachHomeModalListeners();
-  
+
       homeModal.offsetHeight; // Trigger reflow
-  
+
       requestAnimationFrame(() => {
         homeModal.classList.add('active');
       });
-  
+
       const arrowOffset = iconRect.height / 2;
       homeModal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
       activeIcon = homeIcon;
     }
-  
+
     function hideHomeModal() {
       homeModal.style.display = 'none';
       homeModal.classList.remove('active');
       activeIcon = null;
     }
-  
+
     // Event Listeners for Icons
     peerConnBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
-  
+
       if (modal.style.display === 'none') {
         showPeerModal();
       } else {
         hidePeerModal();
       }
-  
+
       // Close slideouts if open
       leftSlideout.classList.remove('active');
       chatSlideout.classList.remove('active');
     });
-  
+
     homeIcon.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
-  
+
       if (homeModal.style.display === 'none') {
         showHomeModal();
       } else {
         hideHomeModal();
       }
     });
-  
+
     // Function to get homeModal content
     function getHomeModalContent() {
       return `
@@ -1400,7 +1472,7 @@
     </div>
       `;
     }
-  
+
     // Event Handlers for homeModal Icons
     function attachHomeModalListeners() {
       homeModal.querySelectorAll('.modal-icon').forEach(icon => {
@@ -1414,7 +1486,7 @@
             document.dispatchEvent(event);
           }
         });
-  
+
         const tooltip = icon.querySelector('.tooltip');
         if (tooltip) {
           icon.addEventListener('mouseenter', () => {
@@ -1426,20 +1498,20 @@
         }
       });
     }
-  
+
     function showSpinner(iconElement) {
       const svgIcon = iconElement.querySelector('svg');
       const spinner = document.createElement('div');
       spinner.className = 'spinner';
       svgIcon.style.display = 'none';
       iconElement.insertBefore(spinner, svgIcon);
-  
+
       setTimeout(() => {
         spinner.remove();
         svgIcon.style.display = '';
       }, 4000);
     }
-  
+
     // Hide modals when clicking outside
     document.addEventListener('click', (e) => {
       if (!modal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
@@ -1449,13 +1521,13 @@
         hideHomeModal();
       }
     });
-  
+
     // Ensure modal events don't propagate
     modal.addEventListener('pointerdown', (e) => e.stopPropagation());
     modal.addEventListener('click', (e) => e.stopPropagation());
     homeModal.addEventListener('pointerdown', (e) => e.stopPropagation());
     homeModal.addEventListener('click', (e) => e.stopPropagation());
-  
+
     // Tooltips for sidebar icons
     document.querySelectorAll('.sidebar-icon').forEach(icon => {
       icon.addEventListener('mouseenter', () => {
@@ -1466,9 +1538,55 @@
       });
     });
   </script>
-  
+
+  <script>
+// Get required elements
+const resizeHandle = chatSlideout.querySelector('.resize-handle');
+let isResizing = false;
+let startWidth;
+let startX;
+
+// Handle resize start
+resizeHandle.addEventListener('mousedown', (e) => {
+    if (!chatSlideout.classList.contains('active')) return;
+    
+    isResizing = true;
+    startX = e.pageX;
+    startWidth = chatSlideout.offsetWidth;
+    
+    resizeHandle.classList.add('dragging');
+    
+    // Add temporary document listeners only while dragging
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+    
+    e.stopPropagation();
+});
+
+// Handle dragging
+function handleMove(e) {
+    if (!isResizing) return;
+    
+    const width = startWidth - (e.pageX - startX);
+    if (width >= 200 && width <= 800) {
+        chatSlideout.style.width = `${width}px`;
+    }
+}
+
+// Handle resize end
+function handleUp() {
+    if (!isResizing) return;
+    
+    isResizing = false;
+    resizeHandle.classList.remove('dragging');
+    
+    // Remove temporary document listeners
+    document.removeEventListener('mousemove', handleMove);
+    document.removeEventListener('mouseup', handleUp);
+}
+  </script>
   <script type="module" src="/main.js"></script>
-  
+
 </body>
 
 </html>
