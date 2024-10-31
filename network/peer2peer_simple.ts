@@ -62,15 +62,28 @@ class P2PSync {
     this.loadKnownPeers();
 
     const storedPeerId = localStorage.getItem("myPeerId");
+    // const peerId = storedPeerId || `${userId}-${Date.now()}`;
+    // this.peer = new Peer(peerId);
+
+    // this.peer.on("open", (id) => {
+    //   localStorage.setItem("myPeerId", id);
+    //   updateStatus(`Initialized with peer ID: ${id}`);
+    //   this.updateUserIdInput(id); // Update the user ID input instead
+
+    //   this.knownPeers.forEach((peerId) => this.connectToSpecificPeer(peerId));
+    //   this.startHeartbeat();
+    // });
+
     const peerId = storedPeerId || `${userId}-${Date.now()}`;
     this.peer = new Peer(peerId);
 
     this.peer.on("open", (id) => {
       localStorage.setItem("myPeerId", id);
       updateStatus(`Initialized with peer ID: ${id}`);
-      this.updateUserIdInput(id); // Update the user ID input instead
+      this.updateUserIdInput(id);
 
-      this.knownPeers.forEach((peerId) => this.connectToSpecificPeer(peerId));
+      // Wrap the connection attempts in a safe connect method
+      this.knownPeers.forEach((peerId) => this.safeConnectToSpecificPeer(peerId));
       this.startHeartbeat();
     });
 
@@ -103,6 +116,51 @@ class P2PSync {
     this.mouseOverlay = overlay;
   }
 
+  private safeConnectToSpecificPeer(peerId: string): void {
+    if (!this.peer || this.peer.destroyed) {
+      console.warn("Peer object is undefined or destroyed. Cannot connect.");
+      updateStatus("Error: Peer not initialized or destroyed");
+      return;
+    }
+
+    if (this.connections.has(peerId) || peerId === this.peer.id) {
+      return;
+    }
+
+    try {
+      const conn = this.peer.connect(peerId, { 
+        reliable: true,
+        // Add a shorter connection timeout
+        metadata: { timeout: 5000 } 
+      });
+
+      // Set a connection timeout
+      const timeout = setTimeout(() => {
+        if (!conn.open) {
+          conn.close();
+          this.connections.delete(peerId);
+          console.warn(`Connection timeout for peer ${peerId}`);
+        }
+      }, 5000);
+
+      conn.on("open", () => {
+        clearTimeout(timeout);
+        this.handleConnection(conn);
+        this.clearReconnectTimer(peerId);
+      });
+
+      conn.on("error", (err) => {
+        clearTimeout(timeout);
+        console.warn(`Connection error with peer ${peerId}:`, err);
+        this.connections.delete(peerId);
+        this.scheduleReconnect(peerId);
+      });
+    } catch (error) {
+      console.warn(`Failed to initiate connection to peer ${peerId}:`, error);
+      this.scheduleReconnect(peerId);
+    }
+  }
+
   public setTabManager(tabManager: TabManager): void {
     this.tabManager = tabManager;
   }
@@ -128,30 +186,34 @@ class P2PSync {
     this.sceneState = sceneState;
   }
 
+  // connectToSpecificPeer(peerId: string): void {
+  //   if (!this.peer || this.peer.destroyed) {
+  //     console.error("Peer object is undefined or destroyed. Cannot connect.");
+  //     updateStatus("Error: Peer not initialized or destroyed");
+  //     return;
+  //   }
+  //   if (this.connections.has(peerId) || peerId === this.peer.id) {
+  //     updateStatus("Already connected or trying to connect to self");
+  //     return;
+  //   }
+  //   updateStatus(`Attempting to connect to peer: ${peerId}`);
+
+  //   const conn = this.peer.connect(peerId, { reliable: true });
+
+  //   conn.on("open", () => {
+  //     this.handleConnection(conn);
+  //     this.clearReconnectTimer(peerId);
+  //   });
+
+  //   conn.on("error", (err) => {
+  //     console.error(`Connection error with peer ${peerId}:`, err);
+  //     updateStatus(`Connection error with peer ${peerId}: ${err.message}`);
+  //     this.scheduleReconnect(peerId);
+  //   });
+  // }
+
   connectToSpecificPeer(peerId: string): void {
-    if (!this.peer || this.peer.destroyed) {
-      console.error("Peer object is undefined or destroyed. Cannot connect.");
-      updateStatus("Error: Peer not initialized or destroyed");
-      return;
-    }
-    if (this.connections.has(peerId) || peerId === this.peer.id) {
-      updateStatus("Already connected or trying to connect to self");
-      return;
-    }
-    updateStatus(`Attempting to connect to peer: ${peerId}`);
-
-    const conn = this.peer.connect(peerId, { reliable: true });
-
-    conn.on("open", () => {
-      this.handleConnection(conn);
-      this.clearReconnectTimer(peerId);
-    });
-
-    conn.on("error", (err) => {
-      console.error(`Connection error with peer ${peerId}:`, err);
-      updateStatus(`Connection error with peer ${peerId}: ${err.message}`);
-      this.scheduleReconnect(peerId);
-    });
+    this.safeConnectToSpecificPeer(peerId);
   }
 
   isConnected(): boolean {
@@ -171,6 +233,13 @@ class P2PSync {
     this.connections.set(conn.peer, conn);
     updateStatus(`Connected to peer: ${conn.peer}`);
     this.saveKnownPeer(conn.peer);
+    const checkConnection = setInterval(() => {
+      if (!conn.open) {
+        clearInterval(checkConnection);
+        this.connections.delete(conn.peer);
+        this.scheduleReconnect(conn.peer);
+      }
+    }, 5000);
 
     this.peerConnectHandlers.forEach((handler) => handler(conn.peer));
 
@@ -178,7 +247,8 @@ class P2PSync {
     this.sendCurrentState(conn);
     conn.send({ type: "known_peers", data: Array.from(this.knownPeers) });
 
-    conn.on("data", (data: { type: string; docId?: string; data?: any }) => {
+    conn.on("data", (rawData: unknown) => {
+      const data = rawData as { type: string; docId?: string; data?: any };
       this.customMessageHandlers.forEach((handler) => handler(data, conn.peer));
       switch (data.type) {
         case "request_current_state":
@@ -215,7 +285,7 @@ class P2PSync {
               });
             }
             break;
-    
+
           case "full_state_all":
             if (this.tabManager) {
               this.tabManager.handleFullState(data.data);
@@ -263,10 +333,17 @@ class P2PSync {
       }
     });
 
+
     conn.on("close", () => {
+      clearInterval(checkConnection);
       this.connections.delete(conn.peer);
       updateStatus(`Disconnected from peer: ${conn.peer}`);
-      this.scheduleReconnect(conn.peer);
+      
+      // Only attempt reconnect if peer is still known
+      if (this.knownPeers.has(conn.peer)) {
+        this.scheduleReconnect(conn.peer);
+      }
+      
       this.updateConnectionStatus();
       if (this.mouseOverlay) {
         this.mouseOverlay.removePeerCursor(conn.peer);
@@ -282,10 +359,22 @@ class P2PSync {
     this.updateConnectionStatus();
   }
 
+  private cleanupStalePeers(): void {
+    this.knownPeers.forEach(peerId => {
+      const conn = this.connections.get(peerId);
+      if (!conn || !conn.open) {
+        const reconnectTimer = this.reconnectTimers.get(peerId);
+        if (!reconnectTimer) {
+          this.removeKnownPeer(peerId);
+        }
+      }
+    });
+  }
+
   private handleKnownPeers(peerIds: string[]): void {
     peerIds.forEach((peerId) => {
       if (
-        peerId !== this.peer.id &&
+        peerId !== this.peer?.id &&
         !this.knownPeers.has(peerId) &&
         !this.connections.has(peerId)
       ) {
@@ -315,12 +404,27 @@ class P2PSync {
   }
 
   private scheduleReconnect(peerId: string): void {
-    if (!this.reconnectTimers.has(peerId)) {
+    // Clear any existing reconnect timer
+    this.clearReconnectTimer(peerId);
+
+    // Only schedule reconnect if the peer is in knownPeers
+    if (this.knownPeers.has(peerId)) {
       const timer = setTimeout(() => {
-        this.connectToSpecificPeer(peerId);
+        // Verify peer is still known before attempting reconnect
+        if (this.knownPeers.has(peerId)) {
+          this.safeConnectToSpecificPeer(peerId);
+        }
       }, this.reconnectInterval);
+      
       this.reconnectTimers.set(peerId, timer);
     }
+  }
+
+   // Add a method to safely remove a known peer
+   private removeKnownPeer(peerId: string): void {
+    this.knownPeers.delete(peerId);
+    this.clearReconnectTimer(peerId);
+    localStorage.setItem("knownPeers", JSON.stringify(Array.from(this.knownPeers)));
   }
 
   private startHeartbeat(): void {
@@ -330,6 +434,11 @@ class P2PSync {
           conn.send({ type: "heartbeat" });
         }
       });
+      
+      // Cleanup stale peers every few heartbeats
+      if (Math.random() < 0.2) { // 20% chance each heartbeat
+        this.cleanupStalePeers();
+      }
     }, this.heartbeatInterval) as unknown as number;
   }
 
@@ -341,7 +450,7 @@ class P2PSync {
   }
 
   private saveKnownPeer(peerId: string): void {
-    if (peerId !== this.peer.id) {
+    if (peerId !== this.peer?.id) {
       this.knownPeers.add(peerId);
       localStorage.setItem(
         "knownPeers",
@@ -472,7 +581,6 @@ function initializeP2PSync() {
   }
 }
 
-// Call initializeP2PSync on page load if there's a stored peer ID
 if (storedPeerId) {
   initializeP2PSync();
 }
