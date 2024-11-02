@@ -15,7 +15,7 @@ import indexDBOverlay from "./memory/local/file_worker";
 import { throttle } from "./utils/utils";
 import { TabManager } from "./ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
 // import { initializeEditor } from './ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/index.ts'
-
+import {initializeWorker} from './memory/fileHandler.js'
 let tabManager = null;
 const userId = "kai";
 localStorage.setItem("login_block", userId);
@@ -24,6 +24,7 @@ const p2pSync_instance = p2pSync;
 
 async function main() {
   embeddingWorker.initialize();
+  initializeWorker();
 
   try {
     await setupMarkdownEditor();

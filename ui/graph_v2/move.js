@@ -18,7 +18,7 @@ import {
 } from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
 import * as THREE from "three";
-import { convertToThreeJSFormat, throttle } from "../../utils/utils";
+import { convertToThreeJSFormat, throttle, generateUniqueId } from "../../utils/utils";
 import { diffSceneChanges } from "../../memory/collaboration/scene_colab";
 import { updateConnectedLines } from "./lineGraphs.js";
 import { runOverallDebug } from "./sceneDebug.js";
@@ -527,7 +527,8 @@ function handleFileDrop_sphere(event) {
 
   const dt = event.dataTransfer;
   const fileList = dt?.files;
-  const fileIds = event.fileIds || [];
+  // const fileIds = event.fileIds || [];/
+  const { fileIds, fileNames, fileEntries } = handleFileDrop(event);
 
   const canvas = renderer.domElement;
   const rect = canvas.getBoundingClientRect();
@@ -960,7 +961,7 @@ function handleSphereDragEnd(sphere, ghostCube) {
       sphere.position.copy(cubePosition.clone().add(offset));
 
       // Resize the existing cube to fit the new sphere
-      resizeCubeToFitSpheres(existingCube);
+      // resizeCubeToFitSpheres(existingCube);
     } else {
       // Create a new cube to contain the sphere
       const cubeSize = sphereRadius * RESCALEFACTOR;

@@ -1,45 +1,15 @@
+
 // umap.js
-import { share3dDat } from '../ui/graph_v2/create.js';
+import { share3dDat } from '../ui/graph_v2/create.js'
 import { getSceneBoundingBox, updateSphereAndCubePositions } from '../ui/graph_v2/reorientScene.js';
-import indexDBOverlay from '../memory/local/file_worker';
+import indexDBOverlay from '../memory/local/file_worker'
 
-let umapWorker = null; // Lazy-loaded worker
-let inactivityTimeout = null; // Inactivity timer
-
-// Function to initialize the UMAP worker only when needed
-function getUMAPWorker() {
-    if (!umapWorker) {
-        const UMAPWorker = require('../workers/umap_worker.js?worker');
-        umapWorker = new UMAPWorker();
-        console.log('UMAP worker initialized.');
-    }
-    resetInactivityTimeout();
-    return umapWorker;
-}
-
-// Reset inactivity timeout to terminate the worker if unused
-function resetInactivityTimeout() {
-    if (inactivityTimeout) clearTimeout(inactivityTimeout);
-    inactivityTimeout = setTimeout(() => terminateWorker(), 300000); // 5 minutes
-}
-
-// Terminate the worker after inactivity
-function terminateWorker() {
-    if (umapWorker) {
-        umapWorker.terminate();
-        umapWorker = null;
-        console.log('UMAP worker terminated due to inactivity.');
-    }
-}
-
-// Wrapper to ensure the worker is initialized before performing actions
-function ensureWorkerInitialized() {
-    getUMAPWorker();
-}
+// Initialize the worker
+import UMAPWorker from '../workers/umap_worker.js?worker';
+const umapWorker = new UMAPWorker();
 
 // Create a promise-based wrapper for UMAP processing
 function performUMAPAsync(embeddings, labels) {
-    ensureWorkerInitialized();
     return new Promise((resolve, reject) => {
         const messageHandler = function (e) {
             const { type, data } = e.data;
@@ -89,13 +59,13 @@ export async function performUMAPAndUpdateScene(embeddings, labels) {
 
 // Function to send the scene bounding box to the UMAP worker
 export function sendSceneBoundingBoxToWorker() {
-    ensureWorkerInitialized();
     const { scene } = share3dDat();
     const sceneBoundingBox = getSceneBoundingBox(scene);
     umapWorker.postMessage({
         type: 'setSceneBoundingBox',
         data: sceneBoundingBox
     });
+    // console.log('Sent scene bounding box to UMAP worker:', sceneBoundingBox);
 }
 
 // Function to initialize the database and fetch embeddings
@@ -145,13 +115,12 @@ export async function fetchEmbeddingsAndPerformUMAP() {
 
 // Optional: Terminate workers when no longer needed
 export function terminateWorkers() {
-    terminateWorker();
+    umapWorker.postMessage({ type: 'terminate' });
+    console.log('Terminated UMAP worker.');
 }
 
-// Function to fetch data and perform UMAP projections
 export async function fetchDataAndPerformUMAP_projections() {
   try {
-    ensureWorkerInitialized();
     await indexDBOverlay.openDB('vectorDB_new');
     await indexDBOverlay.initializeDB(['vectors', 'vectors_hashIndex']);
 

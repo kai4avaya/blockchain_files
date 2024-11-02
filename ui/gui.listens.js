@@ -4,6 +4,8 @@ import { performClustering } from '../ai/clustering.js'
 import { updateStatus } from './components/process.js'  // Import the updateStatus function
 import {setupTextProjectionVisualization} from '../ai/vector_text_patterns.js'
 export function initiate_gui_controls() {
+
+  
   document.addEventListener('modalAction', (e) => {
     const action = e.detail.action;
     switch (action) {
