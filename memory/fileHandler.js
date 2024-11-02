@@ -443,6 +443,8 @@ export function handleFileDrop(event) {
     const uuid = generateUniqueId();
 
     if (item) {
+
+      console.log("i am item in handleFileDrop", item);
       fileIds.push(uuid);
       fileNames.push(item.name);
       fileEntries.push(item);

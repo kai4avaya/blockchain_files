@@ -65,7 +65,7 @@ export function sendSceneBoundingBoxToWorker() {
         type: 'setSceneBoundingBox',
         data: sceneBoundingBox
     });
-    console.log('Sent scene bounding box to UMAP worker:', sceneBoundingBox);
+    // console.log('Sent scene bounding box to UMAP worker:', sceneBoundingBox);
 }
 
 // Function to initialize the database and fetch embeddings

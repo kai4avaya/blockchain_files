@@ -167,6 +167,57 @@ export function dragCube() {
 export function labelListerners(labelDiv, sphere) {
   const { controls } = share3dDat();
 
+  //   // Add event listeners to enable dragging the sphere via its label
+  // labelDiv.addEventListener('pointerdown', (event) => {
+  //   event.preventDefault();
+  //   event.stopPropagation();
+  //   // Record initial pointer position
+  //   initialPointerPosition = { x: event.clientX, y: event.clientY };
+
+  //   isDragging = false; // We will set to true when moved enough
+  //   selectedSphere = sphere;
+  //   selectedObject = sphere;
+
+  //   // Disable controls during drag
+  //   controls.enabled = false;
+
+  //   // Set pointer capture
+  //   labelDiv.setPointerCapture(event.pointerId);
+  // });
+
+  // labelDiv.addEventListener('pointermove', (event) => {
+  //   if (!selectedSphere || selectedSphere !== sphere) return;
+
+  //   const deltaX = event.clientX - initialPointerPosition.x;
+  //   const deltaY = event.clientY - initialPointerPosition.y;
+  //   const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+  //   if (distanceMoved > DRAG_THRESHOLD) {
+  //     isDragging = true;
+  //     controls.enabled = false;
+  //   }
+
+  //   if (isDragging) {
+  //     moveSphere(event);
+  //     markNeedsRender();
+  //   }
+  // });
+
+  // labelDiv.addEventListener('pointerup', (event) => {
+  //   if (selectedSphere === sphere) {
+  //     // Always call onPointerUp to handle clicks and drags
+  //     onPointerUp(event);
+
+  //     // Reset variables
+  //     isDragging = false;
+  //     selectedSphere = null;
+  //     selectedObject = null;
+  //     controls.enabled = true;
+
+  //     // Release pointer capture
+  //     labelDiv.releasePointerCapture(event.pointerId);
+  //   }
+  // });
 
   labelDiv.style.pointerEvents = "none";
 }
@@ -469,9 +520,48 @@ function resetCubeColor(cube) {
   }
 }
 
-function setupDragAndDrop() {
-  //  setupDragAndDrop2()
+function tabDrop(event){
+  console.log("i am event", event)
+   // Check if this is a tab drop
+   const dragData = event.dataTransfer?.getData('application/json');
 
+   console.log("dragData", dragData);
+   if (dragData) {
+     try {
+       const data = JSON.parse(dragData);
+       if (data.type === 'tab' && data.content) {
+         // Create a File object from the tab content
+         const file = new File(
+           [data.content],
+           `${data.title || 'Untitled'}.md`,
+           { type: 'text/markdown' }
+         );
+
+         // Create a new DataTransfer object with our file
+         const dt = new DataTransfer();
+         dt.items.add(file);
+
+         // Create a new drop event that looks like a file drop
+         const modifiedEvent = {
+           ...event,
+           dataTransfer: dt,
+           clientX: event.clientX,
+           clientY: event.clientY
+         };
+
+         // Use the existing file drop handler
+         handleFileDrop_sphere(modifiedEvent);
+         removeGhostCube();
+         onPointerUp(event);
+         return;
+       }
+     } catch (err) {
+       console.error('Error handling tab drop:', err);
+     }
+   }
+}
+
+function setupDragAndDrop() {
   const { renderer } = share3dDat(); // Access the renderer to get the canvas
   const canvas = renderer.domElement;
 
@@ -490,6 +580,7 @@ function setupDragAndDrop() {
 
   canvas.addEventListener("drop", (event) => {
     event.preventDefault();
+    tabDrop(event);
     handleFileDrop_sphere(event);
     removeGhostCube();
     onPointerUp(event);
@@ -524,29 +615,17 @@ function getObjectType(object) {
 let clickStartTime = 0;
 // const CLICK_DURATION_THRESHOLD = 200; // milliseconds
 const CLICK_DURATION_THRESHOLD = 300;
-
-function shouldIgnoreEvent(event) {
-  // Check if the click is on the slideout or any of its children
-  if (event.target.closest('#chatSlideout')) {
-    console.log('Click was on slideout - ignoring');
-    return true;
-  }
-
-  // Check for other UI elements that should not trigger canvas events
-  return event.target.closest('.modal') || 
-         event.target.closest('.p2p_peer_input') || 
-         event.target.id === 'connectButton' || 
-         event.target.id === 'userIdInput' || 
-         event.target.id === 'peerIdInput' ||
-         event.target.closest('.resize-handle');
-}
-
-
+// In move.js, modify the onPointerDown function:
 export function onPointerDown(event) {
-  if (shouldIgnoreEvent(event)) {
-    console.log('Ignoring pointer down on UI element');
-    return;
-  }
+  if (event.target.closest('.modal') || 
+  event.target.closest('.p2p_peer_input') || 
+  event.target.id === 'connectButton' || 
+  event.target.id === 'userIdInput' || 
+  event.target.id === 'peerIdInput') {
+
+    console.log("by by mover ")
+return; // Let the event handle normally for UI elements
+}
 
 
   const { mouse, raycaster, renderer, scene, nonBloomScene, camera, controls } =
@@ -570,6 +649,9 @@ export function onPointerDown(event) {
     true
   );
 
+  console.log("Bloom intersects:", intersectsBloom);
+  console.log("Non-bloom intersects:", intersectsNonBloom);
+
   initialPointerPosition = { x: event.clientX, y: event.clientY };
   clickStartTime = Date.now();
   isDragging = false;
@@ -581,11 +663,29 @@ export function onPointerDown(event) {
   );
 
   if (sphereIntersect) {
+    console.log("Sphere selected:", sphereIntersect.object);
     controls.enabled = false;
     selectedSphere = sphereIntersect.object;
     selectedObject = selectedSphere;
 
+    // Log sphere layers before toggle
+    console.log("Sphere layers before toggle:", selectedSphere.layers.mask);
 
+    // Toggle bloom on click, but keep the sphere in both layers
+    // if (selectedSphere.layers.test(BLOOM_SCENE)) {
+    //   selectedSphere.layers.disable(BLOOM_SCENE);
+    // } else {
+    //   selectedSphere.layers.enable(BLOOM_SCENE);
+    // }
+    // // Ensure the sphere is always in the default layer (0)
+    // selectedSphere.layers.enable(0);
+
+    
+    console.log("Sphere layers before toggle:", selectedSphere.layers.mask);
+    // toggleBloom(selectedSphere);
+    console.log("Sphere layers after toggle:", selectedSphere.layers.mask)
+
+    console.log("Sphere layers after toggle:", selectedSphere.layers.mask);
     markNeedsRender();
   } else if (intersectsNonBloom.length > 0) {
     const selectedCube = getCubeUnderPointer(event, intersectsNonBloom);
@@ -602,6 +702,7 @@ export function onPointerDown(event) {
       raycaster.ray.intersectPlane(plane, previousIntersectPoint);
     }
   } else {
+    console.log("No object selected");
     controls.enabled = true;
     selectedSphere = null;
     selectedObject = null;
@@ -642,10 +743,16 @@ function toggleBloom(object) {
 }
 // Update the onPointerUp function to use this new handleSphereDragEnd
 async function onPointerUp(event) {
-  if (shouldIgnoreEvent(event)) {
-    console.log('Ignoring pointer up on UI element');
-    return;
-  }
+  console.log("Pointer up event triggered");
+  if (event.target.closest('.modal') || 
+  event.target.closest('.p2p_peer_input') || 
+  event.target.id === 'connectButton' || 
+  event.target.id === 'userIdInput' || 
+  event.target.id === 'peerIdInput') {
+
+    console.log("by by mover ")
+return; // Let the event handle normally for UI elements
+}
 
   const { controls, scene, nonBloomScene, ghostCube, sceneSnapshot } =
     share3dDat();
@@ -742,10 +849,6 @@ function handleSphereDragEnd(sphere, ghostCube) {
 }
 
 const onPointerMove = (event) => {
-  if (shouldIgnoreEvent(event)) {
-    console.log('Ignoring pointer move  on UI element');
-    return;
-  }
   const { controls, camera, scene, nonBloomScene } = share3dDat();
   if (!selectedSphere && !selectedObject) return;
   const deltaX = event.clientX - initialPointerPosition.x;
@@ -831,15 +934,6 @@ function cleanupOldCubes() {
 function setupPointerEvents() {
   const { renderer } = share3dDat(); // Access the renderer to get the canvas
   const canvas = renderer.domElement;
-
-    // Make canvas ignore pointer events when over the slideout
-    canvas.addEventListener('pointermove', (event) => {
-      if (shouldIgnoreEvent(event)) {
-        canvas.style.pointerEvents = 'none';
-      } else {
-        canvas.style.pointerEvents = 'auto';
-      }
-    });
 
   canvas.addEventListener("pointerdown", onPointerDown);
 
