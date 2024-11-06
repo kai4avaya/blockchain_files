@@ -1,3 +1,5 @@
+// memory\collaboration\file_colab.ts
+
 import indexDBOverlay from '../local/file_worker';
 
 interface BaseMetadata {
@@ -91,15 +93,11 @@ class FileSystem {
     return { ...this.snapshot };
   }
 
-  // getMetadata<T extends FileMetadata | DirectoryMetadata>(id: string, type: 'file' | 'directory'): T | undefined {
-  //   const items = type === 'file' ? this.snapshot.files : this.snapshot.directories;
-
-  //   console.log("i am items", items)
-  //   return items.find(item => item.id === id) as T | undefined;
-  // }
 
 
   private async applyUpdate(update: Partial<FileSystemSnapshot>) {
+
+    console.log("applyUpdate update", update)
     if (!this.isReady) {
       await new Promise<void>(resolve => this.onReady(resolve));
     }
@@ -150,7 +148,11 @@ class FileSystem {
       item = await this.getItem<T>(id, type);
       // Optionally, add it to the snapshot for future use
       if (item) {
-        this.snapshot[type === 'file' ? 'files' : 'directories'].push(item);
+        if (type === 'file') {
+          (this.snapshot.files as T[]).push(item);
+        } else {
+          (this.snapshot.directories as T[]).push(item);
+        }
       }
     }
 
@@ -175,21 +177,19 @@ class FileSystem {
   }
 
   async addFileToDirectory(fileId: string, directoryId: string): Promise<void> {
-    const directory = this.getMetadata<DirectoryMetadata>(directoryId, 'directory');
+    const directory = await this.getMetadata<DirectoryMetadata>(directoryId, 'directory');
     if (directory) {
       directory.fileIds = [...new Set([...directory.fileIds, fileId])];
       await this.addOrUpdateItem(directory, 'directory');
     }
   }
-
   async removeFileFromDirectory(fileId: string, directoryId: string): Promise<void> {
-    const directory = this.getMetadata<DirectoryMetadata>(directoryId, 'directory');
+    const directory = await this.getMetadata<DirectoryMetadata>(directoryId, 'directory');
     if (directory) {
       directory.fileIds = directory.fileIds.filter(id => id !== fileId);
       await this.addOrUpdateItem(directory, 'directory');
     }
-  }
-}
+  }}
 export const getFileSystem = FileSystem.getInstance;
 export const initializeFileSystem = async () => {
   const fileSystem = FileSystem.getInstance();

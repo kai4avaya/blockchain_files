@@ -4,6 +4,7 @@ import { findAllSpheres } from './snapshot.js';
 import { share3dDat, markNeedsRender } from './create.js';
 import { getFileSystem } from '../../memory/collaboration/file_colab';
 import indexDBOverlay from '../../memory/local/file_worker';
+import config from '../../configs/config.json';
 
 const PARTICLE_COUNT = 100; // Increased for better visibility
 const CURVE_AMOUNT = 0.2; // Amount of curve (0 to 1)
@@ -23,9 +24,8 @@ async function connectSimilarSpheres() {
   const { scene, nonBloomScene } = share3dDat();
   const spheres = findAllSpheres([scene, nonBloomScene]);
 
-  // Initialize IndexedDB
-  await indexDBOverlay.openDB('fileGraphDB');
-  await indexDBOverlay.openDB('summarizationDB', 2);
+  await indexDBOverlay.openDB(config.dbName);
+  await indexDBOverlay.initializeDB(Object.keys(config.dbStores));
 
   // Create a map of sphere userIds to their keywords
   const sphereKeywords = new Map();
@@ -70,7 +70,7 @@ async function getKeywordsForSphere(sphereId) {
       return [];
     }
 
-    const summaries = await indexDBOverlay.getData('summaries', 'summarizationDB');
+    const summaries = await indexDBOverlay.getData('summaries');
     const summaryEntry = summaries.find(entry => entry.fileId === sphereId);
 
     if (summaryEntry && summaryEntry.keywords) {

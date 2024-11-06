@@ -1,7 +1,28 @@
 {
-    "excluded": [
-      "GridHelper",
-      "PlaneGeometry",
-      "BufferGeometry"
-    ]
+  "excluded": [
+    "GridHelper",
+    "PlaneGeometry",
+    "BufferGeometry"
+  ],
+  "dbName": "fileGraphDB",
+  "dbStores": {
+    "directories": { "keyPath": "id" },
+    "files": { "keyPath": "id" },
+    "graph": { "keyPath": "uuid" },
+    "summaries": { "keyPath": "fileId" },
+    "tabs": { "keyPath": "docId" },
+    "docs": { "keyPath": "docId" },
+    "vectors": {
+      "keyPath": "id",
+      "vectorConfig": {
+        "dimensions": 384,
+        "hyperplanes": 10,
+        "numPlanes": 5,
+        "vectorPath": "embedding",
+        "hashIndexSuffix": "_hashIndex"
+      }
+    },
+    "vectors_hashIndex": {
+    }
   }
+}

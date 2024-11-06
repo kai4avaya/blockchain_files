@@ -12,7 +12,7 @@ import {} from "./move.js";
 import { makeObjectWritable, convertToThreeJSFormat, getCurrentTimeOfDay, calculateDistance,throttle   } from "../../utils/utils";
 import {labelListerners} from './move.js'
 import { createSceneSnapshot, findSpheresInCube,findAllSpheres, findAllCubes} from "./snapshot.js";
-import {sendSceneBoundingBoxToWorker} from '../../ai/umap.js'
+import { isUMAPWorkerActive, sendSceneBoundingBoxToWorker } from '../../ai/umap.js'
 import MouseOverlayCanvas from './MouseOverlayCanvas';
 // import {getScaleFactorForDistance} from './reorientScene.js'  // KAI USE THIS see if orbit fixes
 // import {logSceneInfo} from "../../utils/sceneCoordsUtils.js"
@@ -472,15 +472,14 @@ window.onresize = function () {
   bloomComposer.setSize(width, height);
   finalComposer.setSize(width, height);
 
-  sendSceneBoundingBoxToWorker()
+  // Only send bounding box if UMAP worker is active
+  if (isUMAPWorkerActive()) {
+    sendSceneBoundingBoxToWorker();
+  }
 
-  labelRenderer.setSize(width, height); // Add this line
-
-  // render();
+  labelRenderer.setSize(width, height);
   markNeedsRender();
 };
-
-
 function saveCameraState() {
   const cameraState = {
     position: camera.position.toArray(),

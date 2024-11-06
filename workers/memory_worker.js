@@ -1,40 +1,40 @@
 // memory_worker.js
+let DEFAULT_DB_NAME;
 const dbs = {}; // Map of dbName to dbInstance
-async function openDB(dbName, version = undefined) {
+
+// Initialize worker with config
+self.addEventListener('message', function(e) {
+  if (e.data.type === 'INIT_CONFIG') {
+    DEFAULT_DB_NAME = e.data.config.dbName;
+  }
+});
+
+async function openDB(storeConfigs, version = undefined) {
   return new Promise((resolve, reject) => {
     const request = version
-      ? indexedDB.open(dbName, version)
-      : indexedDB.open(dbName);
+      ? indexedDB.open(DEFAULT_DB_NAME, version)
+      : indexedDB.open(DEFAULT_DB_NAME);
 
     request.onupgradeneeded = function (event) {
       const db = event.target.result;
-
-      // Define the object stores based on dbName
-      if (dbName === "fileGraphDB") {
-        ["directories", "files", "graph"].forEach((storeName) => {
-          if (db.objectStoreNames.contains(storeName)) {
-            console.log(`Deleting existing object store: ${storeName}`);
-            db.deleteObjectStore(storeName);
-          }
-        });
-        db.createObjectStore("directories", { keyPath: "id" });
-        db.createObjectStore("files", { keyPath: "id" });
-        db.createObjectStore("graph", { keyPath: "uuid" });
-      } else if (dbName === "summarizationDB") {
-        if (db.objectStoreNames.contains("summaries")) {
-          db.deleteObjectStore("summaries");
+      
+      // Delete and recreate all stores defined in storeConfigs
+      storeConfigs.forEach(({ storeName, keyPath }) => {
+        if (db.objectStoreNames.contains(storeName)) {
+          console.log(`Deleting existing object store: ${storeName}`);
+          db.deleteObjectStore(storeName);
         }
-        db.createObjectStore("summaries", { keyPath: "fileId" }); // Assuming 'fileId' as keyPath
-      }
-      // Add other databases and their stores as needed
+        db.createObjectStore(storeName, { keyPath });
+      });
     };
+
     request.onsuccess = function (event) {
       const db = event.target.result;
-      dbs[dbName] = db;
+      dbs[DEFAULT_DB_NAME] = db;
 
       // Listen for close events
       db.onclose = () => {
-        delete dbs[dbName];
+        delete dbs[DEFAULT_DB_NAME];
       };
 
       resolve({ message: "Database opened successfully", version: db.version });
@@ -42,33 +42,41 @@ async function openDB(dbName, version = undefined) {
 
     request.onerror = function (event) {
       console.error(
-        `Error opening IndexedDB: ${event.target.error.message} | Database: ${dbName}`
+        `Error opening IndexedDB: ${event.target.error.message} | Database: ${DEFAULT_DB_NAME}`
       );
       reject(
         new Error(
-          `Error opening IndexedDB: ${event.target.error.message} | Database: ${dbName}`
+          `Error opening IndexedDB: ${event.target.error.message} | Database: ${DEFAULT_DB_NAME}`
         )
       );
     };
   });
 }
-
-async function initializeDB(storeNames, dbName = "fileGraphDB") {
+async function initializeDB(storeConfigs) {
   try {
-    // Ensure the database is open
-    if (!dbs[dbName]) {
-      await openDB(dbName); // Open without version
+    // Ensure storeConfigs is present and valid
+    if (!storeConfigs || !Array.isArray(storeConfigs)) {
+      throw new Error('Store configs must be an array');
     }
 
-    const db = dbs[dbName];
-    const missingStores = storeNames.filter(
-      (store) => !db.objectStoreNames.contains(store)
+    // Ensure the database is open
+    if (!dbs[DEFAULT_DB_NAME]) {
+      await openDB(storeConfigs); // Open without version
+    }
+
+    const db = dbs[DEFAULT_DB_NAME];
+    
+    // Check for missing stores
+    const missingStores = storeConfigs.filter(
+      ({ storeName }) => !db.objectStoreNames.contains(storeName)
     );
 
     if (missingStores.length > 0) {
+      console.log('Missing stores detected:', missingStores.map(s => s.storeName));
       const newVersion = db.version + 1;
       db.close();
-      await openDB(dbName, newVersion); // Trigger onupgradeneeded
+      delete dbs[DEFAULT_DB_NAME];
+      await openDB(storeConfigs, newVersion); // Trigger onupgradeneeded
     }
 
     return "Database initialized successfully";
@@ -78,12 +86,17 @@ async function initializeDB(storeNames, dbName = "fileGraphDB") {
   }
 }
 
-async function getData(storeName, dbName = "fileGraphDB") {
+async function getData(storeName) {
   try {
-    if (!dbs[dbName]) {
-      throw new Error(`Database "${dbName}" is not open`);
+    if (!dbs[DEFAULT_DB_NAME]) {
+      throw new Error(`Database "${DEFAULT_DB_NAME}" is not open`);
     }
-    const db = dbs[dbName];
+    
+    const db = dbs[DEFAULT_DB_NAME];
+    if (!db.objectStoreNames.contains(storeName)) {
+      throw new Error(`Store "${storeName}" not found in database`);
+    }
+
     return new Promise((resolve, reject) => {
       const tx = db.transaction(storeName, "readonly");
       const store = tx.objectStore(storeName);
@@ -106,41 +119,13 @@ async function getData(storeName, dbName = "fileGraphDB") {
   }
 }
 
-// async function saveData(storeName, data, dbName = 'fileGraphDB') {
-//   try {
-//     if (!dbs[dbName]) {
-//       throw new Error(`Database "${dbName}" is not open`);
-//     }
-//     const db = dbs[dbName];
-
-//     return new Promise((resolve, reject) => {
-//       const tx = db.transaction([storeName], 'readwrite');
-//       const store = tx.objectStore(storeName);
-
-//       if (Array.isArray(data)) {
-//         data.forEach(item => {
-//           console.log("PUT i am put item from memory_worker", item);
-//           store.put(item);
-//         });
-//       } else {
-//         store.put(data);
-//       }
-
-//       tx.oncomplete = () => resolve("Data saved successfully");
-//       tx.onerror = () => reject(new Error(`Error saving data to ${storeName}`));
-//     });
-//   } catch (error) {
-//     throw error;
-//   }
-// }
-
-async function saveData(storeName, data, dbName = "fileGraphDB", retries = 3) {
+async function saveDataMemoryWorker(storeName, data, key = null, retries = 3) {
   try {
-    if (!dbs[dbName] || dbs[dbName].closePending) {
-      await openDB(dbName);
+    if (!dbs[DEFAULT_DB_NAME] || dbs[DEFAULT_DB_NAME].closePending) {
+      throw new Error(`Database "${DEFAULT_DB_NAME}" is not open`);
     }
 
-    const db = dbs[dbName];
+    const db = dbs[DEFAULT_DB_NAME];
 
     return new Promise((resolve, reject) => {
       let tx;
@@ -149,55 +134,54 @@ async function saveData(storeName, data, dbName = "fileGraphDB", retries = 3) {
       } catch (error) {
         if (error.name === "InvalidStateError" && retries > 0) {
           setTimeout(() => {
-            saveData(storeName, data, dbName, retries - 1)
+            saveDataMemoryWorker(storeName, data, key, retries - 1)
               .then(resolve)
               .catch(reject);
-          }, 1000); // Wait for 1 second before retrying
-          return;
-        } else if (error.name === "NotFoundError") {
-          // Attempt to create the missing object store
-          const version = db.version + 1;
-          db.close();
-          openDB(dbName, version)
-            .then(() => {
-              // Retry the save operation after creating the store
-              saveData(storeName, data, dbName).then(resolve).catch(reject);
-            })
-            .catch(reject);
-          return;
-        } else {
-          reject(error);
+          }, 1000);
           return;
         }
+        reject(error);
+        return;
       }
 
       const store = tx.objectStore(storeName);
 
       if (Array.isArray(data)) {
         data.forEach((item) => {
-          store.put(item);
+          if (key !== null) {
+            store.put(item, key);
+          } else {
+            store.put(item);
+          }
         });
       } else {
-        store.put(data);
+        if (key !== null) {
+          store.put(data, key);
+        } else {
+          store.put(data);
+        }
       }
 
       tx.oncomplete = () => resolve("Data saved successfully");
       tx.onerror = () => reject(new Error(`Error saving data to ${storeName}`));
     });
   } catch (error) {
-    console.error("Error in saveData:", error);
+    console.error("Error in saveDataMemoryWorker:", error);
     throw error;
   }
 }
-async function deleteItem(storeName, key, dbName = 'fileGraphDB') {
+
+
+
+async function deleteItem(storeName, key) {
   try {
-    if (!dbs[dbName]) {
-      throw new Error(`Database "${dbName}" is not open`);
+    if (!dbs[DEFAULT_DB_NAME]) {
+      throw new Error(`Database "${DEFAULT_DB_NAME}" is not open`);
     }
-    const db = dbs[dbName];
+    const db = dbs[DEFAULT_DB_NAME];
     
     return new Promise((resolve, reject) => {
-      const tx = db.transaction([storeName], 'readwrite');
+      const tx = db.transaction([storeName], "readwrite");
       const store = tx.objectStore(storeName);
       const request = store.delete(key);
 
@@ -209,12 +193,12 @@ async function deleteItem(storeName, key, dbName = 'fileGraphDB') {
   }
 }
 
-async function getItem(storeName, key, dbName = "fileGraphDB") {
+async function getItem(storeName, key) {
   try {
-    if (!dbs[dbName]) {
-      throw new Error(`Database "${dbName}" is not open`);
+    if (!dbs[DEFAULT_DB_NAME]) {
+      throw new Error(`Database "${DEFAULT_DB_NAME}" is not open`);
     }
-    const db = dbs[dbName];
+    const db = dbs[DEFAULT_DB_NAME];
     return new Promise((resolve, reject) => {
       const tx = db.transaction(storeName, "readonly");
       const store = tx.objectStore(storeName);
@@ -238,35 +222,47 @@ async function getItem(storeName, key, dbName = "fileGraphDB") {
 }
 
 self.onmessage = async function (event) {
-  const { id, action, data } = event.data;
+  const { id, action, data, key, type } = event.data;
+
+  console.log("onmessage .. id, action, data, type = ", id, action, data, type, key,)
+
+  // Handle config initialization separately
+  if (type === 'INIT_CONFIG') {
+    DEFAULT_DB_NAME = event.data.config.dbName;  // Get dbName from the config message
+    return;
+  }
 
   try {
     let result;
     switch (action) {
       case "openDB":
-        result = await openDB(data.dbName, data.version);
+        result = await openDB(data.storeConfigs, data.version);
         break;
       case "initializeDB":
-        result = await initializeDB(data.storeNames, data.dbName);
+        result = await initializeDB(data.storeConfigs);
         break;
       case "getData":
-        result = await getData(data.storeName, data.dbName);
+        result = await getData(data.storeName);
         break;
-      case "saveData":
-        result = await saveData(data.storeName, data.data, data.dbName);
-        break;
+      case 'saveData': {
+          const { storeName, data: saveData } = data;
+          // Pass the key from the top-level event.data
+          result = await saveDataMemoryWorker(storeName, saveData, event.data.key);
+          break;
+        }
+        
       case "getItem":
-        result = await getItem(data.storeName, data.key, data.dbName);
+        console.log("memory worker getItem", data, data.storeName, key, data.key)
+        result = await getItem(data.storeName, key);
         break;
       case "deleteItem":
-        result = await deleteItem(data.storeName, data.key, data.dbName);
+        result = await deleteItem(data.storeName, data.key);
         break;
       default:
         throw new Error(`Unknown action: ${action}`);
     }
     self.postMessage({ id, data: result });
   } catch (error) {
-    // Enhanced error message including database and store information
     self.postMessage({
       id,
       error: `${error.message} | Action: ${action} | Data: ${JSON.stringify(

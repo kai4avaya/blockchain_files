@@ -1,27 +1,23 @@
 // umap.js
 import { share3dDat } from '../ui/graph_v2/create.js';
 import { getSceneBoundingBox, updateSphereAndCubePositions } from '../ui/graph_v2/reorientScene.js';
-import indexDBOverlay from '../memory/local/file_worker';
+import indexDBOverlay from '../memory/local/file_worker.js';
+
 import config from '../configs/config.json';
 
-let umapWorker = null;
-let inactivityTimeout = null;
-let isWorkerActive = false;
+let umapWorker = null; // Lazy-loaded worker
+let inactivityTimeout = null; // Inactivity timer
 
-export function isUMAPWorkerActive() {
-    return isWorkerActive && umapWorker !== null;
-}
-
+// Function to initialize the UMAP worker only when needed
+// Function to initialize the UMAP worker only when needed
 async function getUMAPWorker() {
     if (!umapWorker) {
         try {
             const { default: UMAPWorker } = await import('../workers/umap_worker.js?worker');
             umapWorker = new UMAPWorker();
-            isWorkerActive = true;
             console.log('UMAP worker initialized.');
         } catch (error) {
             console.error('Failed to load UMAP worker:', error);
-            isWorkerActive = false;
             throw error;
         }
     }
@@ -29,24 +25,27 @@ async function getUMAPWorker() {
     return umapWorker;
 }
 
+// Reset inactivity timeout to terminate the worker if unused
 function resetInactivityTimeout() {
     if (inactivityTimeout) clearTimeout(inactivityTimeout);
     inactivityTimeout = setTimeout(() => terminateWorker(), 300000); // 5 minutes
 }
 
+// Terminate the worker after inactivity
 function terminateWorker() {
     if (umapWorker) {
         umapWorker.terminate();
         umapWorker = null;
-        isWorkerActive = false;
-        console.log('UMAP worker terminated.');
+        console.log('UMAP worker terminated due to inactivity.');
     }
 }
 
+// Wrapper to ensure the worker is initialized before performing actions
 async function ensureWorkerInitialized() {
     getUMAPWorker();
 }
 
+// Create a promise-based wrapper for UMAP processing
 function performUMAPAsync(embeddings, labels) {
     ensureWorkerInitialized();
     return new Promise((resolve, reject) => {
@@ -73,6 +72,7 @@ function performUMAPAsync(embeddings, labels) {
     });
 }
 
+// Function to perform UMAP dimensionality reduction without auto-updating the scene
 export async function performUMAPOnly(embeddings, labels) {
     try {
         const result = await performUMAPAsync(embeddings, labels);
@@ -84,6 +84,7 @@ export async function performUMAPOnly(embeddings, labels) {
     }
 }
 
+// Function to perform UMAP and update the scene (existing behavior)
 export async function performUMAPAndUpdateScene(embeddings, labels) {
     try {
         const { reducedData, labels: resultLabels } = await performUMAPAsync(embeddings, labels);
@@ -94,9 +95,9 @@ export async function performUMAPAndUpdateScene(embeddings, labels) {
     }
 }
 
+// Function to send the scene bounding box to the UMAP worker
 export function sendSceneBoundingBoxToWorker() {
-    if (!isWorkerActive || !umapWorker) return;
-    
+    ensureWorkerInitialized();
     const { scene } = share3dDat();
     const sceneBoundingBox = getSceneBoundingBox(scene);
     umapWorker.postMessage({
@@ -105,11 +106,12 @@ export function sendSceneBoundingBoxToWorker() {
     });
 }
 
+// Function to initialize the database and fetch embeddings
 async function initDBAndFetchEmbeddings() {
     try {
-        await indexDBOverlay.openDB(config.dbName);
-        await indexDBOverlay.initializeDB(Object.keys(config.dbStores));
-        const embeddings = await indexDBOverlay.getData('summaries');
+        await indexDBOverlay.openDB('summarizationDB', 2);
+        await indexDBOverlay.initializeDB(['summaries']);
+        const embeddings = await indexDBOverlay.getData('summaries', 'summarizationDB');
 
         if (embeddings && embeddings.length > 0) {
             const embeddingVectors = embeddings.map(item => item.embedding);
@@ -125,6 +127,7 @@ async function initDBAndFetchEmbeddings() {
     }
 }
 
+// Function to fetch embeddings and perform UMAP without updating the scene
 export async function fetchEmbeddingsAndPerformUMAPOnly() {
     try {
         const data = await initDBAndFetchEmbeddings();
@@ -136,6 +139,7 @@ export async function fetchEmbeddingsAndPerformUMAPOnly() {
     }
 }
 
+// Function to fetch embeddings, perform UMAP, and update the scene (existing behavior)
 export async function fetchEmbeddingsAndPerformUMAP() {
     try {
         const data = await initDBAndFetchEmbeddings();
@@ -147,27 +151,31 @@ export async function fetchEmbeddingsAndPerformUMAP() {
     }
 }
 
+// Optional: Terminate workers when no longer needed
 export function terminateWorkers() {
     terminateWorker();
 }
 
+// Function to fetch data and perform UMAP projections
 export async function fetchDataAndPerformUMAP_projections() {
-    try {
-        ensureWorkerInitialized();
-        await indexDBOverlay.openDB(config.dbName);
-        await indexDBOverlay.initializeDB(Object.keys(config.dbStores));
+  try {
+    ensureWorkerInitialized();
+    await indexDBOverlay.openDB(config.dbName);
+    // await indexDBOverlay.initializeDB(['vectors', 'vectors_hashIndex']);
+    await indexDBOverlay.initializeDB(['vectors', 'vectors_hashIndex']);
 
-        const vectorsData = await indexDBOverlay.getData('vectors');
-        const hashIndexData = await indexDBOverlay.getData('vectors_hashIndex');
 
-        const embeddings = vectorsData.map(item => item.embedding);
-        const labels = vectorsData.map(item => item.fileId);
+    const vectorsData = await indexDBOverlay.getData('vectors');
+    const hashIndexData = await indexDBOverlay.getData('vectors_hashIndex');
 
-        const umapResult = await performUMAPOnly(embeddings, labels);
+    const embeddings = vectorsData.map(item => item.embedding);
+    const labels = vectorsData.map(item => item.fileId);
 
-        return { umapResult, vectorsData, hashIndexData };
-    } catch (error) {
-        console.error('Error fetching data or performing UMAP:', error);
-        throw error;
-    }
+    const umapResult = await performUMAPOnly(embeddings, labels);
+
+    return { umapResult, vectorsData, hashIndexData };
+  } catch (error) {
+    console.error('Error fetching data or performing UMAP:', error);
+    throw error;
+  }
 }

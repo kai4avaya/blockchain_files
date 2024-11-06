@@ -1,24 +1,35 @@
-// vectorDb.js
-let DB_DEFAULTS = {
-    dbName: "vectorDB_new",
-    objectStore: "vectors",
-    hyperplanes: 10,
-    dimensions: 384,
-    numPlanes: 5
-  };
+import config from '../../configs/config.json';
+import indexDBOverlay from '../local/file_worker';
+import { generateUniqueId } from "../../utils/utils";  // Add this import!
 
-const CURRENT_DB_VERSION = 2;
-  
+// vectorDb.js
+
+
+// let DB_DEFAULTS = {
+//     dbName: config.dbName, //"vectorDB_new",
+//     objectStore: "vectors",
+//     hyperplanes: 10,
+//     dimensions: 384,
+//     numPlanes: 5
+//   };
+
+let DB_DEFAULTS = {
+  dbName: config.dbName,
+  objectStore: config.dbStores.vectors.storeName || "vectors",
+  ...config.dbStores.vectors.vectorConfig,
+  keyPath: config.dbStores.vectors.keyPath
+};
+
   // Function to update defaults
   export function setDBDefaults(newValues) {
-    DB_DEFAULTS = { ...DB_DEFAULTS, ...newValues };
-  }
-  
-  // Function to get the current defaults
-  export function getDBDefaults() {
+    // Update properties individually instead of reassigning
+    Object.assign(DB_DEFAULTS, newValues);
     return DB_DEFAULTS;
   }
-  
+  // Function to get the current defaults
+  export function getDBDefaults() {
+    return { ...DB_DEFAULTS };
+  }
   function generateRandomVector(dimensions) {
     return Array.from({length: dimensions}, () => Math.random() - 0.5);
   }
@@ -55,43 +66,12 @@ const CURRENT_DB_VERSION = 2;
     return dotProduct / (aMagnitude * bMagnitude);
   }
   
- // Modify the create function to use the provided storeName
-  function create(options) {
-      const { dbName, objectStore, vectorPath } = {
-          ...DB_DEFAULTS,
-          ...options,
-      };
-  
-      return new Promise((resolve, reject) => {
-          const request = indexedDB.open(dbName, CURRENT_DB_VERSION);
-  
-          request.onupgradeneeded = (event) => {
-              const db = event.target.result;
-              if (!db.objectStoreNames.contains(objectStore)) {
-                  db.createObjectStore(objectStore, { autoIncrement: true });
-              }
-              const hashIndexStoreName = `${objectStore}_hashIndex`;
-              if (!db.objectStoreNames.contains(hashIndexStoreName)) {
-                  db.createObjectStore(hashIndexStoreName, { autoIncrement: true });
-              }
-          };
-
-
-      request.onsuccess = (event) => {
-        resolve(event.target.result);
-      };
-  
-      request.onerror = (event) => {
-        reject(event.target.error);
-      };
-    });
-  }
   
   class VectorDB {
     #objectStore;
     #vectorPath;
-    #db;
     #lsh;
+    #hashIndexStore;
   
   
     constructor(options = {}) {
@@ -101,109 +81,103 @@ const CURRENT_DB_VERSION = 2;
       };
   
       this.#objectStore = storeName || DB_DEFAULTS.objectStore;
-      this.#vectorPath = vectorPath;
-      this.#lsh = new LSH(dimensions, numPlanes);
-      this.#db = create({dbName, objectStore: this.#objectStore, vectorPath});
+    this.#vectorPath = vectorPath || DB_DEFAULTS.vectorPath;
+    this.#hashIndexStore = `${this.#objectStore}${DB_DEFAULTS.hashIndexSuffix}`;
+    this.#lsh = new LSH(
+      dimensions || DB_DEFAULTS.dimensions,
+      numPlanes || DB_DEFAULTS.numPlanes
+    );
   }
   
   static async createDatabase(dbName, storeNames) {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(dbName, CURRENT_DB_VERSION);
-
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            storeNames.forEach(storeName => {
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName, { autoIncrement: true });
-                }
-                const hashIndexStoreName = `${storeName}_hashIndex`;
-                if (!db.objectStoreNames.contains(hashIndexStoreName)) {
-                    db.createObjectStore(hashIndexStoreName, { autoIncrement: true });
-                }
-            });
-        };
-
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
-}
-  
-  async insert(object) {
-    const vector = object[this.#vectorPath];
-    if (!Array.isArray(vector) && !(vector instanceof Int8Array)) {
-        throw new Error(`${this.#vectorPath} on 'object' is expected to be an Array or Int8Array`);
-    }
-  
-    const db = await this.#db;
-    const transaction = db.transaction([this.#objectStore, `${this.#objectStore}_hashIndex`], "readwrite");
-    const store = transaction.objectStore(this.#objectStore);
-    const hashIndexStore = transaction.objectStore(`${this.#objectStore}_hashIndex`);
-  
-    try {
-        const request = store.add(object);
-        const result = await new Promise((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-  
-        // Compute hashes for all tables
-        const hashes = this.#lsh.hashVector(vector);
-        for (let hash of hashes) {
-            const bucket = await new Promise((resolve, reject) => {
-                const indexRequest = hashIndexStore.get(hash);
-                indexRequest.onsuccess = () => resolve(indexRequest.result || []);
-                indexRequest.onerror = () => reject(indexRequest.error);
-            });
-  
-            // Add the new vector key to the bucket
-            bucket.push(result);
-            await new Promise((resolve, reject) => {
-                const putRequest = hashIndexStore.put(bucket, hash);
-                putRequest.onsuccess = () => resolve();
-                putRequest.onerror = () => reject(putRequest.error);
-            });
-        }
-  
-        return result;
-    } catch (error) {
-        console.error('Database error during insertion:', error);
-        throw error; // Re-throw to signal error condition to caller
-    }
+    // Use indexDBOverlay to initialize stores
+    await indexDBOverlay.initializeDB(storeNames);
   }
-  
+
+   
+async insert(object) {
+  const vector = object[this.#vectorPath];
+  if (!Array.isArray(vector) && !(vector instanceof Int8Array)) {
+    throw new Error(`${this.#vectorPath} on 'object' is expected to be an Array or Int8Array`);
+  }
+
+  try {
+    if (!object.fileId) {
+      throw new Error('Cannot insert record without fileId');
+    }
+
+    // Generate a 4-char vector ID
+    const vectorId = generateUniqueId(4);
+    const recordToSave = {
+      id: vectorId,
+      fileId: object.fileId,
+      ...object
+    };
+    await indexDBOverlay.saveData(this.#objectStore, recordToSave);
+
+    // Save hash buckets with explicit keys
+    const hashes = this.#lsh.hashVector(vector);
+    for (let hash of hashes) {
+      const existingBucket = await indexDBOverlay.getItem(this.#hashIndexStore, hash);
+      
+      // Use Set to ensure unique vectorIds
+      const uniqueVectorIds = new Set(existingBucket?.vectorIds || []);
+      uniqueVectorIds.add(vectorId);
+
+      const hashBucket = {
+        vectorIds: Array.from(uniqueVectorIds)
+      };
+      
+      await indexDBOverlay.saveData(
+        this.#hashIndexStore, 
+        hashBucket,
+        hash
+      );
+    }
+
+    return {
+      vectorId,
+      fileId: object.fileId
+    };
+  } catch (error) {
+    console.error('Database error during insertion:', error);
+    throw error;
+  }
+}
+
   async delete(key) {
     if (key == null) {
-        throw new Error("Unable to delete object without a key");
+      throw new Error("Unable to delete object without a key");
     }
-  
-    const db = await this.#db;
-    const transaction = db.transaction([this.#objectStore, `${this.#objectStore}_hashIndex`], "readwrite");
-    const store = transaction.objectStore(this.#objectStore);
-    const hashIndexStore = transaction.objectStore(`${this.#objectStore}_hashIndex`);
-  
-    const object = await new Promise((resolve, reject) => {
-        const request = store.get(key);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-  
-    if (!object) {
+
+    try {
+      // Get the object first to get its vector for hash computation
+      const object = await indexDBOverlay.getItem(this.#objectStore, key);
+      if (!object) {
         throw new Error("Object not found with the provided key");
+      }
+
+      const vector = object[this.#vectorPath];
+      const hashKeys = this.#lsh.hashVector(vector);
+
+      // Remove from hash buckets
+      await Promise.all(hashKeys.map(async hashKey => {
+        const bucket = await indexDBOverlay.getItem(this.#hashIndexStore, hashKey) || [];
+        const index = bucket.indexOf(key);
+        if (index !== -1) {
+          bucket.splice(index, 1);
+          await indexDBOverlay.saveData(this.#hashIndexStore, hashKey, bucket);
+        }
+      }));
+
+      // Delete the main object
+      await indexDBOverlay.deleteItem(this.#objectStore, key);
+    } catch (error) {
+      console.error('Error during deletion:', error);
+      throw error;
     }
-  
-    const vector = object[this.#vectorPath];
-    const hashKeys = this.#lsh.hashVector(vector);
-  
-    // Remove the key from all hash buckets across multiple tables
-    await Promise.all(hashKeys.map(hashKey => this.removeFromBucket(hashIndexStore, key, hashKey)));
-  
-    // Finally, delete the object from the main store
-    return new Promise((resolve, reject) => {
-        const deleteRequest = store.delete(key);
-        deleteRequest.onsuccess = () => resolve();
-        deleteRequest.onerror = () => reject(deleteRequest.error);
-    });
   }
+
   
   async removeFromBucket(hashIndexStore, key, hashKey) {
     const bucket = await new Promise((resolve, reject) => {
@@ -225,125 +199,103 @@ const CURRENT_DB_VERSION = 2;
   
   
   
+ 
   async update(key, object) {
     if (key == null) {
-        throw new Error("Unable to update object without a key");
+      throw new Error("Unable to update object without a key");
     }
-  
+
     if (!(this.#vectorPath in object)) {
-        throw new Error(`${this.#vectorPath} expected to be present in the object being updated`);
+      throw new Error(`${this.#vectorPath} expected to be present in the object being updated`);
     }
-  
+
     if (!Array.isArray(object[this.#vectorPath]) && !(object[this.#vectorPath] instanceof Int8Array)) {
-        throw new Error(`${this.#vectorPath} on 'object' is expected to be an Array or Int8Array`);
+      throw new Error(`${this.#vectorPath} on 'object' is expected to be an Array or Int8Array`);
     }
-  
-    const db = await this.#db;
-    const transaction = db.transaction([this.#objectStore, `${this.#objectStore}_hashIndex`], "readwrite");
-    const store = transaction.objectStore(this.#objectStore);
-    const hashIndexStore = transaction.objectStore(`${this.#objectStore}_hashIndex`);
-  
-    const currentObjectRequest = store.get(key);
-  
-    return new Promise((resolve, reject) => {
-        currentObjectRequest.onsuccess = async () => {
-            const currentObject = currentObjectRequest.result;
-            if (!currentObject) {
-                reject(new Error("Object not found with the provided key"));
-                return;
-            }
-            const oldHashes = this.#lsh.hashVector(currentObject[this.#vectorPath]);
-            const newHashes = this.#lsh.hashVector(object[this.#vectorPath]);
-  
-            const updateRequest = store.put(object, key);
-            updateRequest.onsuccess = async () => {
-                try {
-                    for (let i = 0; i < this.#lsh.numTables; i++) {
-                        if (oldHashes[i] !== newHashes[i]) {
-                            await this.updateHashIndex(hashIndexStore, key, oldHashes[i], newHashes[i]);
-                        }
-                    }
-                    resolve(updateRequest.result); // Resolve with the update result
-                } catch (error) {
-                    reject(error);
-                }
-            };
-            updateRequest.onerror = () => reject(updateRequest.error);
-        };
-        currentObjectRequest.onerror = () => reject(currentObjectRequest.error);
-    });
-  }
-  
-  async updateHashIndex(hashIndexStore, key, oldHash, newHash) {
-    const oldBucketRequest = hashIndexStore.get(oldHash);
-    const oldBucket = await new Promise((resolve, reject) => {
-        oldBucketRequest.onsuccess = () => resolve(oldBucketRequest.result || []);
-        oldBucketRequest.onerror = () => reject(oldBucketRequest.error);
-    });
-  
-    const index = oldBucket.indexOf(key);
-    if (index !== -1) {
-        oldBucket.splice(index, 1);
-        await hashIndexStore.put(oldBucket, oldHash);
-    }
-  
-    const newBucketRequest = hashIndexStore.get(newHash);
-    const newBucket = await new Promise((resolve, reject) => {
-        newBucketRequest.onsuccess = () => resolve(newBucketRequest.result || []);
-        newBucketRequest.onerror = () => reject(newBucketRequest.error);
-    });
-  
-    newBucket.push(key);
-    await hashIndexStore.put(newBucket, newHash);
-  }
-  
-  
-  
-  async query(queryVector, options = { limit: 10 }) {
-    // console.log("Querying for vector:", queryVector, options);
-    const { limit } = options;
-    let collectedKeys = new Set();
-    let resultObjects = [];
-  
+
     try {
-        const db = await this.#db;
-        const transaction = db.transaction([this.#objectStore, `${this.#objectStore}_hashIndex`], "readonly");
-        const store = transaction.objectStore(this.#objectStore);
-        const hashIndexStore = transaction.objectStore(`${this.#objectStore}_hashIndex`);
-  
-        // Compute hashes for all tables
-        const hashes = this.#lsh.hashVector(queryVector);
-        for (let hash of hashes) {
-            const bucket = await new Promise((resolve, reject) => {
-                const indexRequest = hashIndexStore.get(hash);
-                indexRequest.onsuccess = () => resolve(indexRequest.result || []);
-                indexRequest.onerror = () => reject(indexRequest.error);
-            });
-  
-            // Process each key in the bucket if not already processed
-            for (let key of bucket) {
-                if (!collectedKeys.has(key)) {
-                    collectedKeys.add(key);
-                    const vector = await new Promise((resolve, reject) => {
-                        const vectorRequest = store.get(key);
-                        vectorRequest.onsuccess = () => resolve(vectorRequest.result);
-                        vectorRequest.onerror = () => reject(vectorRequest.error);
-                    });
-                    const similarity = cosineSimilarity(queryVector, vector[this.#vectorPath]);
-                    resultObjects.push({ object: vector, key, similarity });
-                }
-            }
+      // Get current object to compute old hashes
+      const currentObject = await indexDBOverlay.getItem(this.#objectStore, key);
+      if (!currentObject) {
+        throw new Error("Object not found with the provided key");
+      }
+
+      const oldHashes = this.#lsh.hashVector(currentObject[this.#vectorPath]);
+      const newHashes = this.#lsh.hashVector(object[this.#vectorPath]);
+
+      // Update hash indices
+      for (let i = 0; i < this.#lsh.numTables; i++) {
+        if (oldHashes[i] !== newHashes[i]) {
+          await this.updateHashIndex(key, oldHashes[i], newHashes[i]);
         }
-  
-        // Sort and limit results
-        resultObjects.sort((a, b) => b.similarity - a.similarity); // Descending order by similarity
-        return resultObjects.slice(0, limit);
+      }
+
+      // Update main object
+      await indexDBOverlay.saveData(this.#objectStore, object);
+      return key;
     } catch (error) {
-        console.error("Error during query operation:", error);
-        throw error; // Rethrow or handle error as needed
+      console.error('Error during update:', error);
+      throw error;
     }
   }
+  async updateHashIndex(key, oldHash, newHash) {
+    // Remove from old bucket
+    const oldBucket = await indexDBOverlay.getItem(this.#hashIndexStore, oldHash) || [];
+    const oldVectorIds = new Set(oldBucket.vectorIds || []);
+    oldVectorIds.delete(key);
+    await indexDBOverlay.saveData(this.#hashIndexStore, {
+      vectorIds: Array.from(oldVectorIds)
+    }, oldHash);
   
+    // Add to new bucket
+    const newBucket = await indexDBOverlay.getItem(this.#hashIndexStore, newHash) || [];
+    const newVectorIds = new Set(newBucket.vectorIds || []);
+    newVectorIds.add(key);
+    await indexDBOverlay.saveData(this.#hashIndexStore, {
+      vectorIds: Array.from(newVectorIds)
+    }, newHash);
+  }
+  
+
+  async query(queryVector, options = { limit: 10 }) {
+    const { limit } = options;
+    let collectedVectors = new Set();
+    let resultObjects = [];
+
+    try {
+      // Get hash buckets for query vector
+      const hashes = this.#lsh.hashVector(queryVector);
+      
+      for (let hash of hashes) {
+        const hashBucket = await indexDBOverlay.getItem(this.#hashIndexStore, hash);
+        if (!hashBucket || !hashBucket.vectorIds) continue;
+
+        // Process each vector ID in the bucket
+        for (let vectorId of hashBucket.vectorIds) {
+          if (!collectedVectors.has(vectorId)) {
+            collectedVectors.add(vectorId);
+            const vector = await indexDBOverlay.getItem(this.#objectStore, vectorId);
+            if (vector) {
+              const similarity = cosineSimilarity(queryVector, vector[this.#vectorPath]);
+              resultObjects.push({
+                vectorId,              // ID of the specific chunk/vector
+                fileId: vector.fileId, // ID of the original file
+                similarity,
+                object: vector
+              });
+            }
+          }
+        }
+      }
+
+      // Sort by similarity and limit results
+      resultObjects.sort((a, b) => b.similarity - a.similarity);
+      return resultObjects.slice(0, limit);
+    } catch (error) {
+      console.error("Error during query operation:", error);
+      throw error;
+    }
+  }
   
     get objectStore() {
       // Escape hatch.

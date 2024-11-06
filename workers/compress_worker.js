@@ -1,10 +1,9 @@
 // workers\compress_worker.js
-
 let idleTimeout;
 
 const terminateWorker = () => {
   clearTimeout(idleTimeout);
-  self.close(); // Terminates the worker
+  self.close();
 };
 
 self.onmessage = async function (event) {
@@ -21,16 +20,35 @@ self.onmessage = async function (event) {
       throw new Error("Invalid action");
     }
 
-    // Reset the idle timer
     clearTimeout(idleTimeout);
-    idleTimeout = setTimeout(terminateWorker, 30000); // Close worker after 30 seconds of inactivity
+    idleTimeout = setTimeout(terminateWorker, 30000);
   } catch (error) {
     self.postMessage({ success: false, error: error.message });
   }
 };
 
+async function createCompressionStream() {
+  try {
+    return new CompressionStream('brotli');
+  } catch (e) {
+    console.log('Brotli compression not supported, falling back to gzip');
+    return new CompressionStream('gzip');
+  }
+}
+
+async function createDecompressionStream(data) {
+  // Attempt to detect the compression method used
+  // You might want to pass this information along with the compressed data
+  try {
+    return new DecompressionStream('brotli');
+  } catch (e) {
+    console.log('Brotli decompression not supported, falling back to gzip');
+    return new DecompressionStream('gzip');
+  }
+}
+
 async function compressData(arrayBuffer) {
-  const stream = new CompressionStream("brotli");
+  const stream = await createCompressionStream();
   const writable = stream.writable.getWriter();
   writable.write(new Uint8Array(arrayBuffer));
   writable.close();
@@ -39,7 +57,7 @@ async function compressData(arrayBuffer) {
 }
 
 async function decompressData(arrayBuffer) {
-  const stream = new DecompressionStream("brotli");
+  const stream = await createDecompressionStream();
   const writable = stream.writable.getWriter();
   writable.write(new Uint8Array(arrayBuffer));
   writable.close();

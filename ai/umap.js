@@ -3,15 +3,27 @@ import { share3dDat } from '../ui/graph_v2/create.js';
 import { getSceneBoundingBox, updateSphereAndCubePositions } from '../ui/graph_v2/reorientScene.js';
 import indexDBOverlay from '../memory/local/file_worker';
 
+import config from '../configs/config.json';
+
 let umapWorker = null; // Lazy-loaded worker
 let inactivityTimeout = null; // Inactivity timer
+let isWorkerActive = false;
 
-// Function to initialize the UMAP worker only when needed
-function getUMAPWorker() {
+export function isUMAPWorkerActive() {
+    return isWorkerActive && umapWorker !== null;
+  }
+  async function getUMAPWorker() {
     if (!umapWorker) {
-        const UMAPWorker = require('../workers/umap_worker.js?worker');
-        umapWorker = new UMAPWorker();
-        console.log('UMAP worker initialized.');
+        try {
+            const { default: UMAPWorker } = await import('../workers/umap_worker.js?worker');
+            umapWorker = new UMAPWorker();
+            isWorkerActive = true;
+            console.log('UMAP worker initialized.');
+        } catch (error) {
+            console.error('Failed to load UMAP worker:', error);
+            isWorkerActive = false;
+            throw error;
+        }
     }
     resetInactivityTimeout();
     return umapWorker;
@@ -28,12 +40,12 @@ function terminateWorker() {
     if (umapWorker) {
         umapWorker.terminate();
         umapWorker = null;
-        console.log('UMAP worker terminated due to inactivity.');
+        isWorkerActive = false;
+        console.log('UMAP worker terminated.');
     }
 }
-
 // Wrapper to ensure the worker is initialized before performing actions
-function ensureWorkerInitialized() {
+async function ensureWorkerInitialized() {
     getUMAPWorker();
 }
 
@@ -87,9 +99,9 @@ export async function performUMAPAndUpdateScene(embeddings, labels) {
     }
 }
 
-// Function to send the scene bounding box to the UMAP worker
 export function sendSceneBoundingBoxToWorker() {
-    ensureWorkerInitialized();
+    if (!isWorkerActive || !umapWorker) return;
+    
     const { scene } = share3dDat();
     const sceneBoundingBox = getSceneBoundingBox(scene);
     umapWorker.postMessage({
@@ -101,24 +113,25 @@ export function sendSceneBoundingBoxToWorker() {
 // Function to initialize the database and fetch embeddings
 async function initDBAndFetchEmbeddings() {
     try {
-        await indexDBOverlay.openDB('summarizationDB', 2);
-        await indexDBOverlay.initializeDB(['summaries']);
-        const embeddings = await indexDBOverlay.getData('summaries', 'summarizationDB');
+        await indexDBOverlay.openDB(config.dbName);
+        await indexDBOverlay.initializeDB(Object.keys(config.dbStores));
+        
+        // Get embeddings from the summaries store using the configured DB
+        const embeddings = await indexDBOverlay.getData('summaries');
 
         if (embeddings && embeddings.length > 0) {
             const embeddingVectors = embeddings.map(item => item.embedding);
             const labels = embeddings.map(item => item.fileId);
             return { embeddings: embeddingVectors, labels };
         } else {
-            console.log('No embeddings found in the database.');
+            console.log(`No embeddings found in the ${config.dbName} database.`);
             return null;
         }
     } catch (error) {
-        console.error('Error initializing database or fetching embeddings:', error);
+        console.error(`Error initializing database ${config.dbName} or fetching embeddings:`, error);
         throw error;
     }
 }
-
 // Function to fetch embeddings and perform UMAP without updating the scene
 export async function fetchEmbeddingsAndPerformUMAPOnly() {
     try {
@@ -152,8 +165,10 @@ export function terminateWorkers() {
 export async function fetchDataAndPerformUMAP_projections() {
   try {
     ensureWorkerInitialized();
-    await indexDBOverlay.openDB('vectorDB_new');
+    await indexDBOverlay.openDB(config.dbName);
+    // await indexDBOverlay.initializeDB(['vectors', 'vectors_hashIndex']);
     await indexDBOverlay.initializeDB(['vectors', 'vectors_hashIndex']);
+
 
     const vectorsData = await indexDBOverlay.getData('vectors');
     const hashIndexData = await indexDBOverlay.getData('vectors_hashIndex');

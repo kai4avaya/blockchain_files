@@ -10,7 +10,8 @@
     "forceConsistentCasingInFileNames": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "useDefineForClassFields": true
+    "useDefineForClassFields": true,
+    "resolveJsonModule": true,
   },
  "include": ["**/*.ts", "**/*.d.ts", "ui/graph_v2/snapshot.js", "ui/components/codemirror_md/markdownEditor.js"],
   "exclude": ["node_modules"]

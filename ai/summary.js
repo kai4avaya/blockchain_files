@@ -1,3 +1,5 @@
+// ai\summary.js
+
 const summaryWorker = new Worker(new URL('../workers/summary_worker.js', import.meta.url), { type: 'module' });
 const dbWorker = new Worker('../workers/memory_worker.js');
 

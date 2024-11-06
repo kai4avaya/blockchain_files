@@ -2,18 +2,6 @@
 import { generateUniqueId } from "../utils/utils";
 import { getFileSystem } from "./collaboration/file_colab";
 import { orchestrateTextProcessing } from "../ai/text_orchestration.js";
-// import pako from "pako";
-
-// // Compress the ArrayBuffer
-// function compressData(arrayBuffer) {
-//   return pako.deflate(new Uint8Array(arrayBuffer));
-// }
-
-// // Decompress the data when retrieving
-// function decompressData(uint8Array) {
-//   return pako.inflate(uint8Array);
-// }
-
 
 let compressionWorker;
 let workerIdleTimeout;
@@ -120,14 +108,41 @@ function formatFileSize(bytes) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
+
+async function readFileContent(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        if (file.type === "application/pdf") {
+          resolve(reader.result); // ArrayBuffer for PDFs
+        } else {
+          resolve(reader.result); // Text for other files
+        }
+      } catch (error) {
+        reject(error);
+      }
+    };
+    reader.onerror = () => reject(reader.error);
+    
+    if (file.type === "application/pdf") {
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.readAsText(file);
+    }
+  });
+}
 async function processFile(fileEntry, id) {
+
+  console.log("processFile", id, fileEntry)
   return new Promise((resolve, reject) => {
     fileEntry.file(async (file) => {
       try {
         const fileSystem = getFileSystem();
-        const contentArrayBuffer = await readFileContent(file);
-        const compressedContent = compressData(contentArrayBuffer);
+        const content = await readFileContent(file);
+        const compressedContent = await compressData(content);
         
+        // First save to IndexedDB
         const fileMetadata = {
           id,
           name: file.name,
@@ -137,51 +152,21 @@ async function processFile(fileEntry, id) {
           version: 1,
           versionNonce: Math.floor(Math.random() * 1000000),
           isDeleted: false,
-          file: compressedContent.buffer,
+          content: compressedContent, // Save the actual content
         };
 
         await fileSystem.addOrUpdateItem(fileMetadata, "file");
-        addFileToTree(file);
-
-        let content;
-        if (file.type === "application/pdf") {
-          content = await file.arrayBuffer();
-        } else {
-          content = await file.text();
-        }
-
-        orchestrateTextProcessing(content, file, id);
-        await fileSystem.addOrUpdateItem(fileMetadata, "file");
-
+        
+        // Then process content for vectorization
+        await orchestrateTextProcessing(content, file, id);
+        
+        addFileToTree(fileMetadata);
         resolve();
       } catch (error) {
         console.error(`Error processing file ${id}:`, error);
         reject(error);
       }
     }, reject);
-  });
-}
-
-async function processFiles(files, uuids) {
-  const processPromises = files.map((file, i) => {
-    const id = uuids[i];
-    return processFile(file, id);
-  });
-
-  try {
-    await Promise.all(processPromises);
-    refreshFileTree();
-  } catch (error) {
-    console.error("Error processing files:", error);
-  }
-}
-
-function readFileContent(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsArrayBuffer(file);
   });
 }
 
@@ -201,7 +186,6 @@ export async function retrieveFile(id) {
     throw new Error(`File with id ${id} not found`);
   }
 }
-
 export function handleFileDrop(event) {
   event.preventDefault();
   const items = event.dataTransfer.items;
@@ -210,34 +194,53 @@ export function handleFileDrop(event) {
   const fileNames = [];
   const fileEntries = [];
 
+  // Generate IDs and collect basic info immediately
   for (let i = 0; i < items.length; i++) {
-    const item = items[i].webkitGetAsEntry();
+    const item = items[i];
+    const entry = item.webkitGetAsEntry();
     const uuid = generateUniqueId();
+    const file = item.getAsFile();
 
-    if (item) {
-
-      console.log("i am item in handleFileDrop", item);
+    if (file) {
+      files.push(file);
       fileIds.push(uuid);
-      fileNames.push(item.name);
-      fileEntries.push(item);
-
-      if (item.isFile) {
-        files.push(item);
-      } else if (item.isDirectory) {
-        queueItemForProcessing(() => processDirectory(item, uuid));
-      }
+      fileNames.push(file.name);
+      fileEntries.push(file);
     }
   }
 
-  if (files.length > 0) {
-    processFiles(files, fileIds);
-  }
+  // Process files in the background
+  setTimeout(() => {
+    processFiles(files, fileIds).catch(error => {
+      console.error("Background file processing error:", error);
+    });
+  }, 0);
 
-  if (!isProcessing) {
-    processQueue();
-  }
-
+  // Return IDs immediately
   return { fileIds, fileNames, fileEntries };
+}
+
+// Update processFiles to be more explicitly async
+async function processFiles(files, uuids) {
+  console.log("Processing files in background:", files);
+  const processPromises = files.map((file, i) => {
+    const id = uuids[i];
+    if (file instanceof File) {
+      return processFile({
+        file: (callback) => callback(file),
+        name: file.name,
+        isFile: true
+      }, id);
+    }
+    return processFile(file, id);
+  });
+
+  try {
+    await Promise.all(processPromises);
+    refreshFileTree();
+  } catch (error) {
+    console.error("Error in background file processing:", error);
+  }
 }
 
 function queueItemForProcessing(processingFunction) {

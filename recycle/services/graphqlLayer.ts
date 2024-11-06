@@ -1,5 +1,5 @@
 import { buildSchema, GraphQLArgs, graphql } from 'graphql';
-import { getData as fetchFromDB, saveData as saveToDB } from '../memory/local/dbgeneral'; // Assuming these are the actual data interaction functions
+import { getData as fetchFromDB, saveData as saveToDB } from '../../memory/local/dbgeneral'; // Assuming these are the actual data interaction functions
 
 
 

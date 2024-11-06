@@ -1,11 +1,13 @@
 
 import indexDBOverlay from '../memory/local/file_worker';
 import embeddingWorker from './embeddings.js';
+import config from '../configs/config.json';
+
 
 const BATCH_SIZE = 100;
 
 async function processEmbeddingsInBatches(
-  dbName = "summarizationDB",
+  dbName = config.dbName, 
   table = "summaries",
   fields = ['keywords', 'fileId', 'fileName'],
   dbVersion = 2
@@ -53,7 +55,7 @@ async function processEmbeddingsInBatches(
 
 // Backward compatible function
 export function processKeywordEmbeddings() {
-  return processEmbeddingsInBatches("summarizationDB", "summaries", ['keywords', 'fileId', 'fileName']);
+  return processEmbeddingsInBatches(config.dbName, "summaries", ['keywords', 'fileId', 'fileName']);
 }
 
 

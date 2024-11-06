@@ -1,46 +1,70 @@
-// import textProcessorWorker from './processText'
-// import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
-// import {summarizeText} from './summary'
+// text_orchestration.js
 
-// export async function orchestrateTextProcessing(content, file, id) {
-//     try {
-//         console.log("content: text_orchestration orchestrateTextProcessing...")
-//         const {chunks, text} = await textProcessorWorker.processText(content, file.type, id);
-//         console.log("TEXTPORCESSOR in text_orchestration")
-//         await embeddingResult(text, chunks, file, id);
-//         console.log("TEXTPORCESSOR in embedding")
-//         await summarizeTextAndStore(text, file, id);
-//         console.log("TEXTPORCESSOR in summarization")
+import textProcessorWorker from './processText'
+import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
+import { summarizeText } from './summary'
+import config from "../configs/config.json"
+
+export async function orchestrateTextProcessing(content, file, id) {
+    try {
+      // Initialize vector DB if not already done
+      await vectorDBGateway.initiate();
+      
+      // Process text into chunks
+      const { chunks, text } = await textProcessorWorker.processText(
+        content, 
+        file.type, 
+        id
+      );
+  
+      // Process embeddings
+      await embeddingResult(text, chunks, file, id);
+      
+      // Process summary
+      await summarizeTextAndStore(text, file, id);
+    } catch (error) {
+      console.error(`Error in orchestration for file ${id}:`, error);
+      throw error;
+    }
+  }
+
+  
 
 
-//     } catch (error) {
-//         console.error(`Error processing file ${id}:`, error);
-//         throw error; // Re-throw the error for the caller to handle
-//     }
-// }
+// Add error handling for vectorization
+async function embeddingResult(content, chunks, file, id) {
+  try {
+    if (!chunks || chunks.length === 0) {
+      console.error('No chunks to process for embeddings');
+      return;
+    }
 
-// async function embeddingResult(content, chunks, file, id) {
-//     try {
-//         const embeddingResult = await vectorDBGateway.quickStart({
-//             text: content,
-//             processedChunks: chunks,
-//             fileId: id,
-//             fileName: file.name,
-//             fileType: file.type
-//         });
-//         return embeddingResult;
-//     } catch (error) {
-//         console.error(`Error generating embeddings for file ${id}:`, error);
-//         throw error; // Re-throw the error for the caller to handle
-//     }
-// }
+    const embeddingResult = await vectorDBGateway.quickStart({
+      text: content,
+      processedChunks: chunks,
+      fileId: id,
+      fileName: file.name,
+      fileType: file.type,
+      task: "embeddings",
+    });
+
+    return embeddingResult;
+  } catch (error) {
+    console.error(`Embedding generation failed for file ${id}:`, error);
+    throw error;
+  }
+}
+
 
 // async function summarizeTextAndStore(content, file, id) {
 //     try {
+//         console.log(`Starting summarization for file ${id}`);
 //         const { summary, keywords } = await summarizeText(content, id, file.name);
+//         console.log(`Summarization completed for file ${id}`);
+//         console.log("Summary length:", summary.length);
+//         console.log("Number of keywords:", keywords.length);
 
-//         console.log("text_orchestration", summary, keywords);
-//         // Start embedding generation for the main vectorDB
+//         console.log(`Starting embedding generation for summary of file ${id}`);
 //         await vectorDBGateway.quickStart({
 //             text: content,
 //             processedChunks: [summary],
@@ -48,62 +72,20 @@
 //             fileName: file.name,
 //             fileType: file.type,
 //             summary: summary,
-//             keywords: keywords
-//         }, 'summaries', 'summarizationDB');
+//             keywords: keywords,
+//             task: "summary",
+//         }, 'summaries', config.dbName);
+//         console.log(`Embedding generation for summary completed for file ${id}`);
 
 //         return { summary, keywords };
 //     } catch (error) {
 //         console.error(`Error storing summary for file ${id}:`, error);
-//         throw error; // Re-throw the error for the caller to handle
+//         console.error("Error stack:", error.stack);
+//         throw error;
 //     }
 // }
 
 
-import textProcessorWorker from './processText'
-import * as vectorDBGateway from '../memory/vectorDB/vectorDbGateway'
-import { summarizeText } from './summary'
-
-// let textProcessorWorker;
-
-export async function orchestrateTextProcessing(content, file, id) {
-    try {
-
-        if (!textProcessorWorker) {
-            console.log("Initializing TextProcessorWorker");
-        }
-
-        const { chunks, text } = await textProcessorWorker.processText(content, file.type, id);
-        embeddingResult(text, chunks, file, id);
-
-        summarizeTextAndStore(text, file, id);
-    } catch (error) {
-        console.error(`Error processing file ${id}:`, error);
-        console.error("Error stack:", error.stack);
-        throw error;
-    }
-}
-async function embeddingResult(content, chunks, file, id) {
-    try {
-        
-        const embeddingResult = await vectorDBGateway.quickStart({
-            text: content,
-            processedChunks: chunks,
-            fileId: id,
-            fileName: file.name,
-            fileType: file.type,
-            task: "embeddings",
-        });
-        
-        console.log(`Embedding generation completed for file ${id}`);
-        console.log(`Embedding result:`, embeddingResult);
-        
-        return embeddingResult;
-    } catch (error) {
-        console.error(`Error generating embeddings for file ${id}:`, error);
-        console.error("Error stack:", error.stack);
-        throw error;
-    }
-}
 async function summarizeTextAndStore(content, file, id) {
     try {
         console.log(`Starting summarization for file ${id}`);
@@ -112,20 +94,24 @@ async function summarizeTextAndStore(content, file, id) {
         console.log("Summary length:", summary.length);
         console.log("Number of keywords:", keywords.length);
 
-        console.log(`Starting embedding generation for summary of file ${id}`);
-        await vectorDBGateway.quickStart({
-            text: content,
-            processedChunks: [summary],
+        // Create summary data object first
+        const summaryData = {
             fileId: id,
+            summary,
+            keywords,
             fileName: file.name,
             fileType: file.type,
-            summary: summary,
-            keywords: keywords,
-            task: "summary",
-        }, 'summaries', 'summarizationDB');
-        console.log(`Embedding generation for summary completed for file ${id}`);
+            timestamp: Date.now()
+        };
 
-        return { summary, keywords };
+        // Use addEmbeddingDirectly to handle both embedding generation and storage
+        const enrichedSummary = await vectorDBGateway.addEmbeddingDirectly(
+            summary,  // Pass the summary text to embed
+            summaryData
+        );
+
+        console.log(`Summary and embedding stored for file ${id}`);
+        return enrichedSummary;
     } catch (error) {
         console.error(`Error storing summary for file ${id}:`, error);
         console.error("Error stack:", error.stack);
