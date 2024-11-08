@@ -103,50 +103,49 @@ export class TabManager {
 
 
   
-  addTab() {
-    if (this.editors.length >= 4) {
-      alert('Maximum number of tabs (4) reached.');
-      return;
+    addTab() {
+      if (this.editors.length >= 4) {
+        alert('Maximum number of tabs (4) reached.');
+        return;
+      }
+
+      const tabIndex = this.editors.length;
+
+      // Create a new Y.Doc for the tab
+      const ydoc = new Y.Doc();
+      const ytext = ydoc.getText('codemirror');
+      const awareness = new Awareness(ydoc);
+
+      // Set initial content if needed
+      if (ytext.length === 0) {
+        ytext.insert(0, ''); // Or insert initial content
+      }
+
+      // Create a unique document ID for this tab
+      const docId = `tab-${tabIndex}`;
+
+      // Create a YjsPeerJSProvider for this tab, passing the docId
+      const yjsProvider = new YjsPeerJSProvider(ydoc, p2pSync, docId, awareness);
+
+      // Store Yjs instances
+      this.ydocs.push(ydoc);
+      this.ytexts.push(ytext);
+      this.awarenessList.push(awareness);
+      this.yjsProviders.push(yjsProvider);
+
+      // Create the editor state and view
+      const newState = createEditorState(ytext, awareness);
+      const newEditor = new EditorView({
+        state: newState,
+      });
+
+      this.editors.push(newEditor);
+
+      // Create and append the new tab
+      const newTab = this.createTab();
+      this.tabList.appendChild(newTab);
+      this.activateTab(tabIndex);
     }
-
-    const tabIndex = this.editors.length;
-
-    // Create a new Y.Doc for the tab
-    const ydoc = new Y.Doc();
-    const ytext = ydoc.getText('codemirror');
-    const awareness = new Awareness(ydoc);
-
-    // Set initial content if needed
-    if (ytext.length === 0) {
-      ytext.insert(0, ''); // Or insert initial content
-    }
-
-    // Create a unique document ID for this tab
-    const docId = `tab-${tabIndex}`;
-
-    // Create a YjsPeerJSProvider for this tab, passing the docId
-    const yjsProvider = new YjsPeerJSProvider(ydoc, p2pSync, docId);
-
-    // Store Yjs instances
-    this.ydocs.push(ydoc);
-    this.ytexts.push(ytext);
-    this.awarenessList.push(awareness);
-    this.yjsProviders.push(yjsProvider);
-
-    // Create the editor state and view
-    const newState = createEditorState(ytext, awareness);
-    const newEditor = new EditorView({
-      state: newState,
-    });
-
-    this.editors.push(newEditor);
-
-    // Create and append the new tab
-    const newTab = this.createTab();
-    this.tabList.appendChild(newTab);
-    this.activateTab(tabIndex);
-  }
-
   activateTab(index: number) {
     if (index < 0 || index >= this.editors.length) {
       console.error('Invalid tab index:', index);
@@ -197,6 +196,11 @@ export class TabManager {
             this.clearTabHighlights();
             
             const fromIndex = source.data.index as number;
+
+             // Add early return if source is not a valid tab
+            //   if (fromIndex < 0 || fromIndex >= this.editors.length) {
+            //     return;
+            // }
             const tabElements = Array.from(this.tabList.children);
             const dropX = location.current.input.clientX;
             
@@ -251,7 +255,7 @@ export class TabManager {
   private moveTab(fromIndex: number, toIndex: number) {
     // Ensure toIndex is valid before any operations
     const finalIndex = Math.min(toIndex, this.editors.length - 1);
-
+    console.log("moving tab yeowser boom!")
     // Reorder the editors array
     this.editors = reorder({
         list: this.editors,

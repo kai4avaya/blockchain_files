@@ -617,9 +617,18 @@ function setupDragAndDrop() {
     resetCubeHighlight();
     removeGhostCube();
   });
-
-  
+  canvas.addEventListener('tabDrop', dropExporter);
 }
+
+export function dropExporter(event) {
+  // Handle both regular events and custom events with detail
+  const processEvent = event.detail || event;
+  
+  handleFileDrop_sphere(processEvent);
+  removeGhostCube();
+  onPointerUp(processEvent);
+}
+
 
 let clickStartTime = 0;
 // const CLICK_DURATION_THRESHOLD = 200; // milliseconds
