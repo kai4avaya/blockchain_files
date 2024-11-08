@@ -142,6 +142,7 @@ async function processFile(fileEntry, id) {
         const content = await readFileContent(file);
         const compressedContent = await compressData(content);
         
+        console.log("File processed: compressing")
         // First save to IndexedDB
         const fileMetadata = {
           id,
@@ -155,11 +156,16 @@ async function processFile(fileEntry, id) {
           content: compressedContent, // Save the actual content
         };
 
+        console.log("File processed: here is the metadata", fileMetadata);
+
+
         await fileSystem.addOrUpdateItem(fileMetadata, "file");
         
+        console.log("File processed:", fileMetadata);
         // Then process content for vectorization
         await orchestrateTextProcessing(content, file, id);
         
+        console.log("File processed:", "orchestrateTextProcessing");
         addFileToTree(fileMetadata);
         resolve();
       } catch (error) {

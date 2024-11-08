@@ -816,21 +816,11 @@ async function onPointerUp(event) {
     distanceMoved < DRAG_THRESHOLD &&
     clickDuration < CLICK_DURATION_THRESHOLD;
 
-  console.log(
-    "Is click:",
-    isClick,
-    "Distance moved:",
-    distanceMoved,
-    "Click duration:",
-    clickDuration
-  );
 
   if (isClick && selectedSphere) {
-    console.log("Click detected on sphere:", selectedSphere);
     toggleBloom(selectedSphere);
     console.log("After toggling, layers.mask:", selectedSphere.layers.mask);
   } else if (isDragging || isFileDragging) {
-    console.log("Drag or file drag detected");
     isDragging = false;
     isFileDragging = false;
 
@@ -842,10 +832,6 @@ async function onPointerUp(event) {
     resetCubeHighlight();
     diffSceneChanges(scene, nonBloomScene, sceneSnapshot);
   }
-
-  // if (event.target.hasPointerCapture(event.pointerId)) {
-  //   event.target.releasePointerCapture(event.pointerId);
-  // }
 
   if (event.pointerId !== undefined && event.target?.hasPointerCapture) {
     try {
@@ -877,7 +863,6 @@ function handleSphereDragEnd(sphere, ghostCube) {
       sphere.position.copy(cubePosition.clone().add(offset));
 
       // Resize the existing cube to fit the new sphere
-      // resizeCubeToFitSpheres(existingCube);
     } else {
       // Create a new cube to contain the sphere
       const cubeSize = sphereRadius * RESCALEFACTOR;
@@ -911,18 +896,12 @@ const onPointerMove = (event) => {
   const deltaX = event.clientX - initialPointerPosition.x;
   const deltaY = event.clientY - initialPointerPosition.y;
   const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-  console.log(
-    "distanceMoved > DRAG_THRESHOLD",
-    distanceMoved > DRAG_THRESHOLD,
-    distanceMoved,
-    DRAG_THRESHOLD
-  );
+
 
   if (distanceMoved > DRAG_THRESHOLD) {
     isDragging = true;
     // isClicking = false; // No longer a click, it's a drag
     controls.enabled = false; // Disable controls during drag
-    console.log("Drag started");
   }
 
   if (isDragging) {
@@ -1000,7 +979,6 @@ function setupPointerEvents() {
     : 16;
   canvas.addEventListener("pointermove", throttle(onPointerMove, throttleTime));
   canvas.addEventListener("pointerup", onPointerUp);
-  // document.addEventListener("pointerup", onPointerUp);
 }
 
 setupPointerEvents();

@@ -102,6 +102,7 @@ class FileSystem {
       await new Promise<void>(resolve => this.onReady(resolve));
     }
 
+    console.log("applyUpdate update", update)
     if (update.files) {
       this.snapshot.files = this.mergeItems(this.snapshot.files, update.files);
       await indexDBOverlay.saveData('files', this.snapshot.files);
