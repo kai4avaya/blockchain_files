@@ -215,7 +215,6 @@ function createLabel(text) {
     pointer-events: none;
     white-space: nowrap;
     transform: translate(-50%, -100%);
-    z-index: 1000;
   `;
   return new CSS2DObject(labelDiv);
 }

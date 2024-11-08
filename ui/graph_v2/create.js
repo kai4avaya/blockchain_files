@@ -272,20 +272,38 @@ function setLightingBasedOnTime(scene, nonBloomScene) {
   nonBloomScene.add(directionalLightClone);
 }
 
-function setBackgroundBasedOnTime(scene, nonBloomScene) {
-  const timeOfDay = getCurrentTimeOfDay();
-  let bgColor;
+// function setBackgroundBasedOnTime(scene, nonBloomScene) {
+//   const timeOfDay = getCurrentTimeOfDay();
+//   let bgColor;
 
-  if (timeOfDay === 'day') {
-    bgColor = new THREE.Color(0x87CEEB); // Sky blue
-  } else {
-    bgColor = new THREE.Color(0x000000); // Black
-  }
+//   if (timeOfDay === 'day') {
+//     bgColor = new THREE.Color(0x87CEEB); // Sky blue
+//   } else {
+//     scene.background = new THREE.Color(0x0A0A0A); // Black
+//   }
 
-  scene.background = bgColor;
-  nonBloomScene.background = bgColor;
-  renderer.setClearColor(bgColor);
-}
+//   scene.background = bgColor;
+//   nonBloomScene.background = bgColor;
+//   renderer.setClearColor(bgColor);
+// }
+
+// function setBackgroundBasedOnTime(scene, nonBloomScene) {
+//   const timeOfDay = getCurrentTimeOfDay();
+//   let bgColor;
+
+//   if (timeOfDay === 'day') {
+//     // Soft daylight gradient
+//     renderer.setClearColor(0x87CEEB, 1); // Sky blue
+//   } else {
+//     // Night gradient - deep dark blue that works well with bloom
+//     renderer.setClearColor(0x0A0A14, 1); // Deep night blue
+//   }
+
+//   // Set same background for both scenes to maintain consistency
+//   scene.background = new THREE.Color(renderer.getClearColor());
+//   nonBloomScene.background = new THREE.Color(renderer.getClearColor());
+// }
+
 
 
 
@@ -644,8 +662,6 @@ labelDiv.style.pointerEvents = 'auto';
   markNeedsRender();
 
   console.log("i am created sphere", sphere)
-  console.log("Sphere created:", sphere);
-  console.log("Initial sphere layers:", sphere.layers.mask);
   return { sphere };
 }
 
@@ -809,6 +825,35 @@ const RENDER_STATES = {
 let renderState = RENDER_STATES.NONE;
 let needsLabelUpdate = false;
 
+function setBackgroundBasedOnTime(scene, nonBloomScene) {
+  const timeOfDay = getCurrentTimeOfDay();
+  let bgColor;
+
+  // Convert decimal time to color
+  if (timeOfDay > 0.6 && timeOfDay < 0.8) {
+    // Evening/Dusk
+    bgColor = new THREE.Color(0x1a1a2e); // Deep blue evening
+  } else if (timeOfDay >= 0.8 || timeOfDay < 0.2) {
+    // Night
+    bgColor = new THREE.Color(0x0A0A14); // Deep night blue
+  } else if (timeOfDay >= 0.2 && timeOfDay < 0.4) {
+    // Dawn
+    bgColor = new THREE.Color(0x2a2a4a); // Lighter blue dawn
+  } else {
+    // Day
+    bgColor = new THREE.Color(0x87CEEB); // Sky blue
+  }
+
+  renderer.setClearColor(bgColor, 1);
+  scene.background = bgColor;
+  nonBloomScene.background = bgColor;
+
+  // markNeedsRender();
+}
+
+
+
+
 // Replace your current throttledRender
 const throttledRender = throttle(() => {
   // Skip if no updates needed
@@ -856,7 +901,9 @@ const throttledRender = throttle(() => {
   });
 
   // Render bloom pass only for visible objects
-  renderer.setClearColor(0x000000, 0);
+  // renderer.setClearColor(0x000000, 0);
+  // renderer.setClearColor(0x050510, 1);
+  setBackgroundBasedOnTime(scene, nonBloomScene);
   bloomComposer.renderToScreen = false;
 
   bloomObjects.forEach((layerMask, obj) => {

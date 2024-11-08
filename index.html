@@ -1131,6 +1131,7 @@
       height: 40px;
       background-color: rgba(0, 123, 255, 0.3);
       border-radius: 2px;
+      z-index: 99999
     }
 
     /* Optional: Add dots pattern for better visibility */
@@ -1153,6 +1154,113 @@
   overflow: hidden;
 }
   </style>
+
+<style>
+.editor-button-group {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  /* z-index: 10; */
+  z-index: 1; 
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05),
+              0 1px 3px rgba(0, 0, 0, 0.1),
+              inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+  .editor-btn {
+    background: transparent;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .editor-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: #666;
+  }
+
+  .editor-btn:hover {
+    background: #e6f3ff;
+  }
+
+  .editor-btn:hover svg {
+    stroke: #0066cc;
+  }
+
+  .dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+  
+.dropdown-content {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  min-width: 140px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  padding: 4px 0;
+}
+
+  .dropdown:hover .dropdown-content {
+    display: block;
+  }
+
+  /* Create a padding gap to allow mouse movement to menu */
+.dropdown::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+
+
+  .dropdown-content a {
+    color: #333;
+    padding: 10px 16px;
+    text-decoration: none;
+    display: block;
+    transition: all 0.2s;
+  }
+
+  .dropdown-content a:hover {
+    background: #e6f3ff;
+    color: #0066cc;
+  }
+
+  .dropdown:hover .dropdown-content,
+.dropdown-content:hover {
+  display: block;
+}
+
+  .label {
+    z-index: 99999 !important;
+  }
+
+  
+</style>
+
+
+
   <script type="x-shader/x-vertex" id="vertexshader">
       varying vec2 vUv;
       void main() {
@@ -1318,12 +1426,40 @@
     <div id="overlay" class="overlay" style="display: none;"></div>
 
     <div class="slideout" id="chatSlideout">
+      
       <div class="resize-handle">
         <div class="handle-line"></div>
       </div>
       <div class="slideout-content" id="slideoutContent">
         <!-- Editor content will go here -->
       </div>
+
+
+      <!-- BUTTONS -->
+
+      <div class="editor-button-group">
+        <button class="editor-btn copy-btn" title="Copy content">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+          </svg>
+        </button>
+        <button class="editor-btn share-btn" title="Share via email">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+          </svg>
+        </button>
+        <div class="dropdown">
+          <button class="editor-btn download-btn" title="Download">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+          </button>
+          <div class="dropdown-content">
+            <a href="#" class="download-md">Markdown</a>
+            <a href="#" class="download-pdf">PDF</a>
+          </div>
+        </div>
+      <!-- END OF BUTTONS -->
     </div>
   </div>
 
