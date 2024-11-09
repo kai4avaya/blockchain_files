@@ -66,11 +66,19 @@ const nonBloomRT = new THREE.WebGLRenderTarget(
 const darkMaterial = new THREE.MeshBasicMaterial({ color: "black" });
 const materials = {};
 // const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+// const renderer = new THREE.WebGLRenderer({
+//   antialias: false,
+//   powerPreference: "high-performance",
+//   failIfMajorPerformanceCaveat: false,
+//   preserveDrawingBuffer: true,
+// });
+
 const renderer = new THREE.WebGLRenderer({
   antialias: false,
   powerPreference: "high-performance",
   failIfMajorPerformanceCaveat: false,
   preserveDrawingBuffer: true,
+  alpha: true, // Add this line
 });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -882,158 +890,19 @@ const RENDER_STATES = {
 let renderState = RENDER_STATES.NONE;
 let needsLabelUpdate = false;
 
-// function setBackgroundBasedOnTime(scene, nonBloomScene) {
-//   const timeOfDay = getCurrentTimeOfDay();
-//   console.log("time of day", timeOfDay);
-//   let bgColor;
-
-//   // Convert decimal time to color
-//   if (timeOfDay > 0.6 && timeOfDay < 0.8) {
-//     // Evening/Dusk
-//     bgColor = new THREE.Color(0x1a1a2e); // Deep blue evening
-//   } else if (timeOfDay >= 0.8 || timeOfDay < 0.2) {
-//     // Night
-//     bgColor = new THREE.Color(0x0A0A14); // Deep night blue
-//   } else if (timeOfDay >= 0.2 && timeOfDay < 0.4) {
-//     // Dawn
-//     bgColor = new THREE.Color(0x2a2a4a); // Lighter blue dawn
-//   } else {
-//     // Day
-//     bgColor = new THREE.Color(0x87CEEB); // Sky blue
-//   }
-
-//   renderer.setClearColor(bgColor, 1);
-//   scene.background = bgColor;
-//   nonBloomScene.background = bgColor;
-
-// }
-
-// function setBackgroundBasedOnTime(scene, nonBloomScene) {
-//   const timeOfDay = getCurrentTimeOfDay();
-//   console.log("time of day", timeOfDay);
-
-//   let bgColor;
-
-//   // Enhanced color values for better visibility
-//   if (timeOfDay > 0.6 && timeOfDay < 0.8) {
-//     // Evening/Dusk - warmer deep blue
-//     bgColor = new THREE.Color(0x2a2a4d);
-//   } else if (timeOfDay >= 0.8 || timeOfDay < 0.2) {
-//     // Night - slightly lighter than pure black
-//     bgColor = new THREE.Color(0x111122);
-//   } else if (timeOfDay >= 0.2 && timeOfDay < 0.4) {
-//     // Dawn - soft purple-blue
-//     bgColor = new THREE.Color(0x3a3a6a);
-//   } else {
-//     // Day - lighter sky blue
-//     bgColor = new THREE.Color(0x9dc5dd);
-//   }
-//   // renderer.setClearColor(0x050510, 1);
-//   // renderer.setClearColor(bgColor, 1);
-//   // scene.background = bgColor;
-//   // nonBloomScene.background = bgColor;
-// }
-
 let timeOfDay;
 let prevTimeOfDay;
-// function setBackgroundBasedOnTime(scene, nonBloomScene) {
-//   console.log("time of day", timeOfDay);
-
-//   let bgColor;
-//   const fallbackColor = new THREE.Color(0x050510);
-
-//   try {
-//     if (timeOfDay >= 0.0 && timeOfDay < 0.1) {
-//       bgColor = new THREE.Color(0x2a2a4d);
-//     } else if (timeOfDay >= 0.1 && timeOfDay < 0.2) {
-//       bgColor = new THREE.Color(0x252550);
-//     } else if (timeOfDay >= 0.2 && timeOfDay < 0.3) {
-//       bgColor = new THREE.Color(0x202045);
-//     } else if (timeOfDay >= 0.3 && timeOfDay < 0.4) {
-//       // Early morning - increased visibility
-//       bgColor = new THREE.Color(0x2a2a4d);
-//     } else if (timeOfDay >= 0.4 && timeOfDay < 0.5) {
-//       bgColor = new THREE.Color(0x101035);
-//     } else if (timeOfDay >= 0.5 && timeOfDay < 0.6) {
-//       bgColor = new THREE.Color(0x0e0e30);
-//     } else if (timeOfDay >= 0.6 && timeOfDay < 0.7) {
-//       bgColor = new THREE.Color(0x0c0c25);
-//     } else if (timeOfDay >= 0.7 && timeOfDay < 0.8) {
-//       bgColor = new THREE.Color(0x0a0a20);
-//     } else if (timeOfDay >= 0.8 && timeOfDay < 0.9) {
-//       bgColor = new THREE.Color(0x080815);
-//     } else if (timeOfDay >= 0.9 && timeOfDay <= 1.0) {
-//       bgColor = new THREE.Color(0x050510);
-//     }
-
-// //     bgColor = new THREE.Color(0x252550); // Alternative deep blue
-// // // or
-// //
-
-//     renderer.setClearColor(bgColor, 1);
-//     scene.background = bgColor;
-//     nonBloomScene.background = null;
-
-//   } catch (error) {
-//     console.warn('Using fallback color', error);
-//     renderer.setClearColor(fallbackColor, 1);
-//     scene.background = fallbackColor;
-//     // nonBloomScene.background = fallbackColor;
-//   }
-// }
-
-// function setBackgroundBasedOnTime(scene, nonBloomScene) {
-//   let bgColor;
-//   const fallbackColor = new THREE.Color(0x1a1a2e);
-//   console.log("time of day", timeOfDay)
-
-//   try {
-//     if (timeOfDay >= 0.0 && timeOfDay < 0.1) {
-//       bgColor = new THREE.Color(0x1a1a2e); // Deep night blue
-//     } else if (timeOfDay >= 0.1 && timeOfDay < 0.2) {
-//       bgColor = new THREE.Color(0x202040); // Late night
-//     } else if (timeOfDay >= 0.2 && timeOfDay < 0.3) {
-//       bgColor = new THREE.Color(0x2a2a4d); // Dawn approaching
-//     } else if (timeOfDay >= 0.3 && timeOfDay < 0.4) {
-//       bgColor = new THREE.Color(0x3a3a6d); // Early morning
-//     } else if (timeOfDay >= 0.4 && timeOfDay < 0.5) {
-//       bgColor = new THREE.Color(0x4a4a8d); // Morning
-//     } else if (timeOfDay >= 0.5 && timeOfDay < 0.6) {
-//       bgColor = new THREE.Color(0x5656b8); // Midday
-//     } else if (timeOfDay >= 0.6 && timeOfDay < 0.7) {
-//       bgColor = new THREE.Color(0x4a4a8d); // Late afternoon
-//     } else if (timeOfDay >= 0.7 && timeOfDay < 0.8) {
-//       bgColor = new THREE.Color(0x3a3a6d); // Dusk
-//     } else if (timeOfDay >= 0.8 && timeOfDay < 0.9) {
-//       bgColor = new THREE.Color(0x2a2a4d); // Evening
-//     } else if (timeOfDay >= 0.9 && timeOfDay <= 1.0) {
-//       bgColor = new THREE.Color(0x1a1a2e); // Night
-//     }
-
-//     renderer.setClearColor(bgColor, 1);
-//     scene.background = bgColor;
-//     nonBloomScene.background = null;
-
-//   } catch (error) {
-//     console.warn('Using fallback color', error);
-//     renderer.setClearColor(fallbackColor, 1);
-//     scene.background = fallbackColor;
-//     nonBloomScene.background = null;
-//   }
-//   markNeedsRender('cubeRemoval');
-
-//    // Force initial render
-//   //  markNeedsRender('cubeRemoval');
-// }
 
 function setBackgroundBasedOnTime(scene, nonBloomScene) {
   const nightColors = {
     deepNight: new THREE.Color(0x2a2a4d),
     twilight: new THREE.Color(0x3a3a6d),
-    dawn: new THREE.Color(0x4a4a8d),
-    morning: new THREE.Color(0x5656b8),
+    dawn: new THREE.Color(0x2a2a4d),
+    morning: new THREE.Color(0x3a3a6d),    // Darke
     noon: new THREE.Color(0x6464c8),
   };
+
+  console.log("time of day", timeOfDay)
 
   // Label colors that contrast with backgrounds
   const labelColors = {
@@ -1064,9 +933,23 @@ function setBackgroundBasedOnTime(scene, nonBloomScene) {
     labelColor = labelColors.noon;
   }
 
-  renderer.setClearColor(bgColor, 1);
+  // renderer.setClearColor(bgColor, 1);
+  renderer.setClearColor(bgColor, 0); // Set alpha to 0 for transparency
   scene.background = bgColor;
-  nonBloomScene.background = bgColor;
+  // nonBloomScene.background = bgColor;
+
+   // Set transparent background for nonBloomScene
+  //  nonBloomScene.background = new THREE.Color(0x000000);
+  //  nonBloomScene.background.alpha = 0;
+
+  nonBloomScene.background = null;
+
+  nonBloomScene.traverse((object) => {
+    if (object.material) {
+      object.material.transparent = true;
+      object.material.needsUpdate = true;
+    }
+  });
 
 
   // Update all labels in the scene
@@ -1076,7 +959,8 @@ function setBackgroundBasedOnTime(scene, nonBloomScene) {
     }
   });
 
-  markNeedsRender("cubeRemoval");
+  // markNeedsRender("cubeRemoval");
+  markNeedsRender("full");
 }
 
 // Replace your current throttledRender
@@ -1288,6 +1172,39 @@ function restoreMaterial(obj) {
 //   updateMiniMap();
 // }
 let isCubeRender = false;
+// export function markNeedsRender(type = "full") {
+//   isCubeRender = false;
+//   switch (type) {
+//     case "matrix":
+//       renderState = Math.max(renderState, RENDER_STATES.NEEDS_MATRIX_UPDATE);
+//       break;
+//     case "labels":
+//       needsLabelUpdate = true;
+//       break;
+//     case "cubeRemoval":
+//       // Special case for cube removal with full cleanup
+//       renderer.renderLists.dispose();
+//       renderer.clear();
+//       renderer.info.reset();
+//       scene.updateMatrixWorld(true);
+//       nonBloomScene.updateMatrixWorld(true);
+//       bloomComposer.render();
+//       finalComposer.render();
+//       isCubeRender = true;
+//       renderState = RENDER_STATES.NEEDS_FULL_RENDER;
+//       // render();
+//       break;
+//     case "full":
+//     default:
+//       renderState = RENDER_STATES.NEEDS_FULL_RENDER;
+//       renderCount = 1;
+//       if (updateMiniMap) {
+//         updateMiniMap();
+//       }
+//   }
+// }
+
+
 export function markNeedsRender(type = "full") {
   isCubeRender = false;
   switch (type) {
@@ -1297,19 +1214,19 @@ export function markNeedsRender(type = "full") {
     case "labels":
       needsLabelUpdate = true;
       break;
-    case "cubeRemoval":
-      // Special case for cube removal with full cleanup
-      renderer.renderLists.dispose();
-      renderer.clear();
-      renderer.info.reset();
-      scene.updateMatrixWorld(true);
-      nonBloomScene.updateMatrixWorld(true);
-      bloomComposer.render();
-      finalComposer.render();
-      isCubeRender = true;
-      renderState = RENDER_STATES.NEEDS_FULL_RENDER;
-      // render();
-      break;
+      case "cubeRemoval":
+            // Special case for cube removal with full cleanup
+            renderer.renderLists.dispose();
+            renderer.clear();
+            renderer.info.reset();
+            scene.updateMatrixWorld(true);
+            nonBloomScene.updateMatrixWorld(true);
+            bloomComposer.render();
+            finalComposer.render();
+            isCubeRender = true;
+            renderState = RENDER_STATES.NEEDS_FULL_RENDER;
+            // render();
+            break;
     case "full":
     default:
       renderState = RENDER_STATES.NEEDS_FULL_RENDER;

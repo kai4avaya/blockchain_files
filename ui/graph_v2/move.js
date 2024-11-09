@@ -1081,6 +1081,7 @@ function cleanupOldCubes() {
 
   cubesToDelete?.forEach((cube) => {
     if (!cube.wireframe) return;
+    
     cube.wireframe.isDeleted = true;
     cube.solid.isDeleted = true;
   });
