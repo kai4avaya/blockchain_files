@@ -1,7 +1,10 @@
 // create.js
 
 import * as THREE from "three";
-import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import {
+  CSS2DRenderer,
+  CSS2DObject,
+} from "three/addons/renderers/CSS2DRenderer.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -9,14 +12,27 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
-import { makeObjectWritable, convertToThreeJSFormat, getCurrentTimeOfDay, calculateDistance,throttle   } from "../../utils/utils";
-import {labelListerners} from './move.js'
-import { createSceneSnapshot, findSpheresInCube,logSceneContents } from "./snapshot.js";
-import { isUMAPWorkerActive, sendSceneBoundingBoxToWorker } from '../../ai/umap.js'
-import MouseOverlayCanvas from './MouseOverlayCanvas';
+import {
+  makeObjectWritable,
+  convertToThreeJSFormat,
+  getCurrentTimeOfDay,
+  calculateDistance,
+  throttle,
+} from "../../utils/utils";
+import { labelListerners } from "./move.js";
+import {
+  createSceneSnapshot,
+  findSpheresInCube,
+  logSceneContents,
+} from "./snapshot.js";
+import {
+  isUMAPWorkerActive,
+  sendSceneBoundingBoxToWorker,
+} from "../../ai/umap.js";
+import MouseOverlayCanvas from "./MouseOverlayCanvas";
 // import {getScaleFactorForDistance} from './reorientScene.js'  // KAI USE THIS see if orbit fixes
 // import {logSceneInfo} from "../../utils/sceneCoordsUtils.js"
-import { Frustum, Matrix4 } from 'three';
+import { Frustum, Matrix4 } from "three";
 const frustum = new Frustum();
 const projScreenMatrix = new Matrix4();
 
@@ -25,7 +41,7 @@ export const ENTIRE_SCENE = 0;
 export const BLOOM_SCENE = 1;
 const bloomLayer = new THREE.Layers();
 bloomLayer.set(BLOOM_SCENE);
-const SCALEFACTOR = 0.05
+const SCALEFACTOR = 0.05;
 
 export const scene = new THREE.Scene();
 export const nonBloomScene = new THREE.Scene();
@@ -50,24 +66,26 @@ const nonBloomRT = new THREE.WebGLRenderTarget(
 const darkMaterial = new THREE.MeshBasicMaterial({ color: "black" });
 const materials = {};
 // const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
-const renderer = new THREE.WebGLRenderer({ 
-  antialias: false, 
+const renderer = new THREE.WebGLRenderer({
+  antialias: false,
   powerPreference: "high-performance",
   failIfMajorPerformanceCaveat: false,
-  preserveDrawingBuffer: true
+  preserveDrawingBuffer: true,
 });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ReinhardToneMapping;
-renderer.domElement.addEventListener('webglcontextlost', (event) => {
-  event.preventDefault();
-  setTimeout(() => {
+renderer.domElement.addEventListener(
+  "webglcontextlost",
+  (event) => {
+    event.preventDefault();
+    setTimeout(() => {
       renderer.forceContextRestore();
-  }, 1000);
-}, false);
+    }, 1000);
+  },
+  false
+);
 document.body.appendChild(renderer.domElement);
-
-
 
 const camera = new THREE.PerspectiveCamera(
   40,
@@ -76,19 +94,22 @@ const camera = new THREE.PerspectiveCamera(
   1000 // Increased Far Clipping Plane
 );
 
-
 camera.position.set(0, 0, 20);
 camera.lookAt(0, 0, 0);
 
 const labelRenderer = new CSS2DRenderer();
 labelRenderer.setSize(window.innerWidth, window.innerHeight);
-labelRenderer.domElement.style.position = 'absolute';
-labelRenderer.domElement.style.top = '0px';
-labelRenderer.domElement.style.pointerEvents = 'none'; // Allows mouse events to pass through
+labelRenderer.domElement.style.position = "absolute";
+labelRenderer.domElement.style.top = "0px";
+labelRenderer.domElement.style.pointerEvents = "none"; // Allows mouse events to pass through
 document.body.appendChild(labelRenderer.domElement);
 
 // const controls = new OrbitControls(camera, renderer.domElement);
-const controls = new OrbitControls(camera, renderer.domElement, labelRenderer.domElement);
+const controls = new OrbitControls(
+  camera,
+  renderer.domElement,
+  labelRenderer.domElement
+);
 
 controls.maxPolarAngle = Math.PI * 0.5;
 // controls.minDistance = 1;
@@ -205,11 +226,11 @@ function getCachedMaterial(type, params) {
   const key = `${type}-${JSON.stringify(params)}`;
   if (!materialCache.has(key)) {
     let material;
-    switch(type) {
-      case 'basic':
+    switch (type) {
+      case "basic":
         material = new THREE.MeshBasicMaterial(params);
         break;
-      case 'line':
+      case "line":
         material = new THREE.LineBasicMaterial(params);
         break;
     }
@@ -217,7 +238,6 @@ function getCachedMaterial(type, params) {
   }
   return materialCache.get(key);
 }
-
 
 const updateMiniMap = createMiniMap(scene, nonBloomScene, camera, renderer);
 
@@ -233,7 +253,12 @@ function createEnvironment() {
   // Create a large grid
   const gridSize = 1000;
   const gridDivisions = 100;
-  const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x444444, 0x444444);
+  const gridHelper = new THREE.GridHelper(
+    gridSize,
+    gridDivisions,
+    0x444444,
+    0x444444
+  );
   scene.add(gridHelper);
 
   // Add ambient light
@@ -244,7 +269,6 @@ function createEnvironment() {
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
   directionalLight.position.set(1, 1, 1).normalize();
   scene.add(directionalLight);
-
 }
 // function setLightingBasedOnTime(scene, nonBloomScene) {
 //   const timeOfDay = getCurrentTimeOfDay();
@@ -316,18 +340,15 @@ function createEnvironment() {
 //   nonBloomScene.background = new THREE.Color(renderer.getClearColor());
 // }
 
-
-
-
 function loadTerrain(file, callback) {
   const xhr = new XMLHttpRequest();
-  xhr.responseType = 'arraybuffer';
-  xhr.open('GET', file, true);
-  xhr.onload = function(evt) {    
+  xhr.responseType = "arraybuffer";
+  xhr.open("GET", file, true);
+  xhr.onload = function (evt) {
     if (xhr.response) {
       callback(new Uint16Array(xhr.response));
     }
-  };  
+  };
   xhr.send(null);
 }
 
@@ -335,24 +356,24 @@ function createEnvironmentTerrain() {
   // Set the background to black
   scene.background = new THREE.Color(0x000000);
 
-  loadTerrain('../../assets/besseggen.bin', function(data) {
+  loadTerrain("../../assets/besseggen.bin", function (data) {
     const width = 199;
     const height = 199;
     const geometry = new THREE.PlaneGeometry(60, 60, width - 1, height - 1);
 
     for (let i = 0, l = geometry.attributes.position.count; i < l; i++) {
-      geometry.attributes.position.setZ(i, data[i] / 65535 * 10);
+      geometry.attributes.position.setZ(i, (data[i] / 65535) * 10);
     }
 
     geometry.computeVertexNormals();
 
     const material = new THREE.MeshPhongMaterial({
       color: 0xdddddd,
-      wireframe: true
+      wireframe: true,
     });
 
     const terrain = new THREE.Mesh(geometry, material);
-    terrain.rotation.x = -Math.PI / 2;  // Rotate to lay flat
+    terrain.rotation.x = -Math.PI / 2; // Rotate to lay flat
     scene.add(terrain);
 
     markNeedsRender();
@@ -389,15 +410,22 @@ const edges = new THREE.EdgesGeometry(geometry);
 let wireMaterial;
 let solidMaterial;
 
-
-export function resizeCubeToFitSpheres(cube, minSizeAllowed = false, buffer = 5) {
+export function resizeCubeToFitSpheres(
+  cube,
+  minSizeAllowed = false,
+  buffer = 5
+) {
   // Instead of using cubeGroups, we'll find spheres within the cube
   const spheres = findSpheresInCube(cube);
   if (spheres.length === 0) return;
 
   // Calculate the bounding box that fits all spheres
-  let minX = Infinity, minY = Infinity, minZ = Infinity;
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    minZ = Infinity;
+  let maxX = -Infinity,
+    maxY = -Infinity,
+    maxZ = -Infinity;
 
   spheres.forEach((sphere) => {
     const spherePosition = sphere.position;
@@ -426,7 +454,9 @@ export function resizeCubeToFitSpheres(cube, minSizeAllowed = false, buffer = 5)
   const currentCubeSize = cube.scale.x; // Assuming uniform scale
 
   // Determine the final cube size
-  const finalCubeSize = minSizeAllowed ? newCubeSize : Math.max(newCubeSize, currentCubeSize);
+  const finalCubeSize = minSizeAllowed
+    ? newCubeSize
+    : Math.max(newCubeSize, currentCubeSize);
 
   // Set the cube size to the final calculated size
   cube.scale.set(finalCubeSize, finalCubeSize, finalCubeSize);
@@ -440,8 +470,15 @@ export function resizeCubeToFitSpheres(cube, minSizeAllowed = false, buffer = 5)
 
 export function createWireframeCube(convertedData) {
   // Update materials with the new color
-  wireMaterial = new THREE.LineBasicMaterial({ color: convertedData.color, linewidth: 2 });
-  solidMaterial = new THREE.MeshBasicMaterial({ color: convertedData.color, transparent: true, opacity: 0 });
+  wireMaterial = new THREE.LineBasicMaterial({
+    color: convertedData.color,
+    linewidth: 2,
+  });
+  solidMaterial = new THREE.MeshBasicMaterial({
+    color: convertedData.color,
+    transparent: true,
+    opacity: 0,
+  });
 
   // Create wireframe and solid cubes using the global geometry and updated materials
   const wireframeCube = new THREE.LineSegments(edges, wireMaterial);
@@ -452,7 +489,7 @@ export function createWireframeCube(convertedData) {
   makeObjectWritable(solidCube);
 
   // Set position and scale
-  [wireframeCube, solidCube].forEach(cube => {
+  [wireframeCube, solidCube].forEach((cube) => {
     if (convertedData.position) cube.position.copy(convertedData.position);
     cube.scale.setScalar(convertedData.size);
   });
@@ -462,7 +499,6 @@ export function createWireframeCube(convertedData) {
     shape: "wireframeCube",
   });
 
-  
   const uuid = wireframeCube.uuid;
 
   Object.assign(solidCube, {
@@ -480,10 +516,13 @@ export function createWireframeCube(convertedData) {
   nonBloomScene.add(wireframeCube);
   nonBloomScene.add(solidCube);
 
-  console.log("CUBE CREATED! I have created wireframecube", wireframeCube, solidCube)
+  console.log(
+    "CUBE CREATED! I have created wireframecube",
+    wireframeCube,
+    solidCube
+  );
   return { wireframeCube, solidCube };
 }
-
 
 export function resetSphereScales(spheres, defaultScale = 1) {
   spheres.forEach((sphere) => {
@@ -550,9 +589,9 @@ function setupScene() {
   nonBloomScene.children.length = 0;
 
   // Get the canvas container
-  const canvasContainer = document.getElementById('canvas-container');
+  const canvasContainer = document.getElementById("canvas-container");
   if (!canvasContainer) {
-    console.error('Canvas container not found');
+    console.error("Canvas container not found");
     return;
   }
 
@@ -565,23 +604,23 @@ function setupScene() {
   // Initialize mouse overlay with the canvas container
   mouseOverlay = new MouseOverlayCanvas(canvasContainer);
 
-    // Add helpers
-    addAxesHelper();
-    // addGridHelper();
+  // Add helpers
+  addAxesHelper();
+  // addGridHelper();
 
   // Ensure the Three.js canvas and overlay canvas have the same size
   function resizeCanvases() {
     const width = window.innerWidth;
     const height = window.innerHeight;
-    
+
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    
+
     renderer.setSize(width, height);
     mouseOverlay.resizeCanvas();
   }
 
-  window.addEventListener('resize', resizeCanvases);
+  window.addEventListener("resize", resizeCanvases);
   resizeCanvases(); // Initial resize
 
   markNeedsRender();
@@ -600,13 +639,11 @@ controls.addEventListener("change", () => {
 const sphereGeometry = new THREE.IcosahedronGeometry(1, 15);
 
 export function createSphere(convertedData) {
-  const color = convertedData.color || new THREE.Color().setHSL(
-    Math.random(),
-    0.7,
-    Math.random() * 0.2 + 0.05
-  );
-  
-  const material = getCachedMaterial('basic', { color });
+  const color =
+    convertedData.color ||
+    new THREE.Color().setHSL(Math.random(), 0.7, Math.random() * 0.2 + 0.05);
+
+  const material = getCachedMaterial("basic", { color });
   const sphere = new THREE.Mesh(sphereGeometry, material);
 
   // Create sphere using the global geometry and updated material
@@ -614,7 +651,6 @@ export function createSphere(convertedData) {
   makeObjectWritable(sphere);
 
   sphere.version = 0;
-
 
   // Set position
   if (convertedData.position) sphere.position.copy(convertedData.position);
@@ -632,33 +668,34 @@ export function createSphere(convertedData) {
 
   // Store the original size as a separate property
   sphere.originalSize = convertedData.size;
- // Compute and store the bounding sphere
- sphere.geometry.computeBoundingSphere();
- sphere.boundingSphere = new THREE.Sphere().copy(sphere.geometry.boundingSphere);
+  // Compute and store the bounding sphere
+  sphere.geometry.computeBoundingSphere();
+  sphere.boundingSphere = new THREE.Sphere().copy(
+    sphere.geometry.boundingSphere
+  );
 
- // Assume that the filename is stored in sphere.userData.filename
-const filename = sphere.userData.filename || 'Unknown File';
+  // Assume that the filename is stored in sphere.userData.filename
+  const filename = sphere.userData.filename || "Unknown File";
 
-const labelDiv = document.createElement('div');
-labelDiv.className = 'label';
-labelDiv.textContent = filename;
-labelDiv.style.color = '#4169E1'; // Royal blue
-labelDiv.style.fontFamily = 'monospace';
-labelDiv.style.fontSize = '16px';
-labelDiv.style.padding = '2px';
-// Remove the backgroundColor style to make it fully transparent
-labelDiv.style.pointerEvents = 'auto';
- labelListerners(labelDiv, sphere)
- const label = new CSS2DObject(labelDiv);
+  const labelDiv = document.createElement("div");
+  labelDiv.className = "label";
+  labelDiv.textContent = filename;
+  labelDiv.style.color = "#4169E1"; // Royal blue
+  labelDiv.style.fontFamily = "monospace";
+  labelDiv.style.fontSize = "16px";
+  labelDiv.style.padding = "2px";
+  // Remove the backgroundColor style to make it fully transparent
+  labelDiv.style.pointerEvents = "auto";
+  labelListerners(labelDiv, sphere);
+  const label = new CSS2DObject(labelDiv);
 
- // Position label to the right of the sphere
- const radius = sphere.geometry.boundingSphere.radius * sphere.scale.x;
- const padding = radius * 6; // Adjust this factor to fine-tune the distance
- label.position.set(radius + padding, 0, 0);
- 
- sphere.add(label);
-//  sphere.userData.label = label;
+  // Position label to the right of the sphere
+  const radius = sphere.geometry.boundingSphere.radius * sphere.scale.x;
+  const padding = radius * 6; // Adjust this factor to fine-tune the distance
+  label.position.set(radius + padding, 0, 0);
 
+  sphere.add(label);
+  //  sphere.userData.label = label;
 
   scene.add(sphere);
 
@@ -673,7 +710,7 @@ labelDiv.style.pointerEvents = 'auto';
 
   markNeedsRender();
 
-  console.log("i am created sphere", sphere)
+  console.log("i am created sphere", sphere);
   return { sphere };
 }
 
@@ -688,7 +725,6 @@ finalComposer.addPass(new RenderPass(scene, camera)); // Add a render pass for t
 finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom scene
 finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
 
-
 // kai render
 export function render_cull() {
   // Increase the frustum size by scaling the projection matrix
@@ -697,31 +733,39 @@ export function render_cull() {
   // projScreenMatrix.multiplyMatrices(scaledProjectionMatrix, camera.matrixWorldInverse);
   // frustum.setFromProjectionMatrix(projScreenMatrix);
 
-  projScreenMatrix.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse);
+  projScreenMatrix
+    .copy(camera.projectionMatrix)
+    .multiply(camera.matrixWorldInverse);
   frustum.setFromProjectionMatrix(projScreenMatrix);
 
-  scene.traverse(object => {
+  scene.traverse((object) => {
     if (object.isMesh) {
       let isVisible;
-      
+
       if (object.geometry && object.geometry.boundingSphere) {
         // Update the object's bounding sphere
         if (!object.boundingSphere) {
           object.boundingSphere = new THREE.Sphere();
         }
-        object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
-        
+        object.boundingSphere
+          .copy(object.geometry.boundingSphere)
+          .applyMatrix4(object.matrixWorld);
+
         // Add a small buffer to the bounding sphere radius
         const bufferFactor = 1.1; // Adjust this value as needed
         const bufferedRadius = object.boundingSphere.radius * bufferFactor;
-        
-        isVisible = frustum.intersectsSphere(new THREE.Sphere(object.boundingSphere.center, bufferedRadius));
+
+        isVisible = frustum.intersectsSphere(
+          new THREE.Sphere(object.boundingSphere.center, bufferedRadius)
+        );
       } else {
         // For large objects like cubes, use a more lenient culling method
-        isVisible = frustum.intersectsObject(object) || 
-                    object.position.distanceTo(camera.position) < (object.geometry.boundingSphere?.radius || 100);
+        isVisible =
+          frustum.intersectsObject(object) ||
+          object.position.distanceTo(camera.position) <
+            (object.geometry.boundingSphere?.radius || 100);
       }
-      
+
       object.visible = isVisible;
 
       if (isVisible && !object.layers.test(bloomLayer)) {
@@ -733,15 +777,17 @@ export function render_cull() {
   bloomComposer.render();
   scene.traverse(restoreMaterial);
 
-  nonBloomScene.traverse(object => {
+  nonBloomScene.traverse((object) => {
     if (object.isMesh) {
       if (object.geometry && object.geometry.boundingSphere) {
         // Update the object's bounding sphere
         if (!object.boundingSphere) {
           object.boundingSphere = new THREE.Sphere();
         }
-        object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
-        
+        object.boundingSphere
+          .copy(object.geometry.boundingSphere)
+          .applyMatrix4(object.matrixWorld);
+
         object.visible = frustum.intersectsSphere(object.boundingSphere);
       } else {
         // Fallback to using intersectsObject if boundingSphere is not available
@@ -760,7 +806,7 @@ export function render_cull() {
 
 // const throttledRender = throttle(() => {
 //   camera.updateMatrixWorld();
-  
+
 //   // Render bloom pass
 //   renderer.setClearColor(0x000000, 0);
 //   bloomComposer.renderToScreen = false;
@@ -795,21 +841,20 @@ export function render_cull() {
 //   labelRenderer.render(scene, camera);
 // }, 16);
 
-
 // const throttledRender = throttle(() => {
 //   camera.updateMatrixWorld();
 
 //   // **1. Render Bloom Pass**
 //   renderer.setClearColor(0x000000, 0);
 //   bloomComposer.renderToScreen = false;
-  
+
 //   // **Set camera to render only BLOOM_SCENE layer**
 //   camera.layers.set(BLOOM_SCENE);
 //   bloomComposer.render();
 
 //   // **2. Render Normal Scene**
 //   renderer.setClearColor(0x000000, 1);
-  
+
 //   // **Set camera to render only ENTIRE_SCENE layer**
 //   camera.layers.set(ENTIRE_SCENE);
 //   renderer.setRenderTarget(null);
@@ -831,7 +876,7 @@ export function render_cull() {
 const RENDER_STATES = {
   NONE: 0,
   NEEDS_MATRIX_UPDATE: 1,
-  NEEDS_FULL_RENDER: 2
+  NEEDS_FULL_RENDER: 2,
 };
 
 let renderState = RENDER_STATES.NONE;
@@ -861,13 +906,12 @@ let needsLabelUpdate = false;
 //   scene.background = bgColor;
 //   nonBloomScene.background = bgColor;
 
-
 // }
 
 // function setBackgroundBasedOnTime(scene, nonBloomScene) {
 //   const timeOfDay = getCurrentTimeOfDay();
 //   console.log("time of day", timeOfDay);
-  
+
 //   let bgColor;
 
 //   // Enhanced color values for better visibility
@@ -890,24 +934,24 @@ let needsLabelUpdate = false;
 //   // nonBloomScene.background = bgColor;
 // }
 
-let timeOfDay
-let prevTimeOfDay
+let timeOfDay;
+let prevTimeOfDay;
 // function setBackgroundBasedOnTime(scene, nonBloomScene) {
 //   console.log("time of day", timeOfDay);
- 
+
 //   let bgColor;
 //   const fallbackColor = new THREE.Color(0x050510);
 
 //   try {
 //     if (timeOfDay >= 0.0 && timeOfDay < 0.1) {
-//       bgColor = new THREE.Color(0x2a2a4d); 
+//       bgColor = new THREE.Color(0x2a2a4d);
 //     } else if (timeOfDay >= 0.1 && timeOfDay < 0.2) {
 //       bgColor = new THREE.Color(0x252550);
 //     } else if (timeOfDay >= 0.2 && timeOfDay < 0.3) {
 //       bgColor = new THREE.Color(0x202045);
 //     } else if (timeOfDay >= 0.3 && timeOfDay < 0.4) {
 //       // Early morning - increased visibility
-//       bgColor = new THREE.Color(0x2a2a4d); 
+//       bgColor = new THREE.Color(0x2a2a4d);
 //     } else if (timeOfDay >= 0.4 && timeOfDay < 0.5) {
 //       bgColor = new THREE.Color(0x101035);
 //     } else if (timeOfDay >= 0.5 && timeOfDay < 0.6) {
@@ -924,7 +968,7 @@ let prevTimeOfDay
 
 // //     bgColor = new THREE.Color(0x252550); // Alternative deep blue
 // // // or
-// // 
+// //
 
 //     renderer.setClearColor(bgColor, 1);
 //     scene.background = bgColor;
@@ -937,7 +981,6 @@ let prevTimeOfDay
 //     // nonBloomScene.background = fallbackColor;
 //   }
 // }
-
 
 // function setBackgroundBasedOnTime(scene, nonBloomScene) {
 //   let bgColor;
@@ -985,20 +1028,20 @@ let prevTimeOfDay
 
 function setBackgroundBasedOnTime(scene, nonBloomScene) {
   const nightColors = {
-    deepNight: new THREE.Color(0x2a2a4d),    
-    twilight: new THREE.Color(0x3a3a6d),     
-    dawn: new THREE.Color(0x4a4a8d),         
-    morning: new THREE.Color(0x5656b8),      
-    noon: new THREE.Color(0x6464c8)          
+    deepNight: new THREE.Color(0x2a2a4d),
+    twilight: new THREE.Color(0x3a3a6d),
+    dawn: new THREE.Color(0x4a4a8d),
+    morning: new THREE.Color(0x5656b8),
+    noon: new THREE.Color(0x6464c8),
   };
 
   // Label colors that contrast with backgrounds
   const labelColors = {
-    deepNight: '#00ffff',    // Cyan for deep night
-    twilight: '#ffa500',     // Orange for twilight
-    dawn: '#ffffff',         // White for dawn
-    morning: '#ffff00',      // Yellow for morning
-    noon: '#ffffff'          // White for noon
+    deepNight: "#00ffff", // Cyan for deep night
+    twilight: "#ffa500", // Orange for twilight
+    dawn: "#ffffff", // White for dawn
+    morning: "#ffff00", // Yellow for morning
+    noon: "#ffffff", // White for noon
   };
 
   let bgColor = nightColors.deepNight;
@@ -1023,6 +1066,8 @@ function setBackgroundBasedOnTime(scene, nonBloomScene) {
 
   renderer.setClearColor(bgColor, 1);
   scene.background = bgColor;
+  nonBloomScene.background = bgColor;
+
 
   // Update all labels in the scene
   scene.traverse((object) => {
@@ -1031,12 +1076,8 @@ function setBackgroundBasedOnTime(scene, nonBloomScene) {
     }
   });
 
-   markNeedsRender('cubeRemoval');
-
+  markNeedsRender("cubeRemoval");
 }
-
-
-
 
 // Replace your current throttledRender
 const throttledRender = throttle(() => {
@@ -1045,18 +1086,19 @@ const throttledRender = throttle(() => {
     return;
   }
   timeOfDay = getCurrentTimeOfDay();
-  
 
-  if(!timeOfDay && !isCubeRender || timeOfDay != prevTimeOfDay)
-  {
+  if ((!timeOfDay && !isCubeRender) || timeOfDay != prevTimeOfDay) {
     setBackgroundBasedOnTime(scene, nonBloomScene);
-     prevTimeOfDay =  timeOfDay 
+    prevTimeOfDay = timeOfDay;
   }
 
   // Update matrices only when needed
   if (camera.matrixWorldNeedsUpdate) {
     camera.updateMatrixWorld();
-    projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    projScreenMatrix.multiplyMatrices(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
+    );
     frustum.setFromProjectionMatrix(projScreenMatrix);
   }
 
@@ -1066,8 +1108,8 @@ const throttledRender = throttle(() => {
 
   // Efficient frustum culling
   const visibleObjects = new Set();
-  
-  scene.traverse(object => {
+
+  scene.traverse((object) => {
     // if (object.isMesh) {
     //   // Update bounding sphere only when needed
     //   if (!object.boundingSphere || object.matrixWorldNeedsUpdate) {
@@ -1084,11 +1126,15 @@ const throttledRender = throttle(() => {
         }
         // Add null check for geometry.boundingSphere
         if (object.geometry.boundingSphere) {
-          object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
+          object.boundingSphere
+            .copy(object.geometry.boundingSphere)
+            .applyMatrix4(object.matrixWorld);
         } else {
           // Compute the bounding sphere if it doesn't exist
           object.geometry.computeBoundingSphere();
-          object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
+          object.boundingSphere
+            .copy(object.geometry.boundingSphere)
+            .applyMatrix4(object.matrixWorld);
         }
       }
 
@@ -1118,7 +1164,7 @@ const throttledRender = throttle(() => {
   bloomObjects.forEach((layerMask, obj) => {
     obj.layers.mask = BLOOM_SCENE;
   });
-  
+
   camera.layers.set(BLOOM_SCENE);
   bloomComposer.render();
 
@@ -1158,16 +1204,16 @@ export function render() {
 
 function ensureBaseSize(object) {
   if (object.baseSize === undefined) {
-      if (object.isAxesHelper) {
-          // For AxesHelper, use its size as baseSize
-          object.baseSize = object.geometry.boundingSphere.radius;
-      } else if (object.geometry && object.geometry.boundingSphere) {
-          // For other objects with geometry, use the bounding sphere radius
-          object.baseSize = object.geometry.boundingSphere.radius;
-      } else {
-          // Default fallback size
-          object.baseSize = 1;
-      }
+    if (object.isAxesHelper) {
+      // For AxesHelper, use its size as baseSize
+      object.baseSize = object.geometry.boundingSphere.radius;
+    } else if (object.geometry && object.geometry.boundingSphere) {
+      // For other objects with geometry, use the bounding sphere radius
+      object.baseSize = object.geometry.boundingSphere.radius;
+    } else {
+      // Default fallback size
+      object.baseSize = 1;
+    }
   }
 }
 
@@ -1177,14 +1223,14 @@ function ensureBaseSize(object) {
 //   function updateObjectVisibilityAndScale(object) {
 //       if (object.isMesh || object.isLine || object.isPoints) {
 //           ensureBaseSize(object);
-          
+
 //           const visible = isObjectVisible(object, camera);
 //           object.visible = visible;
 
 //           if (visible) {
 //               const distance = camera.position.distanceTo(object.position);
 //               const scaleFactor = getScaleFactorForDistance(distance);
-              
+
 //               object.scale.setScalar(object.baseSize * scaleFactor);
 
 //               if (object.isCSS2DObject) {
@@ -1212,7 +1258,6 @@ function ensureBaseSize(object) {
 //   labelRenderer.render(scene, camera);
 // }
 
-
 // function darkenNonBloomed(obj) {
 //   if (obj.isMesh && !bloomLayer.test(obj.layers)) {
 //     if (!materials[obj.uuid]) {
@@ -1230,7 +1275,6 @@ function darkenNonBloomed(obj) {
   }
 }
 
-
 function restoreMaterial(obj) {
   if (materials[obj.uuid]) {
     obj.material = materials[obj.uuid];
@@ -1243,17 +1287,17 @@ function restoreMaterial(obj) {
 //   renderCount = 1; // Render for the next 2 frames
 //   updateMiniMap();
 // }
-let isCubeRender = false
-export function markNeedsRender(type = 'full') {
-  isCubeRender = false
-  switch(type) {
-    case 'matrix':
+let isCubeRender = false;
+export function markNeedsRender(type = "full") {
+  isCubeRender = false;
+  switch (type) {
+    case "matrix":
       renderState = Math.max(renderState, RENDER_STATES.NEEDS_MATRIX_UPDATE);
       break;
-    case 'labels':
+    case "labels":
       needsLabelUpdate = true;
       break;
-    case 'cubeRemoval':
+    case "cubeRemoval":
       // Special case for cube removal with full cleanup
       renderer.renderLists.dispose();
       renderer.clear();
@@ -1262,11 +1306,11 @@ export function markNeedsRender(type = 'full') {
       nonBloomScene.updateMatrixWorld(true);
       bloomComposer.render();
       finalComposer.render();
-      isCubeRender=true;
+      isCubeRender = true;
       renderState = RENDER_STATES.NEEDS_FULL_RENDER;
       // render();
       break;
-    case 'full':
+    case "full":
     default:
       renderState = RENDER_STATES.NEEDS_FULL_RENDER;
       renderCount = 1;
@@ -1275,9 +1319,6 @@ export function markNeedsRender(type = 'full') {
       }
   }
 }
-
-
-
 
 function animate() {
   requestAnimationFrame(animate);
@@ -1312,7 +1353,7 @@ export function addNode(
   size = 1,
   x = Math.random() * 100 - 50,
   y = Math.random() * 100 - 50,
-  z = Math.random() * 100 - 50,
+  z = Math.random() * 100 - 50
   // color = Math.random() * 0xffffff
 ) {
   // Placeholder implementation
@@ -1350,8 +1391,6 @@ export function removeEmptyCubes(scene, nonBloomScene) {
     }
   });
 
-
-
   // Remove the identified cubes
   cubesToRemove.forEach((box) => {
     const boxId = box.wireframe.userData.id;
@@ -1371,7 +1410,9 @@ export function removeEmptyCubes(scene, nonBloomScene) {
     // }
 
     // Remove from the snapshot
-    const boxIndex = snapshot.boxes.findIndex((b) => b.wireframe.userData.id === boxId);
+    const boxIndex = snapshot.boxes.findIndex(
+      (b) => b.wireframe.userData.id === boxId
+    );
     if (boxIndex !== -1) {
       snapshot.boxes.splice(boxIndex, 1);
     }
@@ -1415,7 +1456,6 @@ export function createGhostCube(position, size, existingCube = null) {
   markNeedsRender();
 }
 
-
 export function removeGhostCube() {
   if (ghostCube) {
     const { scene } = share3dDat();
@@ -1427,8 +1467,6 @@ export function removeGhostCube() {
   }
 }
 
-
-
 let sceneSnapshot = {};
 
 function saveSceneSnapshot() {
@@ -1437,7 +1475,11 @@ function saveSceneSnapshot() {
   // Function to capture simplified objects
   function captureObjects(sceneToCapture) {
     sceneToCapture.traverse((object) => {
-      if (object.shape && object.isMesh && (object.shape === 'sphere' || object.shape.includes('Cube'))) {
+      if (
+        object.shape &&
+        object.isMesh &&
+        (object.shape === "sphere" || object.shape.includes("Cube"))
+      ) {
         sceneSnapshot[object.uuid] = {
           position: object.position.clone(),
           rotation: object.rotation.clone(),
@@ -1455,46 +1497,49 @@ function saveSceneSnapshot() {
   captureObjects(nonBloomScene);
 }
 
-
 export function reconstructScene(snapshot) {
   console.log("+++++ Reconstructing scene with snapshot:", snapshot);
   // handleDeletedObjects()
 
-  
-  logSceneContents({scene, nonBloomScene})
+  logSceneContents({ scene, nonBloomScene });
 
+  snapshot
+    .filter((objectState) => objectState.isDeleted)
+    .forEach((objectState) => {
+      const objToDelete =
+        scene.getObjectByProperty("uuid", objectState.uuid) ||
+        nonBloomScene.getObjectByProperty("uuid", objectState.uuid);
 
+      console.log("reconstructScene objToDelete", objToDelete);
+      if (objToDelete) {
+        console.log(
+          "existingObject objToDelete im about to delete you foo",
+          objToDelete
+        );
+        removeObject(objToDelete);
+      }
+    });
 
-  snapshot.filter(objectState => objectState.isDeleted).forEach((objectState) => {
-    const objToDelete = scene.getObjectByProperty('uuid', objectState.uuid) || 
-                             nonBloomScene.getObjectByProperty('uuid', objectState.uuid);
-    
-      console.log("reconstructScene objToDelete", objToDelete)
-       if (objToDelete) {
-
-      console.log("existingObject objToDelete im about to delete you foo", objToDelete)
-      removeObject(objToDelete);
-    }
-  });
-  
   // Create or update non-deleted objects
-  snapshot.filter(objectState => !objectState.isDeleted).forEach((objectState) => {
-    const existingObject = scene.getObjectByProperty('uuid', objectState.uuid) || 
-                             nonBloomScene.getObjectByProperty('uuid', objectState.uuid);
-    if (existingObject) {
-      objectState.isUpdated && updateObjectProperties(existingObject, objectState);
-    } else {
-      createObject(objectState);  // if its a new object
-    }
-  });
-  // console.log("createSceneSnapshot()", createSceneSnapshot())
+  snapshot
+    .filter((objectState) => !objectState.isDeleted)
+    .forEach((objectState) => {
+      const existingObject =
+        scene.getObjectByProperty("uuid", objectState.uuid) ||
+        nonBloomScene.getObjectByProperty("uuid", objectState.uuid);
+      if (existingObject) {
+        objectState.isUpdated &&
+          updateObjectProperties(existingObject, objectState);
+      } else {
+        createObject(objectState); // if its a new object
+      }
+    });
   markNeedsRender();
-  saveSceneSnapshot() 
+  saveSceneSnapshot();
 }
 
-
 function updateObjectProperties(object, objectState) {
-  console.log("updateObjectProperties ", object, "objectState", objectState )
+  console.log("updateObjectProperties ", object, "objectState", objectState);
   objectState.isUpdated = false;
 
   if (objectState.position) object.position.fromArray(objectState.position);
@@ -1502,7 +1547,6 @@ function updateObjectProperties(object, objectState) {
     object.material.color.setHex(objectState.color);
   }
   if (objectState.version !== undefined) object.version = objectState.version;
-
 }
 
 function createObject(objectState) {
@@ -1515,24 +1559,18 @@ function createObject(objectState) {
 
 function removeObject(object) {
   if (!object) return;
-
-// let currSceneSnapshot = createSceneSnapshot([scene, nonBloomScene]);
-// console.log(" removeObject PRE  logSceneContents", )
-// logSceneContents({scene, nonBloomScene})
-  // Remove from main scene
-  if (scene.getObjectByProperty('uuid', object.uuid)) {
+  if (scene.getObjectByProperty("uuid", object.uuid)) {
     scene.remove(object);
   }
-
   // Remove from non-bloom scene
-  if (nonBloomScene.getObjectByProperty('uuid', object.uuid)) {
+  if (nonBloomScene.getObjectByProperty("uuid", object.uuid)) {
     nonBloomScene.remove(object);
   }
 
   // If the object is a Line or LineSegments (for wireframe cubes)
   if (object.isLine || object.isLineSegments) {
     const solidCubeUuid = object.uuid + "-solid";
-    const solidCube = nonBloomScene.getObjectByProperty('uuid', solidCubeUuid);
+    const solidCube = nonBloomScene.getObjectByProperty("uuid", solidCubeUuid);
     if (solidCube) {
       nonBloomScene.remove(solidCube);
       if (solidCube.material) solidCube.material.dispose();
@@ -1543,7 +1581,7 @@ function removeObject(object) {
   // Dispose of materials and geometries
   if (object.material) {
     if (Array.isArray(object.material)) {
-      object.material.forEach(material => material.dispose());
+      object.material.forEach((material) => material.dispose());
     } else {
       object.material.dispose();
     }
@@ -1557,37 +1595,30 @@ function removeObject(object) {
   scene.updateMatrixWorld(true);
   nonBloomScene.updateMatrixWorld(true);
 
-  // currSceneSnapshot = createSceneSnapshot([scene, nonBloomScene]);
-  // console.log(" removeObject  logSceneContents POST #2",)
-  // logSceneContents({scene, nonBloomScene})
+  // Force complete scene cleanup
+  nonBloomScene.children = nonBloomScene.children.filter(
+    (child) =>
+      child.uuid !== object.uuid && child.uuid !== object.uuid + "-solid"
+  );
 
- // Force complete scene cleanup
- nonBloomScene.children = nonBloomScene.children.filter(child => 
-  child.uuid !== object.uuid && 
-  child.uuid !== object.uuid + "-solid"
-);
+  // Force renderer to clear its internal state
+  renderer.renderLists.dispose();
 
-// Force renderer to clear its internal state
-renderer.renderLists.dispose();
+  // Update scene matrices
+  scene.updateMatrixWorld(true);
+  nonBloomScene.updateMatrixWorld(true);
 
-// Update scene matrices
-scene.updateMatrixWorld(true);
-nonBloomScene.updateMatrixWorld(true);
-
-// Force a complete re-render
-renderer.clear();
-markNeedsRender('cubeRemoval');
-
-
+  // Force a complete re-render
+  renderer.clear();
+  markNeedsRender("cubeRemoval");
 }
-
 
 export function hideObject(object, scene, nonBloomScene) {
   // Function to recursively hide an object and its children
   function hideRecursively(obj) {
     obj.visible = false;
     if (obj.children) {
-      obj.children.forEach(child => hideRecursively(child));
+      obj.children.forEach((child) => hideRecursively(child));
     }
   }
 
@@ -1626,29 +1657,28 @@ function createSphereWrapper(objectState) {
 
 function addAxesHelper() {
   const axesHelper = new THREE.AxesHelper(2); // Adjust size as needed
-  
+
   // Update vertex colors for each axis: 6 vertices (2 per axis)
   const colors = axesHelper.geometry.attributes.color;
-  
+
   // X-axis (red by default)
   colors.setXYZ(0, 0.5, 0.5, 0.5); // First vertex
   colors.setXYZ(1, 0.5, 0.5, 0.5); // Second vertex
-  
+
   // Y-axis (green by default)
   colors.setXYZ(2, 0.5, 0.5, 0.5); // First vertex
   colors.setXYZ(3, 0.5, 0.5, 0.5); // Second vertex
-  
+
   // Z-axis (blue by default)
   colors.setXYZ(4, 0.5, 0.5, 0.5); // First vertex
   colors.setXYZ(5, 0.5, 0.5, 0.5); // Second vertex
-  
+
   colors.needsUpdate = true; // Ensure the colors are updated in the rendering
-  
-  axesHelper.name = 'AxesHelper';
+
+  axesHelper.name = "AxesHelper";
   scene.add(axesHelper);
   console.log("Stylish Axes Helper with faint colors added to the scene.");
 }
-
 
 export function createMiniMap(scene, nonBloomScene, camera, renderer) {
   const mapSize = 150;
@@ -1656,28 +1686,28 @@ export function createMiniMap(scene, nonBloomScene, camera, renderer) {
   const borderWidth = 2;
 
   // Create container div for border
-  const container = document.createElement('div');
-  container.style.position = 'absolute';
+  const container = document.createElement("div");
+  container.style.position = "absolute";
   container.style.right = `${padding}px`;
   container.style.bottom = `${padding}px`;
   container.style.width = `${mapSize + 2 * borderWidth}px`;
   container.style.height = `${mapSize + 2 * borderWidth}px`;
-  container.style.backgroundColor = 'rgba(211, 211, 211, 0.5)';
+  container.style.backgroundColor = "rgba(211, 211, 211, 0.5)";
   container.style.padding = `${borderWidth}px`;
   document.body.appendChild(container);
 
   // Create canvas element
-  const canvas = document.createElement('canvas');
+  const canvas = document.createElement("canvas");
   canvas.width = mapSize;
   canvas.height = mapSize;
-  canvas.style.display = 'block';
-  canvas.style.backgroundColor = 'rgba(0,0,0,0.5)';
+  canvas.style.display = "block";
+  canvas.style.backgroundColor = "rgba(0,0,0,0.5)";
   container.appendChild(canvas);
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
 
   // Add click event listener to the canvas
-  canvas.addEventListener('click', (event) => {
+  canvas.addEventListener("click", (event) => {
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -1699,15 +1729,17 @@ export function createMiniMap(scene, nonBloomScene, camera, renderer) {
     markNeedsRender();
   });
 
-
   function updateMiniMap() {
     ctx.clearRect(0, 0, mapSize, mapSize);
-  
+
     const centerX = mapSize / 2;
     const centerY = mapSize * 0.8; // Position camera dot near the bottom
-  
+
     // Calculate bounds of all objects
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity,
+      minZ = Infinity,
+      maxZ = -Infinity;
     function updateBounds(sceneToCheck) {
       sceneToCheck.traverse((object) => {
         if (object.isMesh) {
@@ -1720,43 +1752,43 @@ export function createMiniMap(scene, nonBloomScene, camera, renderer) {
     }
     updateBounds(scene);
     updateBounds(nonBloomScene);
-  
+
     // Add padding
     const padding = 50;
     minX -= padding;
     maxX += padding;
     minZ -= padding;
     maxZ += padding;
-  
+
     // Ensure the view area is square
     const range = Math.max(maxX - minX, maxZ - minZ);
-    
+
     // Calculate scale factor to fit all objects
     const scaleFactor = (mapSize * 0.6) / range; // 60% of map size to leave margin
-  
+
     // Function to convert world coordinates to mini-map coordinates
     function worldToMap(x, z) {
       return {
         x: centerX + (x - camera.position.x) * scaleFactor,
-        y: centerY - (z - camera.position.z) * scaleFactor
+        y: centerY - (z - camera.position.z) * scaleFactor,
       };
     }
-  
+
     // Function to draw objects from a scene
     function drawSceneObjects(sceneToRender) {
       sceneToRender.traverse((object) => {
         if (object.isMesh) {
           const { x, y } = worldToMap(object.position.x, object.position.z);
-  
+
           let color;
           if (object.geometry.type === "IcosahedronGeometry") {
-            color = 'red';
+            color = "red";
           } else if (object.geometry.type === "BoxGeometry") {
             color = object.material.color.getStyle();
           } else {
             return;
           }
-  
+
           ctx.fillStyle = color;
           ctx.beginPath();
           ctx.arc(x, y, 3, 0, Math.PI * 2);
@@ -1764,50 +1796,62 @@ export function createMiniMap(scene, nonBloomScene, camera, renderer) {
         }
       });
     }
-  
+
     // Draw objects from both scenes
     drawSceneObjects(scene);
     drawSceneObjects(nonBloomScene);
-  
+
     // Calculate camera's visible range based on zoom
     const visibleRange = 100 / camera.zoom; // Adjust this factor as needed
     const cameraY = centerY + (visibleRange / 2) * scaleFactor;
-  
+
     // Draw camera position
-    ctx.fillStyle = 'yellow';
+    ctx.fillStyle = "yellow";
     ctx.beginPath();
     ctx.arc(centerX, cameraY, 5, 0, Math.PI * 2);
     ctx.fill();
-  
+
     // Calculate view frustum
-    const fov = camera.fov * Math.PI / 180;
+    const fov = (camera.fov * Math.PI) / 180;
     const aspect = camera.aspect;
     const nearDistance = 10 * scaleFactor;
     const farDistance = visibleRange * scaleFactor;
-  
+
     // Draw viewpoint cone
-    ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-    ctx.fillStyle = 'rgba(255, 255, 0, 0.1)';
+    ctx.strokeStyle = "rgba(255, 255, 0, 0.5)";
+    ctx.fillStyle = "rgba(255, 255, 0, 0.1)";
     ctx.beginPath();
     ctx.moveTo(centerX, cameraY);
-    ctx.lineTo(centerX + Math.tan(fov / 2) * aspect * nearDistance, cameraY - nearDistance);
-    ctx.lineTo(centerX + Math.tan(fov / 2) * aspect * farDistance, cameraY - farDistance);
-    ctx.lineTo(centerX - Math.tan(fov / 2) * aspect * farDistance, cameraY - farDistance);
-    ctx.lineTo(centerX - Math.tan(fov / 2) * aspect * nearDistance, cameraY - nearDistance);
+    ctx.lineTo(
+      centerX + Math.tan(fov / 2) * aspect * nearDistance,
+      cameraY - nearDistance
+    );
+    ctx.lineTo(
+      centerX + Math.tan(fov / 2) * aspect * farDistance,
+      cameraY - farDistance
+    );
+    ctx.lineTo(
+      centerX - Math.tan(fov / 2) * aspect * farDistance,
+      cameraY - farDistance
+    );
+    ctx.lineTo(
+      centerX - Math.tan(fov / 2) * aspect * nearDistance,
+      cameraY - nearDistance
+    );
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-  
+
     // Draw compass
     const compassRadius = 15;
     const compassX = mapSize - compassRadius - 5;
     const compassY = compassRadius + 5;
-  
+
     ctx.save();
     ctx.translate(compassX, compassY);
     ctx.rotate(-camera.rotation.y);
-  
-    ctx.strokeStyle = 'white';
+
+    ctx.strokeStyle = "white";
     ctx.beginPath();
     ctx.moveTo(0, -compassRadius);
     ctx.lineTo(0, compassRadius);
@@ -1816,17 +1860,16 @@ export function createMiniMap(scene, nonBloomScene, camera, renderer) {
     ctx.moveTo(0, -compassRadius);
     ctx.lineTo(compassRadius / 2, 0);
     ctx.stroke();
-  
+
     ctx.restore();
   }
 
-// Initial update
-updateMiniMap();
+  // Initial update
+  updateMiniMap();
 
-// Return the update function
-return updateMiniMap;
+  // Return the update function
+  return updateMiniMap;
 }
-
 
 const deletedObjects = new Set();
 
@@ -1844,4 +1887,4 @@ function cleanupResources() {
   geometryCache.clear();
 }
 
-window.addEventListener('beforeunload', cleanupResources);
+window.addEventListener("beforeunload", cleanupResources);
