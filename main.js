@@ -17,6 +17,8 @@ import { TabManager } from "./ui/components/codemirror_md copy/codemirror-rich-m
 // import { initializeEditor } from './ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/index.ts'
 import { initializeWorker } from "./memory/fileHandler.js";
 import config from './configs/config.json';
+import { dbSyncManager } from "./memory/collaboration/dbState_sync";
+
 
 let tabManager = null;
 const userId = "kai";

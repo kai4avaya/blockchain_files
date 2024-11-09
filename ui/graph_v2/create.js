@@ -11,7 +11,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {} from "./move.js";
 import { makeObjectWritable, convertToThreeJSFormat, getCurrentTimeOfDay, calculateDistance,throttle   } from "../../utils/utils";
 import {labelListerners} from './move.js'
-import { createSceneSnapshot, findSpheresInCube,findAllSpheres, findAllCubes} from "./snapshot.js";
+import { createSceneSnapshot, findSpheresInCube,logSceneContents } from "./snapshot.js";
 import { isUMAPWorkerActive, sendSceneBoundingBoxToWorker } from '../../ai/umap.js'
 import MouseOverlayCanvas from './MouseOverlayCanvas';
 // import {getScaleFactorForDistance} from './reorientScene.js'  // KAI USE THIS see if orbit fixes
@@ -31,7 +31,7 @@ export const scene = new THREE.Scene();
 export const nonBloomScene = new THREE.Scene();
 
 const params = {
-  threshold: 0,
+  threshold: 0.01,
   strength: 1,
   radius: 0.5,
   exposure: 1,
@@ -49,10 +49,22 @@ const nonBloomRT = new THREE.WebGLRenderTarget(
 );
 const darkMaterial = new THREE.MeshBasicMaterial({ color: "black" });
 const materials = {};
-const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+// const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+const renderer = new THREE.WebGLRenderer({ 
+  antialias: false, 
+  powerPreference: "high-performance",
+  failIfMajorPerformanceCaveat: false,
+  preserveDrawingBuffer: true
+});
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ReinhardToneMapping;
+renderer.domElement.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault();
+  setTimeout(() => {
+      renderer.forceContextRestore();
+  }, 1000);
+}, false);
 document.body.appendChild(renderer.domElement);
 
 
@@ -234,43 +246,43 @@ function createEnvironment() {
   scene.add(directionalLight);
 
 }
-function setLightingBasedOnTime(scene, nonBloomScene) {
-  const timeOfDay = getCurrentTimeOfDay();
+// function setLightingBasedOnTime(scene, nonBloomScene) {
+//   const timeOfDay = getCurrentTimeOfDay();
 
-  // Remove existing lights from both scenes
-  [scene, nonBloomScene].forEach((scn) => {
-    scn.traverse((object) => {
-      if (object.isLight) {
-        scn.remove(object);
-      }
-    });
-  });
+//   // Remove existing lights from both scenes
+//   [scene, nonBloomScene].forEach((scn) => {
+//     scn.traverse((object) => {
+//       if (object.isLight) {
+//         scn.remove(object);
+//       }
+//     });
+//   });
 
-  let ambientLight, directionalLight;
+//   let ambientLight, directionalLight;
 
-  if (timeOfDay === 'day') {
-    // Daytime lights
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    directionalLight.position.set(1, 1, 1).normalize();
-  } else {
-    // Nighttime lights
-    ambientLight = new THREE.AmbientLight(0x404040, 0.3);
-    directionalLight = new THREE.DirectionalLight(0x8888ff, 0.2);
-    directionalLight.position.set(1, 1, 1).normalize();
-  }
+//   if (timeOfDay === 'day') {
+//     // Daytime lights
+//     ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+//     directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+//     directionalLight.position.set(1, 1, 1).normalize();
+//   } else {
+//     // Nighttime lights
+//     ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+//     directionalLight = new THREE.DirectionalLight(0x8888ff, 0.2);
+//     directionalLight.position.set(1, 1, 1).normalize();
+//   }
 
-  // Add lights to both scenes
-  scene.add(ambientLight);
-  scene.add(directionalLight);
+//   // Add lights to both scenes
+//   scene.add(ambientLight);
+//   scene.add(directionalLight);
 
-  // Clone the lights for the nonBloomScene
-  const ambientLightClone = ambientLight.clone();
-  const directionalLightClone = directionalLight.clone();
+//   // Clone the lights for the nonBloomScene
+//   const ambientLightClone = ambientLight.clone();
+//   const directionalLightClone = directionalLight.clone();
 
-  nonBloomScene.add(ambientLightClone);
-  nonBloomScene.add(directionalLightClone);
-}
+//   nonBloomScene.add(ambientLightClone);
+//   nonBloomScene.add(directionalLightClone);
+// }
 
 // function setBackgroundBasedOnTime(scene, nonBloomScene) {
 //   const timeOfDay = getCurrentTimeOfDay();
@@ -825,30 +837,202 @@ const RENDER_STATES = {
 let renderState = RENDER_STATES.NONE;
 let needsLabelUpdate = false;
 
-function setBackgroundBasedOnTime(scene, nonBloomScene) {
-  const timeOfDay = getCurrentTimeOfDay();
-  let bgColor;
+// function setBackgroundBasedOnTime(scene, nonBloomScene) {
+//   const timeOfDay = getCurrentTimeOfDay();
+//   console.log("time of day", timeOfDay);
+//   let bgColor;
 
-  // Convert decimal time to color
-  if (timeOfDay > 0.6 && timeOfDay < 0.8) {
-    // Evening/Dusk
-    bgColor = new THREE.Color(0x1a1a2e); // Deep blue evening
-  } else if (timeOfDay >= 0.8 || timeOfDay < 0.2) {
-    // Night
-    bgColor = new THREE.Color(0x0A0A14); // Deep night blue
+//   // Convert decimal time to color
+//   if (timeOfDay > 0.6 && timeOfDay < 0.8) {
+//     // Evening/Dusk
+//     bgColor = new THREE.Color(0x1a1a2e); // Deep blue evening
+//   } else if (timeOfDay >= 0.8 || timeOfDay < 0.2) {
+//     // Night
+//     bgColor = new THREE.Color(0x0A0A14); // Deep night blue
+//   } else if (timeOfDay >= 0.2 && timeOfDay < 0.4) {
+//     // Dawn
+//     bgColor = new THREE.Color(0x2a2a4a); // Lighter blue dawn
+//   } else {
+//     // Day
+//     bgColor = new THREE.Color(0x87CEEB); // Sky blue
+//   }
+
+//   renderer.setClearColor(bgColor, 1);
+//   scene.background = bgColor;
+//   nonBloomScene.background = bgColor;
+
+
+// }
+
+// function setBackgroundBasedOnTime(scene, nonBloomScene) {
+//   const timeOfDay = getCurrentTimeOfDay();
+//   console.log("time of day", timeOfDay);
+  
+//   let bgColor;
+
+//   // Enhanced color values for better visibility
+//   if (timeOfDay > 0.6 && timeOfDay < 0.8) {
+//     // Evening/Dusk - warmer deep blue
+//     bgColor = new THREE.Color(0x2a2a4d);
+//   } else if (timeOfDay >= 0.8 || timeOfDay < 0.2) {
+//     // Night - slightly lighter than pure black
+//     bgColor = new THREE.Color(0x111122);
+//   } else if (timeOfDay >= 0.2 && timeOfDay < 0.4) {
+//     // Dawn - soft purple-blue
+//     bgColor = new THREE.Color(0x3a3a6a);
+//   } else {
+//     // Day - lighter sky blue
+//     bgColor = new THREE.Color(0x9dc5dd);
+//   }
+//   // renderer.setClearColor(0x050510, 1);
+//   // renderer.setClearColor(bgColor, 1);
+//   // scene.background = bgColor;
+//   // nonBloomScene.background = bgColor;
+// }
+
+let timeOfDay
+let prevTimeOfDay
+// function setBackgroundBasedOnTime(scene, nonBloomScene) {
+//   console.log("time of day", timeOfDay);
+ 
+//   let bgColor;
+//   const fallbackColor = new THREE.Color(0x050510);
+
+//   try {
+//     if (timeOfDay >= 0.0 && timeOfDay < 0.1) {
+//       bgColor = new THREE.Color(0x2a2a4d); 
+//     } else if (timeOfDay >= 0.1 && timeOfDay < 0.2) {
+//       bgColor = new THREE.Color(0x252550);
+//     } else if (timeOfDay >= 0.2 && timeOfDay < 0.3) {
+//       bgColor = new THREE.Color(0x202045);
+//     } else if (timeOfDay >= 0.3 && timeOfDay < 0.4) {
+//       // Early morning - increased visibility
+//       bgColor = new THREE.Color(0x2a2a4d); 
+//     } else if (timeOfDay >= 0.4 && timeOfDay < 0.5) {
+//       bgColor = new THREE.Color(0x101035);
+//     } else if (timeOfDay >= 0.5 && timeOfDay < 0.6) {
+//       bgColor = new THREE.Color(0x0e0e30);
+//     } else if (timeOfDay >= 0.6 && timeOfDay < 0.7) {
+//       bgColor = new THREE.Color(0x0c0c25);
+//     } else if (timeOfDay >= 0.7 && timeOfDay < 0.8) {
+//       bgColor = new THREE.Color(0x0a0a20);
+//     } else if (timeOfDay >= 0.8 && timeOfDay < 0.9) {
+//       bgColor = new THREE.Color(0x080815);
+//     } else if (timeOfDay >= 0.9 && timeOfDay <= 1.0) {
+//       bgColor = new THREE.Color(0x050510);
+//     }
+
+// //     bgColor = new THREE.Color(0x252550); // Alternative deep blue
+// // // or
+// // 
+
+//     renderer.setClearColor(bgColor, 1);
+//     scene.background = bgColor;
+//     nonBloomScene.background = null;
+
+//   } catch (error) {
+//     console.warn('Using fallback color', error);
+//     renderer.setClearColor(fallbackColor, 1);
+//     scene.background = fallbackColor;
+//     // nonBloomScene.background = fallbackColor;
+//   }
+// }
+
+
+// function setBackgroundBasedOnTime(scene, nonBloomScene) {
+//   let bgColor;
+//   const fallbackColor = new THREE.Color(0x1a1a2e);
+//   console.log("time of day", timeOfDay)
+
+//   try {
+//     if (timeOfDay >= 0.0 && timeOfDay < 0.1) {
+//       bgColor = new THREE.Color(0x1a1a2e); // Deep night blue
+//     } else if (timeOfDay >= 0.1 && timeOfDay < 0.2) {
+//       bgColor = new THREE.Color(0x202040); // Late night
+//     } else if (timeOfDay >= 0.2 && timeOfDay < 0.3) {
+//       bgColor = new THREE.Color(0x2a2a4d); // Dawn approaching
+//     } else if (timeOfDay >= 0.3 && timeOfDay < 0.4) {
+//       bgColor = new THREE.Color(0x3a3a6d); // Early morning
+//     } else if (timeOfDay >= 0.4 && timeOfDay < 0.5) {
+//       bgColor = new THREE.Color(0x4a4a8d); // Morning
+//     } else if (timeOfDay >= 0.5 && timeOfDay < 0.6) {
+//       bgColor = new THREE.Color(0x5656b8); // Midday
+//     } else if (timeOfDay >= 0.6 && timeOfDay < 0.7) {
+//       bgColor = new THREE.Color(0x4a4a8d); // Late afternoon
+//     } else if (timeOfDay >= 0.7 && timeOfDay < 0.8) {
+//       bgColor = new THREE.Color(0x3a3a6d); // Dusk
+//     } else if (timeOfDay >= 0.8 && timeOfDay < 0.9) {
+//       bgColor = new THREE.Color(0x2a2a4d); // Evening
+//     } else if (timeOfDay >= 0.9 && timeOfDay <= 1.0) {
+//       bgColor = new THREE.Color(0x1a1a2e); // Night
+//     }
+
+//     renderer.setClearColor(bgColor, 1);
+//     scene.background = bgColor;
+//     nonBloomScene.background = null;
+
+//   } catch (error) {
+//     console.warn('Using fallback color', error);
+//     renderer.setClearColor(fallbackColor, 1);
+//     scene.background = fallbackColor;
+//     nonBloomScene.background = null;
+//   }
+//   markNeedsRender('cubeRemoval');
+
+//    // Force initial render
+//   //  markNeedsRender('cubeRemoval');
+// }
+
+function setBackgroundBasedOnTime(scene, nonBloomScene) {
+  const nightColors = {
+    deepNight: new THREE.Color(0x2a2a4d),    
+    twilight: new THREE.Color(0x3a3a6d),     
+    dawn: new THREE.Color(0x4a4a8d),         
+    morning: new THREE.Color(0x5656b8),      
+    noon: new THREE.Color(0x6464c8)          
+  };
+
+  // Label colors that contrast with backgrounds
+  const labelColors = {
+    deepNight: '#00ffff',    // Cyan for deep night
+    twilight: '#ffa500',     // Orange for twilight
+    dawn: '#ffffff',         // White for dawn
+    morning: '#ffff00',      // Yellow for morning
+    noon: '#ffffff'          // White for noon
+  };
+
+  let bgColor = nightColors.deepNight;
+  let labelColor;
+
+  if (timeOfDay >= 0.0 && timeOfDay < 0.2) {
+    bgColor = nightColors.deepNight;
+    labelColor = labelColors.deepNight;
   } else if (timeOfDay >= 0.2 && timeOfDay < 0.4) {
-    // Dawn
-    bgColor = new THREE.Color(0x2a2a4a); // Lighter blue dawn
+    bgColor = nightColors.twilight;
+    labelColor = labelColors.twilight;
+  } else if (timeOfDay >= 0.4 && timeOfDay < 0.6) {
+    bgColor = nightColors.dawn;
+    labelColor = labelColors.dawn;
+  } else if (timeOfDay >= 0.6 && timeOfDay < 0.8) {
+    bgColor = nightColors.morning;
+    labelColor = labelColors.morning;
   } else {
-    // Day
-    bgColor = new THREE.Color(0x87CEEB); // Sky blue
+    bgColor = nightColors.noon;
+    labelColor = labelColors.noon;
   }
 
   renderer.setClearColor(bgColor, 1);
   scene.background = bgColor;
-  nonBloomScene.background = bgColor;
 
-  // markNeedsRender();
+  // Update all labels in the scene
+  scene.traverse((object) => {
+    if (object.isCSS2DObject) {
+      object.element.style.color = labelColor;
+    }
+  });
+
+   markNeedsRender('cubeRemoval');
+
 }
 
 
@@ -859,6 +1043,14 @@ const throttledRender = throttle(() => {
   // Skip if no updates needed
   if (renderState === RENDER_STATES.NONE && !needsRender && renderCount <= 0) {
     return;
+  }
+  timeOfDay = getCurrentTimeOfDay();
+  
+
+  if(!timeOfDay && !isCubeRender || timeOfDay != prevTimeOfDay)
+  {
+    setBackgroundBasedOnTime(scene, nonBloomScene);
+     prevTimeOfDay =  timeOfDay 
   }
 
   // Update matrices only when needed
@@ -876,13 +1068,28 @@ const throttledRender = throttle(() => {
   const visibleObjects = new Set();
   
   scene.traverse(object => {
+    // if (object.isMesh) {
+    //   // Update bounding sphere only when needed
+    //   if (!object.boundingSphere || object.matrixWorldNeedsUpdate) {
+    //     if (!object.boundingSphere) {
+    //       object.boundingSphere = new THREE.Sphere();
+    //     }
+    //     object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
+    //   }
     if (object.isMesh) {
       // Update bounding sphere only when needed
       if (!object.boundingSphere || object.matrixWorldNeedsUpdate) {
         if (!object.boundingSphere) {
           object.boundingSphere = new THREE.Sphere();
         }
-        object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
+        // Add null check for geometry.boundingSphere
+        if (object.geometry.boundingSphere) {
+          object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
+        } else {
+          // Compute the bounding sphere if it doesn't exist
+          object.geometry.computeBoundingSphere();
+          object.boundingSphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
+        }
       }
 
       // Frustum culling with buffer
@@ -903,7 +1110,9 @@ const throttledRender = throttle(() => {
   // Render bloom pass only for visible objects
   // renderer.setClearColor(0x000000, 0);
   // renderer.setClearColor(0x050510, 1);
-  setBackgroundBasedOnTime(scene, nonBloomScene);
+  // setBackgroundBasedOnTime(scene, nonBloomScene);
+
+  // setBackgroundBasedOnTime(scene, nonBloomScene);
   bloomComposer.renderToScreen = false;
 
   bloomObjects.forEach((layerMask, obj) => {
@@ -918,7 +1127,7 @@ const throttledRender = throttle(() => {
     obj.layers.mask = layerMask;
   });
 
-  renderer.setClearColor(0x000000, 1);
+  // renderer.setClearColor(0x000000, 1);
   camera.layers.set(ENTIRE_SCENE);
   renderer.setRenderTarget(null);
   renderer.render(scene, camera);
@@ -1034,14 +1243,28 @@ function restoreMaterial(obj) {
 //   renderCount = 1; // Render for the next 2 frames
 //   updateMiniMap();
 // }
-
+let isCubeRender = false
 export function markNeedsRender(type = 'full') {
+  isCubeRender = false
   switch(type) {
     case 'matrix':
       renderState = Math.max(renderState, RENDER_STATES.NEEDS_MATRIX_UPDATE);
       break;
     case 'labels':
       needsLabelUpdate = true;
+      break;
+    case 'cubeRemoval':
+      // Special case for cube removal with full cleanup
+      renderer.renderLists.dispose();
+      renderer.clear();
+      renderer.info.reset();
+      scene.updateMatrixWorld(true);
+      nonBloomScene.updateMatrixWorld(true);
+      bloomComposer.render();
+      finalComposer.render();
+      isCubeRender=true;
+      renderState = RENDER_STATES.NEEDS_FULL_RENDER;
+      // render();
       break;
     case 'full':
     default:
@@ -1052,6 +1275,9 @@ export function markNeedsRender(type = 'full') {
       }
   }
 }
+
+
+
 
 function animate() {
   requestAnimationFrame(animate);
@@ -1123,6 +1349,7 @@ export function removeEmptyCubes(scene, nonBloomScene) {
       cubesToRemove.push(box);
     }
   });
+
 
 
   // Remove the identified cubes
@@ -1228,15 +1455,25 @@ function saveSceneSnapshot() {
   captureObjects(nonBloomScene);
 }
 
+
 export function reconstructScene(snapshot) {
   console.log("+++++ Reconstructing scene with snapshot:", snapshot);
+  // handleDeletedObjects()
 
-  // Remove deleted objects from the scene
+  
+  logSceneContents({scene, nonBloomScene})
+
+
+
   snapshot.filter(objectState => objectState.isDeleted).forEach((objectState) => {
-    const existingObject = scene.getObjectByProperty('uuid', objectState.uuid) || 
+    const objToDelete = scene.getObjectByProperty('uuid', objectState.uuid) || 
                              nonBloomScene.getObjectByProperty('uuid', objectState.uuid);
-    if (existingObject) {
-      removeObject(existingObject);
+    
+      console.log("reconstructScene objToDelete", objToDelete)
+       if (objToDelete) {
+
+      console.log("existingObject objToDelete im about to delete you foo", objToDelete)
+      removeObject(objToDelete);
     }
   });
   
@@ -1247,15 +1484,17 @@ export function reconstructScene(snapshot) {
     if (existingObject) {
       objectState.isUpdated && updateObjectProperties(existingObject, objectState);
     } else {
-      createObject(objectState);
+      createObject(objectState);  // if its a new object
     }
   });
+  // console.log("createSceneSnapshot()", createSceneSnapshot())
   markNeedsRender();
   saveSceneSnapshot() 
 }
 
 
 function updateObjectProperties(object, objectState) {
+  console.log("updateObjectProperties ", object, "objectState", objectState )
   objectState.isUpdated = false;
 
   if (objectState.position) object.position.fromArray(objectState.position);
@@ -1277,6 +1516,9 @@ function createObject(objectState) {
 function removeObject(object) {
   if (!object) return;
 
+// let currSceneSnapshot = createSceneSnapshot([scene, nonBloomScene]);
+// console.log(" removeObject PRE  logSceneContents", )
+// logSceneContents({scene, nonBloomScene})
   // Remove from main scene
   if (scene.getObjectByProperty('uuid', object.uuid)) {
     scene.remove(object);
@@ -1315,9 +1557,30 @@ function removeObject(object) {
   scene.updateMatrixWorld(true);
   nonBloomScene.updateMatrixWorld(true);
 
-  // Mark for re-render
-  markNeedsRender();
+  // currSceneSnapshot = createSceneSnapshot([scene, nonBloomScene]);
+  // console.log(" removeObject  logSceneContents POST #2",)
+  // logSceneContents({scene, nonBloomScene})
+
+ // Force complete scene cleanup
+ nonBloomScene.children = nonBloomScene.children.filter(child => 
+  child.uuid !== object.uuid && 
+  child.uuid !== object.uuid + "-solid"
+);
+
+// Force renderer to clear its internal state
+renderer.renderLists.dispose();
+
+// Update scene matrices
+scene.updateMatrixWorld(true);
+nonBloomScene.updateMatrixWorld(true);
+
+// Force a complete re-render
+renderer.clear();
+markNeedsRender('cubeRemoval');
+
+
 }
+
 
 export function hideObject(object, scene, nonBloomScene) {
   // Function to recursively hide an object and its children
@@ -1575,7 +1838,10 @@ export function isObjectDeleted(uuid) {
   return deletedObjects.has(uuid);
 }
 
-export function cleanupDeletedObjects() {
-  // This function should be called periodically to remove old entries
-  // For now, we'll keep all entries, but you might want to implement a cleanup strategy later
+function cleanupResources() {
+  renderer.dispose();
+  materialCache.clear();
+  geometryCache.clear();
 }
+
+window.addEventListener('beforeunload', cleanupResources);

@@ -291,6 +291,11 @@ class P2PSync {
               this.tabManager.handleFullState(data.data);
             }
             break;
+          case "db_sync": {
+              // Forward to DBSyncManager for version check and processing
+              this.customMessageHandlers.forEach(handler => handler(data, conn.peer));
+              break;
+          }
         case "update":
           this.sceneState?.syncWithPeer(data.data);
           break;

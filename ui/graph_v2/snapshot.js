@@ -219,4 +219,33 @@ export function findSpheresInCube(cube) {
   
     return spheres;
   }
+  export function logSceneContents({ scene, nonBloomScene }) {
+    console.log("=== Main Scene Contents ===");
+    scene.traverse(object => {
+      if (object.isMesh || object.isLine || object.isLineSegments) {
+        console.log({
+          type: object.type,
+          id: object.userData?.id,
+          uuid: object.uuid,
+          geometry: object.geometry.type,
+          position: object.position.toArray()
+        });
+      }
+    });
+  
+    console.log("\n=== NonBloom Scene Contents ===");
+    // console.log("nonBloomScene.json:", nonBloomScene, nonBloomScene.json);
+    nonBloomScene.traverse(object => {
+      if (object.isMesh || object.isLine || object.isLineSegments) {
+        console.log({
+          type: object.type,
+          id: object.userData?.id,
+          uuid: object.uuid,
+          geometry: object.geometry.type,
+          position: object.position.toArray()
+        });
+      }
+    });
+  }
+  
   

@@ -4,6 +4,7 @@
     "PlaneGeometry",
     "BufferGeometry"
   ],
+  "excludedSyncTables": ["graph", "tabs", "docs"],
   "dbName": "fileGraphDB",
   "dbStores": {
     "directories": { "keyPath": "id" },

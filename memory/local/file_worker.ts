@@ -1,4 +1,6 @@
 import config from '../../configs/config.json';
+import {generateVersionNonce} from '../../utils/utils';
+import { p2pSync } from '../../network/peer2peer_simple';
 
 // memory\local\file_worker.ts
 class IndexDBWorkerOverlay {
@@ -351,6 +353,19 @@ async initializeDB(storeNames: string[]): Promise<void> {
               key
             });
           }
+
+          if (p2pSync.isConnected() && !config.excludedSyncTables.includes(storeName)) {
+            p2pSync.broadcastCustomMessage({
+                type: 'db_sync',
+                data: {
+                    tableName: storeName,
+                    data: data,
+                    version: Date.now(),
+                    versionNonce: generateVersionNonce(),
+                    lastEditedBy: localStorage.getItem('login_block') || 'no_login'
+                }
+            });
+        }
         } catch (error) {
           console.error(`Failed to save data to ${storeName}:`, error);
           throw error;
