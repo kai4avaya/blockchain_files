@@ -581,6 +581,36 @@ function createFilteredEvent(originalEvent, validFiles) {
 //       CUBEINTERSECTED = null;
 //   }
 // }
+function isFileDuplicate(fileName) {
+  const { labelMap } = share3dDat();
+  console.log("i am labelMap keys", labelMap.keys());
+  
+  // Check if the fileName exists as a key in labelMap
+  return labelMap.has(fileName);
+}
+
+// async function handleFileDrop_sphere(event) {
+//   const processEvent = event.detail || event;
+//   isFileDragging = false;
+//   resetCubeHighlight();
+//   const { camera, scene, nonBloomScene, renderer } = share3dDat();
+
+//   const dt = processEvent.dataTransfer;
+//   const fileList = dt?.files;
+//   const { validFiles, duplicates } = filterDuplicateFiles(fileList);
+
+//   if (duplicates.length > 0) {
+//     let alertMessage = "Duplicate files detected:\n";
+//     duplicates.forEach(({ file }) => {
+//       alertMessage += `- ${file.name}\n`;
+//     });
+//     alert(alertMessage);
+//   }
+
+//   if (validFiles.length === 0) {
+//     console.warn("No valid files to process.");
+//     return;
+//   }
 
 async function handleFileDrop_sphere(event) {
   const processEvent = event.detail || event;
@@ -590,12 +620,27 @@ async function handleFileDrop_sphere(event) {
 
   const dt = processEvent.dataTransfer;
   const fileList = dt?.files;
-  const { validFiles, duplicates } = filterDuplicateFiles(fileList);
+
+  // Check for duplicates using isFileDuplicate
+  const duplicates = [];
+  const validFiles = [];
+
+  for (const file of fileList) {
+    console.log("file.name", file.name)
+    if (isFileDuplicate(file.name)) {
+      duplicates.push(file);
+    } else {
+      validFiles.push(file);
+    }
+  }
 
   if (duplicates.length > 0) {
-    duplicates.forEach(({ file }) => {
-      console.warn(`Duplicate file rejected: ${file.name}`);
+    let alertMessage = "Duplicate files detected:\n";
+    duplicates.forEach((file) => {
+      alertMessage += `- ${file.name}\n`;
     });
+    alert(alertMessage);
+    return
   }
 
   if (validFiles.length === 0) {

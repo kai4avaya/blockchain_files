@@ -1,8 +1,10 @@
+// memory\local\file_worker.ts
+
+
 import config from '../../configs/config.json';
 import {generateVersionNonce} from '../../utils/utils';
 import { p2pSync } from '../../network/peer2peer_simple';
 
-// memory\local\file_worker.ts
 class IndexDBWorkerOverlay {
   private worker: Worker;
   private callbacks: Map<string, (data: any) => void> = new Map();
@@ -16,20 +18,81 @@ class IndexDBWorkerOverlay {
   private isLocked: boolean = false;
   private requestQueue: Array<() => Promise<any>> = [];
   private connectionTimeout: number = 5000; // 5 second timeout for version check
+  private isInitialized: boolean;
+  // constructor() {
+  //   this.worker = new Worker(new URL('../../workers/memory_worker.js', import.meta.url));
+  //   this.worker.onmessage = this.handleWorkerMessage.bind(this);
+    
+  //   this.worker.postMessage({
+  //     type: 'INIT_CONFIG',
+  //     config: {
+  //       dbName: config.dbName || this.dbName
+  //     }
+  //   });
+  // }
 
   constructor() {
     this.worker = new Worker(new URL('../../workers/memory_worker.js', import.meta.url));
     this.worker.onmessage = this.handleWorkerMessage.bind(this);
-    
-    this.worker.postMessage({
-      type: 'INIT_CONFIG',
-      config: {
-        dbName: this.dbName
-      }
-    });
+    this.isInitialized = false; // Add a flag to track initialization
   }
   
+//   public async initialize(dbName?: string): Promise<void> {
+//     if (this.isInitialized) return; // Prevent multiple initializations
+
+//     this.dbName = dbName || config.dbName; // Use the provided dbName or default config
+//     this.worker.postMessage({
+//       type: 'INIT_CONFIG',
+//       config: {
+//         dbName: this.dbName,
+//       },
+//     });
+
+//     // Save the dbName to localStorage if not already present
+//     const databases = JSON.parse(localStorage.getItem('databases') ?? '[]');
+//     if (!databases.includes(this.dbName)) {
+//         databases.push(this.dbName);
+//         localStorage.setItem('databases', JSON.stringify(databases));
+//     }
+
+//     localStorage.setItem('last_opened_db', JSON.stringify(databases));
+
+//     this.isInitialized = true;
+// }
+
+public async initialize(dbName?: string): Promise<void> {
+  if (this.isInitialized) return; // Prevent multiple initializations
+
+  // Determine the database name to use
+  const lastOpenedDB = localStorage.getItem('last_opened_db');
+  this.dbName = dbName || lastOpenedDB || config.dbName;
+
+  // Post initial config to the worker
+  this.worker.postMessage({
+      type: 'INIT_CONFIG',
+      config: {
+          dbName: this.dbName,
+      },
+  });
+
+  // Save the dbName to localStorage if not already present in the databases list
+  const databases = JSON.parse(localStorage.getItem('databases') ?? '[]');
+  if (!databases.includes(this.dbName)) {
+      databases.push(this.dbName);
+      localStorage.setItem('databases', JSON.stringify(databases));
+  }
+
+  // Update localStorage with the last opened database
+  localStorage.setItem('last_opened_db', this.dbName);
+
+  this.isInitialized = true;
+}
+
+  
   private async getLatestDBVersion(): Promise<number> {
+    if (!this.isInitialized) {
+      await this.initialize(); // Ensure the worker is initialized
+    }
     let timeoutId: number;
 
     return new Promise((resolve, reject) => {
@@ -81,6 +144,9 @@ class IndexDBWorkerOverlay {
 
   
   async openDB(forceRefresh: boolean = false): Promise<void> {
+    if (!this.isInitialized) {
+      await this.initialize(); // Ensure the worker is initialized
+    }
     const operationKey = `openDB-${this.dbName}`;
     
     if (this.pendingOperations.has(operationKey)) {
@@ -121,6 +187,35 @@ class IndexDBWorkerOverlay {
     return operation;
   }
 
+  async getAll(storeName: string): Promise<any[]> {
+    await this.ensureDBOpen();
+    return this.sendToWorkerWithRetry('getAll', { storeName });
+}
+
+async deleteDatabase(dbName: string) {
+  try {
+    const deleteRequest = indexedDB.deleteDatabase(dbName);
+    deleteRequest.onsuccess = () => {
+      console.log(`Database "${dbName}" deleted successfully`);
+      // Update localStorage
+      const databases = JSON.parse(localStorage.getItem('databases') || '[]');
+      const index = databases.indexOf(dbName);
+      if (index > -1) {
+        databases.splice(index, 1);
+        localStorage.setItem('databases', JSON.stringify(databases));
+      }
+    };
+    deleteRequest.onerror = (event) => {
+      console.error(`Failed to delete database "${dbName}":`, event.target.error);
+    };
+    deleteRequest.onblocked = () => {
+      console.warn(`Deletion of database "${dbName}" is blocked. Please close all open connections.`);
+    };
+  } catch (error) {
+    console.error(`Error deleting database "${dbName}":`, error);
+  }
+}
+
   private async queueRequest(request: () => Promise<any>): Promise<any> {
     return new Promise((resolve, reject) => {
         this.requestQueue.push(async () => {
@@ -148,21 +243,6 @@ private async processQueue() {
   }
 }
     
-
-  //   private async reopenDB(dbName: string): Promise<void> {
-  //     this.isReopening = true;
-  //     this.isDBOpen = false;
-  
-  //     // Wait for all pending operations to complete
-  //     await Promise.all(this.pendingOperations.values());
-  
-  //     await this.closeAllConnections(dbName);
-  //     await new Promise(resolve => setTimeout(resolve, 200));
-  //     await this.openDB(true); // Force refresh
-  
-  //     this.isReopening = false;
-  // }
-  
 
 
   async deleteItem(storeName: string, key: string): Promise<void> {
@@ -199,7 +279,6 @@ private async processQueue() {
                   return await this.sendToWorker(action, data);
               } catch (error: any) {
                   if (retries < this.maxRetries) {
-                      console.log(`Retrying ${action} (Attempt ${retries + 1}/${this.maxRetries})`);
                       await new Promise(resolve => setTimeout(resolve, this.retryDelay));
                       return this.sendToWorkerWithRetry(action, data, retries + 1);
                   }
@@ -241,13 +320,10 @@ private async processQueue() {
             }
         });
 
-        console.log("file_worker.ts",  id, action, data)
 
         if (!data.key) {
-          console.log("no key no key file_worker.ts",  id, action, data)
           this.worker.postMessage({ id, action, data });
       } else {
-        console.log("yes key  key file_worker.ts",  id, action, data)
 
           const { key, ...dataWithoutKey } = data;
           this.worker.postMessage({ id, action, data: dataWithoutKey, key });
@@ -292,6 +368,10 @@ private async closeAllConnections(dbName: string): Promise<void> {
   });
 }
 async initializeDB(storeNames: string[]): Promise<void> {
+  if (!this.isInitialized) {
+    await this.initialize(); // Ensure the worker is initialized
+  }
+
   const storeConfigs = storeNames.map(storeName => {
     const storeConfig = config.dbStores[storeName as keyof typeof config.dbStores];
     return {
@@ -302,7 +382,6 @@ async initializeDB(storeNames: string[]): Promise<void> {
   
   try {
     await this.sendToWorkerWithRetry('initializeDB', { storeConfigs });
-    console.log('Stores initialized:', storeNames);
   } catch (error) {
     console.error('Failed to initialize stores:', error);
     throw error;
@@ -328,24 +407,21 @@ async initializeDB(storeNames: string[]): Promise<void> {
         return this.sendToWorkerWithRetry('getData', { storeName });
       }
   
-
+      
       async saveData(storeName: string, data: any, key?: string): Promise<void> {
-
-        console.log("file_worker.ts saveData", "storeName, data, key", storeName, data, key)
         try {
           await this.ensureDBOpen();
       
           // Get the store configuration
           const storeConfig = config.dbStores[storeName as keyof typeof config.dbStores];
       
-          // If the store uses a keyPath (in-line keys), do not include the 'key' parameter aka it will be in data and indexdb knows to grab it from here 
+          // If the store uses a keyPath (in-line keys), do not include the 'key' parameter
           if (storeConfig && 'keyPath' in storeConfig) {
             await this.sendToWorkerWithRetry('saveData', { 
               storeName, 
               data
             });
           } else {
-            console.log("we go else saveData", "storeName, data, key", storeName, data, key)
             // If the store does not use a keyPath, include the 'key' parameter
             await this.sendToWorkerWithRetry('saveData', { 
               storeName, 
@@ -353,29 +429,32 @@ async initializeDB(storeNames: string[]): Promise<void> {
               key
             });
           }
-
-          if (p2pSync.isConnected() && !config.excludedSyncTables.includes(storeName)) {
+      
+          console.log("saveData pre peer", data, "data?.isFromPeer", data?.isFromPeer);
+      
+          // Check if `isFromPeer` is not present in data before broadcasting
+          if (!data?.isFromPeer && p2pSync.isConnected() && !config.excludedSyncTables.includes(storeName)) {
             p2pSync.broadcastCustomMessage({
-                type: 'db_sync',
-                data: {
-                    tableName: storeName,
-                    data: data,
-                    version: Date.now(),
-                    versionNonce: generateVersionNonce(),
-                    lastEditedBy: localStorage.getItem('login_block') || 'no_login'
-                }
+              type: 'db_sync',
+              data: {
+                tableName: storeName,
+                data: data,
+                key: key,
+                isFromPeer: true,
+                version: Date.now(),
+                versionNonce: generateVersionNonce(),
+                lastEditedBy: localStorage.getItem('login_block') || 'no_login'
+              }
             });
-        }
+          }
         } catch (error) {
           console.error(`Failed to save data to ${storeName}:`, error);
           throw error;
         }
-      }      
+      }
       
-    
   
       async getItem(storeName: string, key: string): Promise<any> {
-        console.log("file_worker.ts getItem", "storeName, key", storeName, key)
         await this.ensureDBOpen();
         return this.sendToWorkerWithRetry('getItem', { storeName, key });
       }

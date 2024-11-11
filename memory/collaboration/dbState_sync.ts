@@ -2,14 +2,15 @@ import { p2pSync } from '../../network/peer2peer_simple';
 import indexDBOverlay from '../local/file_worker';
 // import { generateVersionNonce } from '../../utils/utils';
 import config from '../../configs/config.json';
-
 interface DBState {
   tableName: string;
   data: any;
+  key?: string;
   version: number;
   versionNonce: number;
   lastEditedBy: string;
 }
+
 
 class DBSyncManager {
   private static instance: DBSyncManager | null = null;
@@ -29,22 +30,92 @@ class DBSyncManager {
     return DBSyncManager.instance;
   }
 
-  private async handlePeerMessage(message: any, peerId: string) {
+//   private async handlePeerMessage(message: any, peerId: string) {
 
-    console.log("incoming message from ", peerId, "message", message);
-    if (message.type === 'db_sync') {
-        const state: DBState = message.data;
+//     if (message.type === 'db_sync') {
+//         const state: DBState = message.data;
         
-        if (!config.excludedSyncTables.includes(state.tableName)) {
-            const currentVersion = this.getStateVersion(state.tableName, state.data.id);
+//         if (!config.excludedSyncTables.includes(state.tableName)) {
+//             const currentVersion = this.getStateVersion(state.tableName, state.data.id);
             
-            if (this.isNewerState(state.version, currentVersion)) {
-                await indexDBOverlay.saveData(state.tableName, state.data);
-                this.updateStateVersion(state.tableName, state.data.id, state.version);
-            }
-        }
+//             if (this.isNewerState(state.version, currentVersion)) {
+//                 await indexDBOverlay.saveData(state.tableName, state.data);
+//                 this.updateStateVersion(state.tableName, state.data.id, state.version);
+//             }
+//         }
+//     }
+// }
+
+
+// private async handlePeerMessage(message: any, peerId: string) {
+//   if (message.type === 'db_sync') {
+//     const state: DBState = message.data;
+
+//     if (!config.excludedSyncTables.includes(state.tableName)) {
+//       const currentVersion = this.getStateVersion(state.tableName, state.data.id);
+
+
+
+//       if (this.isNewerState(state.version, currentVersion)) {
+
+//         const storeConfig = config.dbStores[state.tableName];
+//         const key = storeConfig && 'keyPath' in storeConfig ? undefined : state.data.id || state.data.key;
+//         console.log("db sync", state.tableName, state.data, key)
+
+//         await indexDBOverlay.saveData(state.tableName, state.data, key);
+//         this.updateStateVersion(state.tableName, state.data.id, state.version);
+//       }
+//     }
+//   }
+// }
+
+
+// private async handlePeerMessage(message: any, peerId: string) {
+//   if (message.type === 'db_sync') {
+//     const state: DBState = message.data;
+
+//     if (!config.excludedSyncTables.includes(state.tableName)) {
+//       const currentVersion = this.getStateVersion(state.tableName, state.data.id);
+
+//       if (this.isNewerState(state.version, currentVersion)) {
+//         // Set isFromPeer to true
+//         state.data.isFromPeer = true;
+
+//         const storeConfig = config.dbStores[state.tableName];
+//         const key = storeConfig && 'keyPath' in storeConfig ? undefined : state.data.id || state.data.key;
+//         console.log("db sync", state.tableName, state.data, key);
+
+//         await indexDBOverlay.saveData(state.tableName, state.data, key);
+//         this.updateStateVersion(state.tableName, state.data.id, state.version);
+//       }
+//     }
+//   }
+// }
+
+private async handlePeerMessage(message: any, peerId: string) {
+  if (message.type === 'db_sync') {
+    const state: DBState = message.data;
+
+    console.log("db sync", state.tableName, state.data, state.key);
+
+    if (!config.excludedSyncTables.includes(state.tableName)) {
+      const currentVersion = this.getStateVersion(state.tableName, state.key);
+
+      if (this.isNewerState(state.version, currentVersion)) {
+        // Set isFromPeer to true
+        state.data.isFromPeer = true;
+
+        const storeConfig = config.dbStores[state.tableName];
+        const key = storeConfig && 'keyPath' in storeConfig ? undefined : state.key;
+        console.log("db sync", state.tableName, state.data, key);
+
+        await indexDBOverlay.saveData(state.tableName, state.data, key);
+        this.updateStateVersion(state.tableName, state.key, state.version);
+      }
     }
+  }
 }
+
 
   
 

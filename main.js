@@ -12,13 +12,12 @@ import embeddingWorker from "./ai/embeddings.js";
 import { initiate } from "./memory/vectorDB/vectorDbGateway.js"; // Assuming your initiate function is exported
 import { initiate_gui_controls } from "./ui/gui.listens.js";
 import indexDBOverlay from "./memory/local/file_worker";
-import { throttle } from "./utils/utils";
+import { throttle, generateUniqueId } from "./utils/utils";
 import { TabManager } from "./ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
-// import { initializeEditor } from './ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/index.ts'
-import { initializeWorker } from "./memory/fileHandler.js";
+import { initializeWorker, updateFileTreeUI } from "./memory/fileHandler.js";
 import config from './configs/config.json';
-import { dbSyncManager } from "./memory/collaboration/dbState_sync";
-
+import { dbSyncManager } from "./memory/collaboration/dbState_sync"; // need this so it activates!
+import { setupDatabaseModal } from './ui/components/database_modal/modalHandler.js';
 
 let tabManager = null;
 const userId = "kai";
@@ -29,6 +28,7 @@ const p2pSync_instance = p2pSync;
 async function main() {
   embeddingWorker.initialize();
   initializeWorker();
+  setupDatabaseModal(); 
   await initializeDatabases();
   try {
     await setupMarkdownEditor();
@@ -36,16 +36,15 @@ async function main() {
   } catch (error) {
     console.error("Error setting up Markdown editor:", error);
   }
-  // await initiate();
-
-  // Initialize a new database for summarizations
-  // await initiate("summarizationDB", ["summaries"]);
+ 
   await initializeFileSystem();
   const fileSystem = getFileSystem();
 
   fileSystem.onReady(() => {
     // Perform operations that require the file system
   });
+
+  updateFileTreeUI()
 
   // Initialize the graph and SceneState
   await initializeGraph();
@@ -88,17 +87,82 @@ const handleQuickClick = throttle(async (event) => {
 }, 300);
 
 
+
+
+// export async function initializeDatabases() {
+//   try {
+//     const storeConfigs = Object.entries(config.dbStores).map(([storeName, storeConfig]) => ({
+//       storeName,
+//       keyPath: storeConfig.keyPath || null,
+//       vectorConfig: storeConfig.vectorConfig || null
+//     }));
+
+//     await indexDBOverlay.openDB();
+//     await indexDBOverlay.initializeDB(storeConfigs.map(config => config.storeName));
+    
+//     // Initialize vectorDB gateway after IndexDB is ready
+//     await initiate();
+
+//     console.log("All databases initialized successfully");
+//   } catch (error) {
+//     console.error("Error initializing databases:", error);
+//     throw error;
+//   }
+// }
+// export async function initializeDatabases() {
+//   try {
+//     if (!config.dbName) {
+//       // Check if this is the first time initialization
+//       if (!localStorage.getItem('latestDBName')) {
+//         config.dbName = `fileGraphDB_${generateUniqueId().slice(-3)}_initial`;
+//       } else {
+//         config.dbName = localStorage.getItem('latestDBName') || `fileGraphDB_${generateUniqueId().slice(-3)}`;
+//       }
+//     }
+
+//     const storeConfigs = Object.entries(config.dbStores).map(([storeName, storeConfig]) => ({
+//       storeName,
+//       keyPath: storeConfig.keyPath || null,
+//       vectorConfig: storeConfig.vectorConfig || null
+//     }));
+
+//     // await indexDBOverlay.openDB();
+//     await indexDBOverlay.initialize(config.dbName + `_${generateUniqueId()}_first`)
+//     await indexDBOverlay.initializeDB(storeConfigs.map(config => config.storeName));
+    
+//     // Initialize vectorDB gateway after IndexDB is ready
+//     await initiate();
+
+//     console.log("All databases initialized successfully");
+//   } catch (error) {
+//     console.error("Error initializing databases:", error);
+//     throw error;
+//   }
+// }
+
+
 export async function initializeDatabases() {
   try {
+    // Determine the database name from config or localStorage
+    if (!localStorage.getItem('latestDBName')) {
+      config.dbName = `fileGraphDB_${generateUniqueId().slice(-3)}_initial`;
+    } else {
+      config.dbName = localStorage.getItem('latestDBName');
+    }
+
     const storeConfigs = Object.entries(config.dbStores).map(([storeName, storeConfig]) => ({
       storeName,
       keyPath: storeConfig.keyPath || null,
-      vectorConfig: storeConfig.vectorConfig || null
+      vectorConfig: storeConfig.vectorConfig || null,
     }));
 
-    await indexDBOverlay.openDB();
+    // Initialize database using `indexDBOverlay`
+    await indexDBOverlay.initialize(config.dbName);
     await indexDBOverlay.initializeDB(storeConfigs.map(config => config.storeName));
-    
+
+    // Save the last opened database name
+    localStorage.setItem('latestDBName', config.dbName);
+
     // Initialize vectorDB gateway after IndexDB is ready
     await initiate();
 

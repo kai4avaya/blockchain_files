@@ -498,6 +498,7 @@
       /* Initial opacity for fade-in effect */
       transition: opacity 0.3s ease;
       /* Smooth transition for opacity */
+      pointer-events: none !important; /* Disable pointer events on the overlay */
     }
 
 
@@ -1025,6 +1026,21 @@
     }
 
 
+    .fa-database::before {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cellipse cx='12' cy='5' rx='9' ry='3'%3E%3C/ellipse%3E%3Cpath d='M3 5v14a9 3 0 0 0 18 0V5'%3E%3C/path%3E%3Cellipse cx='12' cy='19' rx='9' ry='3'%3E%3C/ellipse%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+
+
+
     /* NEW CSS TO UPDATE CANVAS LAYER */
     #ui-layer {
       position: fixed;
@@ -1256,6 +1272,181 @@
     z-index: 99999 !important;
   }
 
+  .modal_databases {
+    position: absolute; /* or fixed if needed */
+    left: 50px; /* Adjust this to align correctly */
+    top: 50px; /* Example positioning - adjust based on your button's position */
+    transform: none;
+  /* transform: translate(-50%, -50%); */
+  
+  background-color: white;
+  padding: 20px;
+  width: 80%;
+  max-width: 600px;
+  max-height: 80vh;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+  display: none; /* Hidden by default */
+  z-index: 9999;
+  transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+  transform: translateY(-30px); /* Initial offset for animation effect */
+  opacity: 0; /* Start hidden */
+  display: none; /* Hidden initially */
+  pointer-events: none;
+  max-height: 80vh;
+}
+
+.modal_databases.show {
+  pointer-events: all;
+  transform: translateY(0); /* Move to the final position */
+  opacity: 1; /* Fully visible */
+}
+.modal_databases .modal-content {
+  position: relative;
+}
+
+.modal_databases .popup-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.modal_databases .popup-close:hover {
+  color: #ff0000;
+}
+
+.modal_databases h2 {
+  margin-top: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ddd;
+  font-size: 20px;
+  color: #333;
+}
+
+#databasesContainer {
+  margin-top: 15px;
+  max-height: 60vh;
+  overflow-y: auto; 
+  padding-right: 5px;
+  
+}
+
+.accordion {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.accordion .accordion-header {
+  padding: 10px 15px;
+  background-color: #f9f9f9;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background-color 0.3s ease;
+}
+
+.accordion .accordion-header:hover {
+  background-color: #e6f3ff;
+}
+
+.accordion .accordion-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #007bff;
+}
+
+.accordion .accordion-content {
+  padding: 10px 15px;
+  display: none;
+  background-color: #ffffff;
+}
+
+.pill {
+  display: inline-block;
+  padding: 5px 10px;
+  margin: 5px;
+  background-color: #e6f3ff;
+  color: #007bff;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: default;
+  position: relative;
+}
+
+.pill .revoke-btn {
+  background: none;
+  border: none;
+  color: #ff0000;
+  font-weight: bold;
+  font-size: 14px;
+  margin-left: 8px;
+  cursor: pointer;
+}
+
+.pill .revoke-btn:hover {
+  color: #cc0000;
+}
+
+
+.modal_databases .modal-content {
+  padding: 20px;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  max-width: 600px;
+  margin: auto;
+}
+
+.create-database-button,
+.delete-db-button,
+.accordion-toggle {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  margin: 5px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.create-database-button:hover,
+.delete-db-button:hover,
+.accordion-toggle:hover {
+  background-color: #0056b3;
+}
+
+.delete-db-button {
+  background-color: #dc3545;
+}
+
+.delete-db-button:hover {
+  background-color: #b02a37;
+}
+
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.accordion-content {
+  padding: 10px;
+  display: none;
+}
+
   
 </style>
 
@@ -1281,6 +1472,18 @@
 </head>
 
 <body>
+
+  <div id="databasesModal" class="modal_databases" style="display: none;">
+    <div class="modal-content">
+      <span id="closeModal" class="popup-close">&times;</span>
+      <h2>Databases</h2>
+      <button id="createDatabaseButton" class="create-database-button">Create New Database</button>
+      <div id="databasesContainer"></div>
+    </div>
+  </div>
+  
+  
+
   <div id="ui-layer"
     style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2000;">
     <!-- Drop indicator -->
@@ -1336,13 +1539,13 @@
         </svg>
         <span class="tooltip">Settings</span>
       </div>
-      <div id='tests' class="sidebar-icon">
+      <div id='saved-db-btn' class="sidebar-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round">
           <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
           <polyline points="22,6 12,13 2,6"></polyline>
         </svg>
-        <span class="tooltip">Messages</span>
+        <span class="tooltip">Saved Scenes</span>
       </div>
 
       <div id="fileTreeBtn" class="sidebar-icon">
@@ -1372,15 +1575,17 @@
     <!-- Separate left slideout -->
     <div class="left-slideout" id="leftSlideout">
       <div id="fileTreeContainer">
-        <div class="tree" id="fileTree">
+        <div class="tree" id="fileTreeTop">
           <div class="mt-5 pl-3">
-            <a href="http://blockchain.org">⿻ create story</a> |
-            <a href="http://blockchain.org">⿻ create quest</a> |
-            <a href="http://blockchain.org">⿻ create friend</a> <br> <br>
-            <strong>File Viewer:</strong> File structure viewable in a TREE
+            <a href="#">⿻ Add a file into your scene</a> |
+            <a href="#">⿻ create quest</a> |
+            <a href="#">⿻ create friend</a> <br> <br>
+            <strong>File Viewer:</strong> Drag and drop files into your tree to see them here
           </div>
+        <div class="tree" id="fileTree">
+
           <div class="tree">
-            <ul>
+            <!-- <ul>
               <li><i class="fa fa-folder-open"></i> Project
                 <ul>
                   <li><i class="fa fa-folder-open"></i> Opened Folder <span>- 15kb</span>
@@ -1403,9 +1608,9 @@
                   </li>
                 </ul>
               </li>
-            </ul>
+            </ul> -->
           </div>
-
+        </div>
 
         </div>
       </div>

@@ -134,7 +134,6 @@ async function readFileContent(file) {
 }
 async function processFile(fileEntry, id) {
 
-  console.log("processFile", id, fileEntry)
   return new Promise((resolve, reject) => {
     fileEntry.file(async (file) => {
       try {
@@ -142,7 +141,6 @@ async function processFile(fileEntry, id) {
         const content = await readFileContent(file);
         const compressedContent = await compressData(content);
         
-        console.log("File processed: compressing")
         // First save to IndexedDB
         const fileMetadata = {
           id,
@@ -156,16 +154,13 @@ async function processFile(fileEntry, id) {
           content: compressedContent, // Save the actual content
         };
 
-        console.log("File processed: here is the metadata", fileMetadata);
 
 
         await fileSystem.addOrUpdateItem(fileMetadata, "file");
         
-        console.log("File processed:", fileMetadata);
         // Then process content for vectorization
         await orchestrateTextProcessing(content, file, id);
         
-        console.log("File processed:", "orchestrateTextProcessing");
         addFileToTree(fileMetadata);
         resolve();
       } catch (error) {
@@ -228,7 +223,6 @@ export function handleFileDrop(event) {
 
 // Update processFiles to be more explicitly async
 async function processFiles(files, uuids) {
-  console.log("Processing files in background:", files);
   const processPromises = files.map((file, i) => {
     const id = uuids[i];
     if (file instanceof File) {
@@ -260,9 +254,7 @@ async function processQueue() {
   while (processingQueue.length > 0) {
     const processFunction = processingQueue.shift();
     try {
-      console.time("processFunction");
       await processFunction();
-      console.timeEnd("processFunction");
     } catch (error) {
       console.error("Error processing item:", error);
     }
@@ -399,7 +391,6 @@ function handleRowClick(event) {
     path: getElementPath(row)
   };
 
-  console.log('Selected item metadata:', metadata);
 }
 
 function getElementPath(element) {
@@ -502,7 +493,7 @@ function getElementPath(element) {
     updateParentCheckbox(parentLi);
   }
   
-  function updateFileTreeUI() {
+  export function updateFileTreeUI() {
     const fileSystem = getFileSystem();
     const snapshot = fileSystem.getSnapshot();
     fileTree.innerHTML = "";

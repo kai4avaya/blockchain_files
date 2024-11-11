@@ -16,7 +16,6 @@ import {
   makeObjectWritable,
   convertToThreeJSFormat,
   getCurrentTimeOfDay,
-  calculateDistance,
   throttle,
 } from "../../utils/utils";
 import { labelListerners } from "./move.js";
@@ -30,8 +29,6 @@ import {
   sendSceneBoundingBoxToWorker,
 } from "../../ai/umap.js";
 import MouseOverlayCanvas from "./MouseOverlayCanvas";
-// import {getScaleFactorForDistance} from './reorientScene.js'  // KAI USE THIS see if orbit fixes
-// import {logSceneInfo} from "../../utils/sceneCoordsUtils.js"
 import { Frustum, Matrix4 } from "three";
 const frustum = new Frustum();
 const projScreenMatrix = new Matrix4();
@@ -226,6 +223,7 @@ const mouse = new THREE.Vector2();
 // setupScene();
 let cubes = [];
 let mousePositionManager;
+const labelMap = new Map(); 
 
 const materialCache = new Map();
 const geometryCache = new Map();
@@ -566,29 +564,6 @@ function saveCameraState() {
   localStorage.setItem("cameraState", JSON.stringify(cameraState));
 }
 
-function loadCameraState() {
-  const savedState = localStorage.getItem("cameraState");
-  if (savedState) {
-    const cameraState = JSON.parse(savedState);
-    camera.position.fromArray(cameraState.position);
-    camera.rotation.fromArray(cameraState.rotation);
-    camera.zoom = cameraState.zoom;
-    camera.updateProjectionMatrix();
-  }
-}
-
-// Modify your setupScene function
-// function setupScene() {
-//   scene.traverse(disposeMaterial);
-//   scene.children.length = 0;
-//   nonBloomScene.traverse(disposeMaterial);
-//   nonBloomScene.children.length = 0;
-//   // const container = renderer.domElement.parentElement;
-//   // mouseOverlay = new MouseOverlayCanvas(container);
-//   loadCameraState();
-
-//   const container = renderer.domElement.parentElement;
-//   mouseOverlay = new MouseOverlayCanvas(container);
 
 function setupScene() {
   scene.traverse(disposeMaterial);
@@ -646,6 +621,29 @@ controls.addEventListener("change", () => {
 // Define global variables for geometry and material
 const sphereGeometry = new THREE.IcosahedronGeometry(1, 15);
 
+
+// export function clearExistingLabels() {
+//   labelMap.forEach((label) => {
+//     if (label && label.parentNode) {
+//       label.parentNode.removeChild(label);
+//     }
+//   });
+//   labelMap.clear();
+// }
+
+
+
+function removeExistingLabel(filename) {
+  if (labelMap.has(filename)) {
+    const existingLabel = labelMap.get(filename);
+    if (existingLabel && existingLabel.element && existingLabel.parent) {
+      existingLabel.parent.remove(existingLabel);
+    }
+    labelMap.delete(filename); // Remove it from the map
+  }
+}
+
+
 export function createSphere(convertedData) {
   const color =
     convertedData.color ||
@@ -653,6 +651,9 @@ export function createSphere(convertedData) {
 
   const material = getCachedMaterial("basic", { color });
   const sphere = new THREE.Mesh(sphereGeometry, material);
+
+
+
 
   // Create sphere using the global geometry and updated material
   // const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
@@ -685,6 +686,9 @@ export function createSphere(convertedData) {
   // Assume that the filename is stored in sphere.userData.filename
   const filename = sphere.userData.filename || "Unknown File";
 
+    // Remove any existing label with the same filename
+  removeExistingLabel(filename);
+
   const labelDiv = document.createElement("div");
   labelDiv.className = "label";
   labelDiv.textContent = filename;
@@ -706,6 +710,9 @@ export function createSphere(convertedData) {
   //  sphere.userData.label = label;
 
   scene.add(sphere);
+
+    // Add the label to labelMap
+    labelMap.set(filename, label);
 
   // if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
   // sphere.layers.enable(BLOOM_SCENE);
@@ -893,55 +900,231 @@ let needsLabelUpdate = false;
 let timeOfDay;
 let prevTimeOfDay;
 
-function setBackgroundBasedOnTime(scene, nonBloomScene) {
-  const nightColors = {
-    deepNight: new THREE.Color(0x2a2a4d),
-    twilight: new THREE.Color(0x3a3a6d),
-    dawn: new THREE.Color(0x2a2a4d),
-    morning: new THREE.Color(0x3a3a6d),    // Darke
-    noon: new THREE.Color(0x6464c8),
-  };
+function setBloomParameters(timeOfDay) {
+  if (timeOfDay >= 0.8) {
+    // For noon, reduce bloom strength and increase threshold
+    bloomPass.strength = 0.5;   // Reduce bloom strength
+    bloomPass.threshold = 0.2;  // Increase threshold to reduce bloom on bright areas
+  } else {
+    // Default bloom settings
+    bloomPass.strength = params.strength;
+    bloomPass.threshold = params.threshold;
+  }
+}
 
-  console.log("time of day", timeOfDay)
+function setRendererExposure(timeOfDay) {
+  if (timeOfDay >= 0.8) {
+    renderer.toneMappingExposure = 0.8; // Decrease exposure at noon
+  } else {
+    renderer.toneMappingExposure = 1.0; // Default exposure
+  }
+}
+
+
+// function setBackgroundBasedOnTime(scene, nonBloomScene) {
+//   // const nightColors = {
+//   //   deepNight: new THREE.Color(0x2a2a4d),
+//   //   twilight: new THREE.Color(0x3a3a6d),
+//   //   dawn: new THREE.Color(0x2a2a4d),
+//   //   morning: new THREE.Color(0x3a3a6d),    // Darke
+//   //   noon: new THREE.Color(0x6464c8),
+//   // };
+
+//   const nightColors = {
+//     deepNight: new THREE.Color(0x2a2a4d), // Dark Blue
+//     twilight: new THREE.Color(0x3a3a6d),  // Medium Dark Blue
+//     dawn: new THREE.Color(0x2a2a4d),      // Dark Blue
+//     morning: new THREE.Color(0x3a3a6d),   // Medium Dark Blue
+//     noon: new THREE.Color(0x2a2a5a),      // Slightly Darker Blue
+//   };
+  
+//   console.log("time of day", timeOfDay)
+
+//   // Label colors that contrast with backgrounds
+//   const labelColors = {
+//     deepNight: "#00ffff", // Cyan for deep night
+//     twilight: "#ffa500", // Orange for twilight
+//     dawn: "#ffffff", // White for dawn
+//     morning: "#ffff00", // Yellow for morning
+//     noon: "#ffffff", // White for noon
+//   };
+
+//   let bgColor = nightColors.deepNight;
+//   let labelColor;
+
+//   if (timeOfDay >= 0.0 && timeOfDay < 0.2) {
+//     bgColor = nightColors.deepNight;
+//     labelColor = labelColors.deepNight;
+//   } else if (timeOfDay >= 0.2 && timeOfDay < 0.4) {
+//     bgColor = nightColors.twilight;
+//     labelColor = labelColors.twilight;
+//   } else if (timeOfDay >= 0.4 && timeOfDay < 0.6) {
+//     bgColor = nightColors.dawn;
+//     labelColor = labelColors.dawn;
+//   } else if (timeOfDay >= 0.6 && timeOfDay < 0.8) {
+//     bgColor = nightColors.morning;
+//     labelColor = labelColors.morning;
+//   } else {
+//     bgColor = nightColors.noon;
+//     labelColor = labelColors.noon;
+//   }
+
+
+//    // Adjust bloom parameters based on time
+//    setBloomParameters(timeOfDay);
+
+//    // Adjust renderer exposure based on time
+//    setRendererExposure(timeOfDay);
+
+//   // renderer.setClearColor(bgColor, 1);
+//   renderer.setClearColor(bgColor, 0); // Set alpha to 0 for transparency
+//   scene.background = bgColor;
+//   // nonBloomScene.background = bgColor;
+
+//    // Set transparent background for nonBloomScene
+//   //  nonBloomScene.background = new THREE.Color(0x000000);
+//   //  nonBloomScene.background.alpha = 0;
+
+//   nonBloomScene.background = null;
+
+//   nonBloomScene.traverse((object) => {
+//     if (object.material) {
+//       object.material.transparent = true;
+//       object.material.needsUpdate = true;
+//     }
+//   });
+
+
+//   // Update all labels in the scene
+//   scene.traverse((object) => {
+//     if (object.isCSS2DObject) {
+//       object.element.style.color = labelColor;
+//     }
+//   });
+
+//   // markNeedsRender("cubeRemoval");
+//   markNeedsRender("full");
+// }
+
+// Global variable to switch between plain background and gradient sky
+let useGradientSky = false;
+
+// Define the gradient sky mesh globally so we can modify it later
+let sky;
+
+function setBackgroundBasedOnTime(scene, nonBloomScene) {
+  // Time of day ranges from 0.0 to 1.0
+  // Adjust these colors and times as needed
+  const nightColors = {
+    deepNight: new THREE.Color(0x2a2a4d), // Dark Blue
+    twilight: new THREE.Color(0x3a3a6d),  // Medium Dark Blue
+    dawn: new THREE.Color(0x2a2a4d),      // Dark Blue
+    morning: new THREE.Color(0x3a3a6d),   // Medium Dark Blue
+    noon: new THREE.Color(0x2a2a5a),      // Slightly Darker Blue
+  };
 
   // Label colors that contrast with backgrounds
   const labelColors = {
     deepNight: "#00ffff", // Cyan for deep night
-    twilight: "#ffa500", // Orange for twilight
-    dawn: "#ffffff", // White for dawn
-    morning: "#ffff00", // Yellow for morning
-    noon: "#ffffff", // White for noon
+    twilight: "#ffa500",  // Orange for twilight
+    dawn: "#ffffff",      // White for dawn
+    morning: "#ffff00",   // Yellow for morning
+    noon: "#ffffff",      // White for noon
   };
 
   let bgColor = nightColors.deepNight;
   let labelColor;
+  let bottomColor;
 
   if (timeOfDay >= 0.0 && timeOfDay < 0.2) {
     bgColor = nightColors.deepNight;
     labelColor = labelColors.deepNight;
+    bottomColor = new THREE.Color(0x000000); // Night
   } else if (timeOfDay >= 0.2 && timeOfDay < 0.4) {
     bgColor = nightColors.twilight;
     labelColor = labelColors.twilight;
+    bottomColor = new THREE.Color(0x110022); // Early morning
   } else if (timeOfDay >= 0.4 && timeOfDay < 0.6) {
     bgColor = nightColors.dawn;
     labelColor = labelColors.dawn;
+    bottomColor = new THREE.Color(0x550055); // Dawn
   } else if (timeOfDay >= 0.6 && timeOfDay < 0.8) {
     bgColor = nightColors.morning;
     labelColor = labelColors.morning;
+    bottomColor = new THREE.Color(0x0066ff); // Morning
   } else {
     bgColor = nightColors.noon;
     labelColor = labelColors.noon;
+    bottomColor = new THREE.Color(0x87ceeb); // Day
   }
 
-  // renderer.setClearColor(bgColor, 1);
-  renderer.setClearColor(bgColor, 0); // Set alpha to 0 for transparency
-  scene.background = bgColor;
-  // nonBloomScene.background = bgColor;
+  // Adjust bloom parameters based on time
+  setBloomParameters(timeOfDay);
 
-   // Set transparent background for nonBloomScene
-  //  nonBloomScene.background = new THREE.Color(0x000000);
-  //  nonBloomScene.background.alpha = 0;
+  // Adjust renderer exposure based on time
+  setRendererExposure(timeOfDay);
 
+  if (useGradientSky) {
+    // Remove existing sky if it exists
+    if (sky) {
+      scene.remove(sky);
+      sky.geometry.dispose();
+      sky.material.dispose();
+    }
+
+    // Create gradient sky
+    const skyGeo = new THREE.SphereGeometry(1000, 32, 15);
+    const skyMat = new THREE.ShaderMaterial({
+      uniforms: {
+        topColor: { value: bgColor },
+        bottomColor: { value: bottomColor },
+        offset: { value: 0 }, // Adjusted offset
+        exponent: { value: 0.6 },
+      },
+      vertexShader: `
+        varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
+          vWorldPosition = worldPosition.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        uniform float offset;
+        uniform float exponent;
+        varying vec3 vWorldPosition;
+        void main() {
+          // Correctly add offset to the y-component
+          float h = normalize( vWorldPosition + vec3(0.0, offset, 0.0) ).y;
+          gl_FragColor = vec4( mix( bottomColor, topColor, max( pow( max(h, 0.0), exponent ), 0.0 ) ), 1.0 );
+        }
+      `,
+      side: THREE.BackSide,
+      depthWrite: false,
+    });
+    sky = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(sky);
+
+    // Ensure the background is transparent
+    scene.background = null;
+    renderer.setClearColor(0x000000, 0); // Transparent background
+  } else {
+    // Remove existing sky if it exists
+    if (sky) {
+      scene.remove(sky);
+      sky.geometry.dispose();
+      sky.material.dispose();
+      sky = null;
+    }
+
+    // Set plain background color
+    renderer.setClearColor(bgColor, 0);
+    scene.background = bgColor;
+  }
+
+  // Set transparent background for nonBloomScene
   nonBloomScene.background = null;
 
   nonBloomScene.traverse((object) => {
@@ -951,7 +1134,6 @@ function setBackgroundBasedOnTime(scene, nonBloomScene) {
     }
   });
 
-
   // Update all labels in the scene
   scene.traverse((object) => {
     if (object.isCSS2DObject) {
@@ -959,9 +1141,9 @@ function setBackgroundBasedOnTime(scene, nonBloomScene) {
     }
   });
 
-  // markNeedsRender("cubeRemoval");
   markNeedsRender("full");
 }
+
 
 // Replace your current throttledRender
 const throttledRender = throttle(() => {
@@ -1290,6 +1472,7 @@ export function share3dDat() {
     mousePositionManager: mousePositionManager, // Add this line
     mouseOverlay: mouseOverlay,
     labelRenderer: labelRenderer,
+    labelMap: labelMap,
   };
 }
 
@@ -1427,12 +1610,8 @@ export function reconstructScene(snapshot) {
         scene.getObjectByProperty("uuid", objectState.uuid) ||
         nonBloomScene.getObjectByProperty("uuid", objectState.uuid);
 
-      console.log("reconstructScene objToDelete", objToDelete);
       if (objToDelete) {
-        console.log(
-          "existingObject objToDelete im about to delete you foo",
-          objToDelete
-        );
+       
         removeObject(objToDelete);
       }
     });
@@ -1456,7 +1635,6 @@ export function reconstructScene(snapshot) {
 }
 
 function updateObjectProperties(object, objectState) {
-  console.log("updateObjectProperties ", object, "objectState", objectState);
   objectState.isUpdated = false;
 
   if (objectState.position) object.position.fromArray(objectState.position);
@@ -1594,7 +1772,6 @@ function addAxesHelper() {
 
   axesHelper.name = "AxesHelper";
   scene.add(axesHelper);
-  console.log("Stylish Axes Helper with faint colors added to the scene.");
 }
 
 export function createMiniMap(scene, nonBloomScene, camera, renderer) {

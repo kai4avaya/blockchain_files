@@ -77,17 +77,18 @@ export function makeObjectWritable(obj) {
 }
   
 
-export function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
+export function debounce(func: Function, wait: number) {
+  let timeout: number;
+  return function executedFunction(...args: any[]) {
     const later = () => {
       clearTimeout(timeout);
       func(...args);
     };
     clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
+    timeout = window.setTimeout(later, wait);
   };
 }
+
 export function throttle(func, limit) {
   let inThrottle;
   return function(...args) {
@@ -139,6 +140,7 @@ export function getCurrentTimeOfDay() {
   }
 }
 
-export function calculateDistance(point1, point2) {
+export function calculateDistance(point1: THREE.Vector3, point2: THREE.Vector3) {
   return point1.distanceTo(point2);
 }
+

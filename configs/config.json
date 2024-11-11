@@ -13,6 +13,7 @@
     "summaries": { "keyPath": "fileId" },
     "tabs": { "keyPath": "docId" },
     "docs": { "keyPath": "docId" },
+    "peers": { "keyPath": "peerId" },
     "vectors": {
       "keyPath": "id",
       "vectorConfig": {

@@ -21,7 +21,6 @@ async function openDB(storeConfigs, version = undefined) {
       // Delete and recreate all stores defined in storeConfigs
       storeConfigs.forEach(({ storeName, keyPath }) => {
         if (db.objectStoreNames.contains(storeName)) {
-          console.log(`Deleting existing object store: ${storeName}`);
           db.deleteObjectStore(storeName);
         }
         db.createObjectStore(storeName, { keyPath });
@@ -72,7 +71,6 @@ async function initializeDB(storeConfigs) {
     );
 
     if (missingStores.length > 0) {
-      console.log('Missing stores detected:', missingStores.map(s => s.storeName));
       const newVersion = db.version + 1;
       db.close();
       delete dbs[DEFAULT_DB_NAME];
@@ -221,10 +219,110 @@ async function getItem(storeName, key) {
   }
 }
 
+async function closeDatabaseConnections() {
+  if (!DEFAULT_DB_NAME || !dbs[DEFAULT_DB_NAME]) {
+    console.warn(`Database "${DEFAULT_DB_NAME}" is not open, no connections to close.`);
+    return;
+  }
+
+  const db = dbs[DEFAULT_DB_NAME];
+
+  // Wait for any active transactions to complete before closing
+  const closePromise = new Promise((resolve) => {
+    const interval = setInterval(() => {
+      if (db.transaction && db.transaction.db === db) {
+        // Still a transaction in progress; wait
+        console.log("Waiting for active transactions to complete...");
+      } else {
+        // No more active transactions
+        clearInterval(interval);
+        db.close();
+        delete dbs[DEFAULT_DB_NAME];
+        resolve();
+      }
+    }, 100);
+  });
+
+  return closePromise;
+}
+
+async function deleteDatabase() {
+  try {
+    // First, close any active database connections
+    await closeDatabaseConnections();
+
+    return new Promise((resolve, reject) => {
+      if (!DEFAULT_DB_NAME) {
+        reject(new Error("No default database specified"));
+        return;
+      }
+
+      const deleteRequest = indexedDB.deleteDatabase(DEFAULT_DB_NAME);
+
+      deleteRequest.onsuccess = function () {
+        delete dbs[DEFAULT_DB_NAME]; // Remove from the map if necessary
+        resolve(`Database "${DEFAULT_DB_NAME}" deleted successfully`);
+      };
+
+      deleteRequest.onerror = function (event) {
+        reject(
+          new Error(
+            `Error deleting database "${DEFAULT_DB_NAME}": ${event.target.error.message}`
+          )
+        );
+      };
+
+      deleteRequest.onblocked = function () {
+        reject(
+          new Error(
+            `Database "${DEFAULT_DB_NAME}" deletion is blocked, please close other connections`
+          )
+        );
+      };
+    });
+  } catch (error) {
+    console.error(`Failed to close database connections before deleting: ${error.message}`);
+    throw error;
+  }
+}
+
+
+async function getAllDataFromStore(storeName) {
+  try {
+    if (!dbs[DEFAULT_DB_NAME]) {
+      throw new Error(`Database "${DEFAULT_DB_NAME}" is not open`);
+    }
+
+    const db = dbs[DEFAULT_DB_NAME];
+    if (!db.objectStoreNames.contains(storeName)) {
+      throw new Error(`Store "${storeName}" not found in database`);
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, "readonly");
+      const store = tx.objectStore(storeName);
+      const request = store.getAll();
+
+      request.onsuccess = function (event) {
+        resolve(event.target.result);
+      };
+
+      request.onerror = function (event) {
+        reject(
+          new Error(
+            `Error fetching all data from ${storeName}: ${event.target.error.message}`
+          )
+        );
+      };
+    });
+  } catch (error) {
+    throw error;
+  }
+}
+
 self.onmessage = async function (event) {
   const { id, action, data, key, type } = event.data;
 
-  console.log("onmessage .. id, action, data, type = ", id, action, data, type, key,)
 
   // Handle config initialization separately
   if (type === 'INIT_CONFIG') {
@@ -250,13 +348,18 @@ self.onmessage = async function (event) {
           result = await saveDataMemoryWorker(storeName, saveData, event.data.key);
           break;
         }
+        case "getAll":
+        result = await getAllDataFromStore(data.storeName);
+        break;
         
       case "getItem":
-        console.log("memory worker getItem", data, data.storeName, key, data.key)
         result = await getItem(data.storeName, key);
         break;
       case "deleteItem":
         result = await deleteItem(data.storeName, data.key);
+        break;
+        case "deleteDatabase":
+        result = await deleteDatabase();
         break;
       default:
         throw new Error(`Unknown action: ${action}`);

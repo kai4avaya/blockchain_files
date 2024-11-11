@@ -1,5 +1,4 @@
-ensure summary is accurate, ensure topics are correct
-fix deadzone from culling...
+
 ability to double click canvas to pull up upload widget (use copy paste, file, or website)
 click cube will will bring up question input bar with send to chat with what's inside that cube
  - along with stats on what's inside that cube
@@ -7,18 +6,10 @@ click node will also bring up input
 reorganize 3d space by smilar articles using embeddings matches
 
 ---
-
-need to center the 3d space - 
-- so if we click a node it is active
- - when we use ai it will include that file inside the embedding query
- - we can at any time pin the note to 3d space and it resets or discard..
-  when pinned it becomes a node itself.
-- we should be able to drag to select multiple nodes
-if we drag nodes into boxes they will then be selected as a whole (so when we click one all nodes in that cube will be selected)
-- this is not a final product writing tool, but rather a way to do research
-
----
-
-working on collaborative text
-Affine blocks
- unerlying datalayer
+0) fix collaborative files
+1) add llm and querying
+2) click canvas have upload options, 
+   b. proxy scrape
+3) double click cube brings up direct input of cube
+ -- maybe this appears inside of the note pad with the files at the top highlighted
+4) file selector needs to correctly load the files I've used

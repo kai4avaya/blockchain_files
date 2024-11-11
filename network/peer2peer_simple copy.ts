@@ -293,7 +293,6 @@ class P2PSync {
             break;
           case "db_sync": {
               // Forward to DBSyncManager for version check and processing
-              console.log("i am db sync", data.data);
               this.customMessageHandlers.forEach(handler => handler(data, conn.peer));
               break;
           }
