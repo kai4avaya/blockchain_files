@@ -9,7 +9,50 @@ self.addEventListener('message', function(e) {
   }
 });
 
-async function openDB(storeConfigs, version = undefined) {
+// async function openDB(storeConfigs, version = undefined) {
+//   return new Promise((resolve, reject) => {
+//     const request = version
+//       ? indexedDB.open(DEFAULT_DB_NAME, version)
+//       : indexedDB.open(DEFAULT_DB_NAME);
+
+//     request.onupgradeneeded = function (event) {
+//       const db = event.target.result;
+      
+//       // Delete and recreate all stores defined in storeConfigs
+//       storeConfigs.forEach(({ storeName, keyPath }) => {
+//         if (db.objectStoreNames.contains(storeName)) {
+//           db.deleteObjectStore(storeName);
+//         }
+//         db.createObjectStore(storeName, { keyPath });
+//       });
+//     };
+
+//     request.onsuccess = function (event) {
+//       const db = event.target.result;
+//       dbs[DEFAULT_DB_NAME] = db;
+
+//       // Listen for close events
+//       db.onclose = () => {
+//         delete dbs[DEFAULT_DB_NAME];
+//       };
+
+//       resolve({ message: "Database opened successfully", version: db.version });
+//     };
+
+//     request.onerror = function (event) {
+//       console.error(
+//         `Error opening IndexedDB: ${event.target.error.message} | Database: ${DEFAULT_DB_NAME}`
+//       );
+//       reject(
+//         new Error(
+//           `Error opening IndexedDB: ${event.target.error.message} | Database: ${DEFAULT_DB_NAME}`
+//         )
+//       );
+//     };
+//   });
+// }
+
+async function openDB(storeConfigs, version = undefined, preserveExistingStores = false) {
   return new Promise((resolve, reject) => {
     const request = version
       ? indexedDB.open(DEFAULT_DB_NAME, version)
@@ -17,13 +60,17 @@ async function openDB(storeConfigs, version = undefined) {
 
     request.onupgradeneeded = function (event) {
       const db = event.target.result;
-      
-      // Delete and recreate all stores defined in storeConfigs
+
       storeConfigs.forEach(({ storeName, keyPath }) => {
         if (db.objectStoreNames.contains(storeName)) {
-          db.deleteObjectStore(storeName);
+          if (!preserveExistingStores) {
+            db.deleteObjectStore(storeName);
+            db.createObjectStore(storeName, { keyPath });
+          }
+          // If preserving existing stores, do nothing
+        } else {
+          db.createObjectStore(storeName, { keyPath });
         }
-        db.createObjectStore(storeName, { keyPath });
       });
     };
 
@@ -51,21 +98,55 @@ async function openDB(storeConfigs, version = undefined) {
     };
   });
 }
-async function initializeDB(storeConfigs) {
+
+
+// async function initializeDB(storeConfigs) {
+//   try {
+//     // Ensure storeConfigs is present and valid
+//     if (!storeConfigs || !Array.isArray(storeConfigs)) {
+//       throw new Error('Store configs must be an array');
+//     }
+
+//     // Ensure the database is open
+//     if (!dbs[DEFAULT_DB_NAME]) {
+//       await openDB(storeConfigs); // Open without version
+//     }
+
+//     const db = dbs[DEFAULT_DB_NAME];
+    
+//     // Check for missing stores
+//     const missingStores = storeConfigs.filter(
+//       ({ storeName }) => !db.objectStoreNames.contains(storeName)
+//     );
+
+//     if (missingStores.length > 0) {
+//       const newVersion = db.version + 1;
+//       db.close();
+//       delete dbs[DEFAULT_DB_NAME];
+//       await openDB(storeConfigs, newVersion); // Trigger onupgradeneeded
+//     }
+
+//     return "Database initialized successfully";
+//   } catch (error) {
+//     console.error("Error initializing database:", error);
+//     throw error;
+//   }
+// }
+
+async function initializeDB(storeConfigs, preserveExistingStores = true) {
   try {
-    // Ensure storeConfigs is present and valid
     if (!storeConfigs || !Array.isArray(storeConfigs)) {
       throw new Error('Store configs must be an array');
     }
 
     // Ensure the database is open
     if (!dbs[DEFAULT_DB_NAME]) {
-      await openDB(storeConfigs); // Open without version
+      await openDB([], undefined, preserveExistingStores);
     }
 
     const db = dbs[DEFAULT_DB_NAME];
-    
-    // Check for missing stores
+
+    // Identify missing stores
     const missingStores = storeConfigs.filter(
       ({ storeName }) => !db.objectStoreNames.contains(storeName)
     );
@@ -74,7 +155,7 @@ async function initializeDB(storeConfigs) {
       const newVersion = db.version + 1;
       db.close();
       delete dbs[DEFAULT_DB_NAME];
-      await openDB(storeConfigs, newVersion); // Trigger onupgradeneeded
+      await openDB(missingStores, newVersion, preserveExistingStores);
     }
 
     return "Database initialized successfully";
@@ -83,6 +164,8 @@ async function initializeDB(storeConfigs) {
     throw error;
   }
 }
+
+
 
 async function getData(storeName) {
   try {
@@ -344,6 +427,8 @@ self.onmessage = async function (event) {
         break;
       case 'saveData': {
           const { storeName, data: saveData } = data;
+          if(key) saveData.key = key;
+
           // Pass the key from the top-level event.data
           result = await saveDataMemoryWorker(storeName, saveData, event.data.key);
           break;

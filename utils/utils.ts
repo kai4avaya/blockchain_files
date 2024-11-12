@@ -144,3 +144,14 @@ export function calculateDistance(point1: THREE.Vector3, point2: THREE.Vector3) 
   return point1.distanceTo(point2);
 }
 
+
+
+let globalVersionCounter = 0; // Initialize a global version counter
+
+export function generateGlobalTimestamp(): number {
+  return Date.now(); // Use UNIX timestamp for global state
+}
+
+export function incrementVersion(): number {
+  return ++globalVersionCounter;
+}

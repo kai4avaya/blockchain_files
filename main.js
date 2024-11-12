@@ -18,6 +18,7 @@ import { initializeWorker, updateFileTreeUI } from "./memory/fileHandler.js";
 import config from './configs/config.json';
 import { dbSyncManager } from "./memory/collaboration/dbState_sync"; // need this so it activates!
 import { setupDatabaseModal } from './ui/components/database_modal/modalHandler.js';
+import in_memory_store from './memory/local/in_memory'; // Adjust the import path as necessary
 
 let tabManager = null;
 const userId = "kai";
@@ -29,7 +30,9 @@ async function main() {
   embeddingWorker.initialize();
   initializeWorker();
   setupDatabaseModal(); 
-  await initializeDatabases();
+  initializeDatabases();
+  in_memory_store.loadFromLocalStorage();
+  
   try {
     await setupMarkdownEditor();
     console.log("Markdown editor setup completed");

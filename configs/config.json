@@ -4,6 +4,7 @@
     "PlaneGeometry",
     "BufferGeometry"
   ],
+  "hashindex_prefix":"vectors_hashIndex_",
   "excludedSyncTables": ["graph", "tabs", "docs"],
   "dbName": "fileGraphDB",
   "dbStores": {

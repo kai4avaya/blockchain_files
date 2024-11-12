@@ -3,6 +3,7 @@
 import { Peer, DataConnection } from "peerjs";
 import MousePositionManager from "../memory/collaboration/mouse_colab";
 import { TabManager } from "../ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
+import leaderCoordinator from './elections';
 
 interface SceneState {
   getSerializableState: () => any;
@@ -39,11 +40,9 @@ class P2PSync {
   private heartbeatTimer: number | null = null;
   private reconnectInterval: number = 10000;
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
-  // private mousePositions: Map<string, MousePosition> = new Map();
   private mousePositionManager: MousePositionManager | null = null;
   private mouseOverlay: MouseOverlayCanvas | null = null;
 
-  // private customMessageHandlers: Set<CustomMessageHandler> = new Set();
   private customMessageHandlers: Array<(message: any, peerId: string) => void> = [];
 
   private peerConnectHandlers: Set<PeerConnectHandler> = new Set();
@@ -62,18 +61,7 @@ class P2PSync {
     this.loadKnownPeers();
 
     const storedPeerId = localStorage.getItem("myPeerId");
-    // const peerId = storedPeerId || `${userId}-${Date.now()}`;
-    // this.peer = new Peer(peerId);
-
-    // this.peer.on("open", (id) => {
-    //   localStorage.setItem("myPeerId", id);
-    //   updateStatus(`Initialized with peer ID: ${id}`);
-    //   this.updateUserIdInput(id); // Update the user ID input instead
-
-    //   this.knownPeers.forEach((peerId) => this.connectToSpecificPeer(peerId));
-    //   this.startHeartbeat();
-    // });
-
+ 
     const peerId = storedPeerId || `${userId}-${Date.now()}`;
     this.peer = new Peer(peerId);
 
@@ -186,31 +174,6 @@ class P2PSync {
     this.sceneState = sceneState;
   }
 
-  // connectToSpecificPeer(peerId: string): void {
-  //   if (!this.peer || this.peer.destroyed) {
-  //     console.error("Peer object is undefined or destroyed. Cannot connect.");
-  //     updateStatus("Error: Peer not initialized or destroyed");
-  //     return;
-  //   }
-  //   if (this.connections.has(peerId) || peerId === this.peer.id) {
-  //     updateStatus("Already connected or trying to connect to self");
-  //     return;
-  //   }
-  //   updateStatus(`Attempting to connect to peer: ${peerId}`);
-
-  //   const conn = this.peer.connect(peerId, { reliable: true });
-
-  //   conn.on("open", () => {
-  //     this.handleConnection(conn);
-  //     this.clearReconnectTimer(peerId);
-  //   });
-
-  //   conn.on("error", (err) => {
-  //     console.error(`Connection error with peer ${peerId}:`, err);
-  //     updateStatus(`Connection error with peer ${peerId}: ${err.message}`);
-  //     this.scheduleReconnect(peerId);
-  //   });
-  // }
 
   connectToSpecificPeer(peerId: string): void {
     this.safeConnectToSpecificPeer(peerId);
@@ -228,11 +191,18 @@ class P2PSync {
     }
   }
 
+ 
+
+  
 
   private handleConnection(conn: DataConnection): void {
     this.connections.set(conn.peer, conn);
     updateStatus(`Connected to peer: ${conn.peer}`);
     this.saveKnownPeer(conn.peer);
+
+     // Call leader coordinator to handle the connection and election
+     leaderCoordinator.connectToPeer(conn.peer);
+
     const checkConnection = setInterval(() => {
       if (!conn.open) {
         clearInterval(checkConnection);
@@ -246,6 +216,8 @@ class P2PSync {
     // Send current state immediately after connection
     this.sendCurrentState(conn);
     conn.send({ type: "known_peers", data: Array.from(this.knownPeers) });
+
+    leaderCoordinator.triggerInitialDbSync(conn);
 
     conn.on("data", (rawData: unknown) => {
       const data = rawData as { type: string; docId?: string; data?: any };
@@ -294,9 +266,19 @@ class P2PSync {
           case "db_sync": {
               // Forward to DBSyncManager for version check and processing
               console.log("i am db sync", data.data);
+              
               this.customMessageHandlers.forEach(handler => handler(data, conn.peer));
               break;
           }
+
+          case "connected_peers":
+            case "db_sync_initial":
+            case "leader_announcement":
+            case "request_leader_election":
+              // Delegate leader-specific messages to P2PLeaderCoordinator
+              leaderCoordinator.handleIncomingData(data);
+              break;
+
         case "update":
           this.sceneState?.syncWithPeer(data.data);
           break;
@@ -560,11 +542,7 @@ const connectButton = document.getElementById(
 const statusDiv = document.getElementById("status") as HTMLDivElement;
 
 
-// function updateStatus(message: string): void {
-//   if (statusDiv) {
-//     statusDiv.textContent = message;
-//   }
-// }
+
 function updateStatus(message: string): void {
   const statusDiv = document.getElementById('status');
   
@@ -646,7 +624,6 @@ userIdInput?.addEventListener("change", initializeP2PSync);
 
 // Connect to peer when button is clicked
 connectButton?.addEventListener("click", () => {
-  console.log("hello connectbutton is clicked");
   const peerId = peerIdInput?.value.trim();
   if (peerId) {
     p2pSync.connectToSpecificPeer(peerId);

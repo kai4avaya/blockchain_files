@@ -1,5 +1,6 @@
 import config from '../../configs/config.json';
 import indexDBOverlay from '../local/file_worker';
+import in_memory_store from '../local/in_memory'
 import { generateUniqueId } from "../../utils/utils";  // Add this import!
 
 // vectorDb.js
@@ -72,17 +73,35 @@ let DB_DEFAULTS = {
     #vectorPath;
     #lsh;
     #hashIndexStore;
+    #hashIndexStorePrefix = config.hashindex_prefix;
   
   
-    constructor(options = {}) {
-      const { dbName, storeName, vectorPath, dimensions, numPlanes } = {
-          ...DB_DEFAULTS,
-          ...options,
-      };
+  //   constructor(options = {}) {
+  //     const { dbName, storeName, vectorPath, dimensions, numPlanes } = {
+  //         ...DB_DEFAULTS,
+  //         ...options,
+  //     };
   
-      this.#objectStore = storeName || DB_DEFAULTS.objectStore;
+  //     this.#objectStore = storeName || DB_DEFAULTS.objectStore;
+  //   this.#vectorPath = vectorPath || DB_DEFAULTS.vectorPath;
+  //   this.#hashIndexStore = `${this.#objectStore}${DB_DEFAULTS.hashIndexSuffix}`;
+  //   this.#lsh = new LSH(
+  //     dimensions || DB_DEFAULTS.dimensions,
+  //     numPlanes || DB_DEFAULTS.numPlanes
+  //   );
+  // }
+
+  constructor(options = {}) {
+    const { dbName, storeName, vectorPath, dimensions, numPlanes } = {
+      ...DB_DEFAULTS,
+      ...options,
+    };
+
+    this.#objectStore = storeName || DB_DEFAULTS.objectStore;
     this.#vectorPath = vectorPath || DB_DEFAULTS.vectorPath;
     this.#hashIndexStore = `${this.#objectStore}${DB_DEFAULTS.hashIndexSuffix}`;
+
+    // this.#hashIndexStore = `${this.#hashIndexStorePrefix}${localStorage.getItem('myPeerId')}`; // Use peer ID to differentiate
     this.#lsh = new LSH(
       dimensions || DB_DEFAULTS.dimensions,
       numPlanes || DB_DEFAULTS.numPlanes
@@ -296,11 +315,79 @@ async insert(object) {
       throw error;
     }
   }
+
+  async queryAcrossAllVectorHashIndexes(queryVector, options = { limit: 10 }) {
+    const allTables = await indexDBOverlay.getTablesWithPrefix(this.#hashIndexStorePrefix);
+    let results = [];
+
+    for (const table of allTables) {
+      const partialResults = await this.queryFromTable(queryVector, table, options);
+      results = results.concat(partialResults);
+    }
+
+    // Sort and limit results across all tables
+    results.sort((a, b) => b.similarity - a.similarity);
+    return results.slice(0, options.limit);
+  }
+
+  async queryAcrossAllVectorHashIndexesInMemory(queryVector, options = { limit: 10 }) {
+    // Get all table names from the in-memory store that match the hash index prefix
+    const allTables = Object.keys(inMemoryStore.inMemoryStore).filter(tableName =>
+      tableName.startsWith(this.hashIndexStorePrefix)
+    );
+  
+    let results = [];
+  
+    for (const table of allTables) {
+      const partialResults = await this.queryFromInMemoryTable(queryVector, table, options);
+      results = results.concat(partialResults);
+    }
+  
+    // Sort by similarity and limit the number of results
+    results.sort((a, b) => b.similarity - a.similarity);
+    return results.slice(0, options.limit);
+  }
+  
+
+  async queryFromInMemoryTable(queryVector, tableName, options) {
+    const collectedVectors = new Set();
+    let resultObjects = [];
+  
+    // Retrieve all items from the in-memory table
+    const data = await in_memory_store.getAll(tableName);
+  
+    for (const item of data) {
+      if (!collectedVectors.has(item.id)) {
+        collectedVectors.add(item.id);
+        const similarity = this.calculateSimilarity(queryVector, item.vector); // You can replace this with your similarity calculation method
+        resultObjects.push({
+          vectorId: item.id,
+          fileId: item.fileId,
+          similarity,
+          object: item
+        });
+      }
+    }
+  
+    // Sort results by similarity
+    resultObjects.sort((a, b) => b.similarity - a.similarity);
+    return resultObjects.slice(0, options.limit);
+  }
+
+   calculateSimilarity(queryVector, vector) {
+    // Replace with your actual similarity calculation logic, e.g., cosine similarity
+    const dotProduct = queryVector.reduce((sum, q, idx) => sum + q * vector[idx], 0);
+    const queryMagnitude = Math.sqrt(queryVector.reduce((sum, q) => sum + q * q, 0));
+    const vectorMagnitude = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0));
+    return dotProduct / (queryMagnitude * vectorMagnitude);
+  }
   
     get objectStore() {
       // Escape hatch.
       return this.#objectStore;
     }
+
+    
   }
   
   export { VectorDB };

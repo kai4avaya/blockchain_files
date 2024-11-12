@@ -465,8 +465,8 @@ function serializeThreeObject(objectData){
 }
 
 export function diffSceneChanges(
-  scene,
-  nonBloomScene,
+  scene: any,
+  nonBloomScene: any,
   previousSnapShot = SceneState.getSceneObjArray(),
   options: { fromPeer?: boolean } = {}
 ) {

@@ -22,7 +22,7 @@ import { convertToThreeJSFormat, throttle, generateUniqueId } from "../../utils/
 import { diffSceneChanges } from "../../memory/collaboration/scene_colab";
 import { updateConnectedLines } from "./lineGraphs.js";
 // import { runOverallDebug } from "./sceneDebug.js";
-import {filterDuplicateFiles, FileHashTracker } from '../../utils/file_hash.js'
+// import {filterDuplicateFiles, FileHashTracker } from '../../utils/file_hash.js'
 
 let isDragging = false;
 // let isClicking = false;

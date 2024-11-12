@@ -4,6 +4,32 @@
 import config from '../../configs/config.json';
 import {generateVersionNonce} from '../../utils/utils';
 import { p2pSync } from '../../network/peer2peer_simple';
+import { generateGlobalTimestamp, incrementVersion} from '../../utils/utils'
+import in_memory_store from './in_memory'
+
+
+interface VectorConfig {
+  dimensions: number;
+  hyperplanes: number;
+  numPlanes: number;
+  vectorPath: string;
+  hashIndexSuffix: string;
+}
+
+interface StoreConfig {
+  keyPath?: string;
+  vectorConfig?: VectorConfig;
+}
+
+interface DatabaseConfig {
+  excluded: string[];
+  hashindex_prefix: string;
+  excludedSyncTables: string[];
+  dbName: string;
+  dbStores: {
+    [storeName: string]: StoreConfig;
+  };
+}
 
 class IndexDBWorkerOverlay {
   private worker: Worker;
@@ -19,6 +45,9 @@ class IndexDBWorkerOverlay {
   private requestQueue: Array<() => Promise<any>> = [];
   private connectionTimeout: number = 5000; // 5 second timeout for version check
   private isInitialized: boolean;
+  // private currentTableConfigs: any  =  config.dbStores;
+
+
   // constructor() {
   //   this.worker = new Worker(new URL('../../workers/memory_worker.js', import.meta.url));
   //   this.worker.onmessage = this.handleWorkerMessage.bind(this);
@@ -88,6 +117,56 @@ public async initialize(dbName?: string): Promise<void> {
   this.isInitialized = true;
 }
 
+async getAllTables(): Promise<string[]> {
+  if (!this.isInitialized) {
+    await this.initialize(); // Ensure the worker is initialized
+  }
+
+  // Retrieve all the table names from the configuration
+  return Object.keys(config.dbStores);
+}
+
+async getAllTablesAsync(): Promise<string[]> {
+  if (!this.isInitialized) {
+    await this.initialize(); // Ensure the worker is initialized
+  }
+
+  // Ensure that the database is open
+  // await this.openDB();
+
+  // Retrieve all store names using the existing function
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(this.dbName);
+
+    request.onerror = (event) => {
+      reject(new Error('Error opening database: ' + event.target));
+    };
+
+    request.onsuccess = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      const storeNames = Array.from(db.objectStoreNames);
+      db.close(); // Always close the database when done
+      resolve(storeNames);
+    };
+  });
+}
+
+async checkIfTableExists(tableName: string): Promise<boolean> {
+  try {
+    const allTables = await indexDBOverlay.getAllTablesAsync();
+    if (allTables.includes(tableName)) {
+      return true;
+    } else {
+      console.log(`Table "${tableName}" does not exist in the database.`);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error checking table existence:', error);
+    return false;
+  }
+}
+
+
   
   private async getLatestDBVersion(): Promise<number> {
     if (!this.isInitialized) {
@@ -143,6 +222,49 @@ public async initialize(dbName?: string): Promise<void> {
   }
 
   
+  // async openDB(forceRefresh: boolean = false): Promise<void> {
+  //   if (!this.isInitialized) {
+  //     await this.initialize(); // Ensure the worker is initialized
+  //   }
+  //   const operationKey = `openDB-${this.dbName}`;
+    
+  //   if (this.pendingOperations.has(operationKey)) {
+  //     return this.pendingOperations.get(operationKey);
+  //   }
+
+  //   const operation = (async () => {
+  //     if (forceRefresh) {
+  //       await this.closeAllConnections(this.dbName);
+  //     }
+
+  //     try {
+  //       const latestVersion = await this.getLatestDBVersion();
+  //       this.dbVersion = latestVersion;
+
+  //       const storeConfigs = Object.entries(config.dbStores).map(([storeName, storeConfig]) => ({
+  //         storeName,
+  //         keyPath: 'keyPath' in storeConfig ? storeConfig?.keyPath : undefined
+  //       }));
+
+  //       await this.sendToWorkerWithRetry('openDB', { 
+  //         storeConfigs,
+  //         version: latestVersion,
+  //         forceRefresh 
+  //       });
+
+  //       this.isDBOpen = true;
+  //     } catch (error) {
+  //       console.error('Error opening database:', error);
+  //       // Don't throw here - let the operation continue with default values
+  //       this.isDBOpen = true; // Set to true to prevent endless retry loops
+  //     } finally {
+  //       this.pendingOperations.delete(operationKey);
+  //     }
+  //   })();
+
+  //   this.pendingOperations.set(operationKey, operation);
+  //   return operation;
+  // }
   async openDB(forceRefresh: boolean = false): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize(); // Ensure the worker is initialized
@@ -152,41 +274,42 @@ public async initialize(dbName?: string): Promise<void> {
     if (this.pendingOperations.has(operationKey)) {
       return this.pendingOperations.get(operationKey);
     }
-
+  
     const operation = (async () => {
       if (forceRefresh) {
         await this.closeAllConnections(this.dbName);
       }
-
+  
       try {
         const latestVersion = await this.getLatestDBVersion();
         this.dbVersion = latestVersion;
-
+  
         const storeConfigs = Object.entries(config.dbStores).map(([storeName, storeConfig]) => ({
           storeName,
-          keyPath: 'keyPath' in storeConfig ? storeConfig.keyPath : undefined
+          keyPath: 'keyPath' in storeConfig ? storeConfig?.keyPath : undefined
         }));
-
+  
         await this.sendToWorkerWithRetry('openDB', { 
           storeConfigs,
           version: latestVersion,
-          forceRefresh 
+          forceRefresh,
+          preserveExistingStores: true // Ensure existing stores are preserved
         });
-
+  
         this.isDBOpen = true;
       } catch (error) {
         console.error('Error opening database:', error);
-        // Don't throw here - let the operation continue with default values
         this.isDBOpen = true; // Set to true to prevent endless retry loops
       } finally {
         this.pendingOperations.delete(operationKey);
       }
     })();
-
+  
     this.pendingOperations.set(operationKey, operation);
     return operation;
   }
 
+  
   async getAll(storeName: string): Promise<any[]> {
     await this.ensureDBOpen();
     return this.sendToWorkerWithRetry('getAll', { storeName });
@@ -206,7 +329,7 @@ async deleteDatabase(dbName: string) {
       }
     };
     deleteRequest.onerror = (event) => {
-      console.error(`Failed to delete database "${dbName}":`, event.target.error);
+      console.error(`Failed to delete database "${dbName}":`, (event.target as IDBRequest).error);
     };
     deleteRequest.onblocked = () => {
       console.warn(`Deletion of database "${dbName}" is blocked. Please close all open connections.`);
@@ -294,49 +417,88 @@ private async processQueue() {
   }
   
   
+  // private async sendToWorker(action: string, data: any): Promise<any> {
+  //   return new Promise((resolve, reject) => {
+  //       const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        
+  //       const timeoutId = setTimeout(() => {
+  //           this.callbacks.delete(id);
+  //           reject(new Error(`Worker ${action} operation timed out`));
+  //       }, 5000);
+
+  //       this.callbacks.set(id, (result) => {
+  //           clearTimeout(timeoutId);
+  //           if (result && result.error) {
+  //               // If we get a "not found" error, try reinitializing
+  //               if (result.error.includes('not found')) {
+  //                   this.reopenDB()
+  //                       .then(() => this.sendToWorker(action, data))
+  //                       .then(resolve)
+  //                       .catch(reject);
+  //                   return;
+  //               }
+  //               reject(new Error(result.error));
+  //           } else {
+  //               resolve(result);
+  //           }
+  //       });
+
+
+  //       if (!data.key) {
+  //         this.worker.postMessage({ id, action, data });
+  //     } else {
+
+  //         const { key, ...dataWithoutKey } = data;
+  //         this.worker.postMessage({ id, action, data: dataWithoutKey, key });
+  //     }
+  //   });
+  // }
+
   private async sendToWorker(action: string, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
-        const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-        
-        const timeoutId = setTimeout(() => {
-            this.callbacks.delete(id);
-            reject(new Error(`Worker ${action} operation timed out`));
-        }, 5000);
-
-        this.callbacks.set(id, (result) => {
-            clearTimeout(timeoutId);
-            if (result && result.error) {
-                // If we get a "not found" error, try reinitializing
-                if (result.error.includes('not found')) {
-                    this.reopenDB()
-                        .then(() => this.sendToWorker(action, data))
-                        .then(resolve)
-                        .catch(reject);
-                    return;
-                }
-                reject(new Error(result.error));
-            } else {
-                resolve(result);
-            }
-        });
-
-
-        if (!data.key) {
-          this.worker.postMessage({ id, action, data });
+      const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      
+      const timeoutId = setTimeout(() => {
+        this.callbacks.delete(id);
+        reject(new Error(`Worker ${action} operation timed out`));
+      }, 5000);
+  
+      this.callbacks.set(id, (result) => {
+        clearTimeout(timeoutId);
+        if (result && result.error) {
+          // If we get a "not found" error, try reinitializing
+          if (result.error.includes('not found')) {
+            this.reopenDB()
+              .then(() => this.sendToWorker(action, data))
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+          reject(new Error(result.error));
+        } else {
+          resolve(result);
+        }
+      });
+  
+      // Extract the key but keep it in the data
+      const { key } = data;
+  
+      if (!key) {
+        this.worker.postMessage({ id, action, data });
       } else {
-
-          const { key, ...dataWithoutKey } = data;
-          this.worker.postMessage({ id, action, data: dataWithoutKey, key });
+        // Send data without removing the key
+        this.worker.postMessage({ id, action, data, key });
       }
     });
   }
+  
 
 private async ensureDBOpen(): Promise<void> {
   if (!this.isDBOpen) {
     // Get all store configs from config file
     const storeConfigs = Object.entries(config.dbStores).map(([storeName, storeConfig]) => ({
       storeName,
-      keyPath: 'keyPath' in storeConfig ? storeConfig.keyPath : 'id'
+      keyPath: 'keyPath' in storeConfig ? storeConfig?.keyPath : 'id'
     }));
 
     try {
@@ -352,6 +514,19 @@ private async ensureDBOpen(): Promise<void> {
   }
 }
   
+// private getStoreConfig(storeName: string, stores: StoreConfig): any | null {
+//   if (stores[storeName]) {
+//     return stores[storeName];
+//   }
+
+//   for (const key in stores) {
+//     if (key.includes(storeName)) {
+//       return stores[key];
+//     }
+//   }
+
+//   return null;
+// }
 
 private async closeAllConnections(dbName: string): Promise<void> {
   return new Promise((resolve) => {
@@ -374,9 +549,15 @@ async initializeDB(storeNames: string[]): Promise<void> {
 
   const storeConfigs = storeNames.map(storeName => {
     const storeConfig = config.dbStores[storeName as keyof typeof config.dbStores];
+    // if (!storeConfig) {
+    //   return {
+    //     storeName,
+    //     keyPath: null
+    //   }
+    // }
     return {
       storeName,
-      keyPath: 'keyPath' in storeConfig ? storeConfig.keyPath : null // Allow null keyPath for stores that need explicit keys
+      keyPath: 'keyPath' in storeConfig ? storeConfig?.keyPath : null // Allow null keyPath for stores that need explicit keys
     };
   });
   
@@ -408,32 +589,216 @@ async initializeDB(storeNames: string[]): Promise<void> {
       }
   
       
+      // async saveData(storeName: string, data: any, key?: string): Promise<void> {
+      //   try {
+      //     await this.ensureDBOpen();
+      
+      //     // Get the store configuration
+      //     const storeConfig = config.dbStores[storeName as keyof typeof config.dbStores];
+      
+      //     // If the store uses a keyPath (in-line keys), do not include the 'key' parameter
+      //     if (storeConfig && 'keyPath' in storeConfig) {
+      //       await this.sendToWorkerWithRetry('saveData', { 
+      //         storeName, 
+      //         data
+      //       });
+      //     } else {
+      //       // If the store does not use a keyPath, include the 'key' parameter
+      //       await this.sendToWorkerWithRetry('saveData', { 
+      //         storeName, 
+      //         data,
+      //         key
+      //       });
+      //     }
+      
+      //     console.log("saveData pre peer", data, "data?.isFromPeer", data?.isFromPeer);
+      
+      //     // Check if `isFromPeer` is not present in data before broadcasting
+      //     if (!data?.isFromPeer && p2pSync.isConnected() && !config.excludedSyncTables.includes(storeName)) {
+      //       p2pSync.broadcastCustomMessage({
+      //         type: 'db_sync',
+      //         data: {
+      //           tableName: storeName,
+      //           data: data,
+      //           key: key,
+      //           isFromPeer: true,
+      //           version: Date.now(),
+      //           versionNonce: generateVersionNonce(),
+      //           lastEditedBy: localStorage.getItem('login_block') || 'no_login'
+      //         }
+      //       });
+      //     }
+      //   } catch (error) {
+      //     console.error(`Failed to save data to ${storeName}:`, error);
+      //     throw error;
+      //   }
+      // }
+      // async createTableIfNotExists(tableName: string): Promise<void> {
+      //   // Logic to check if the table exists and create it if necessary
+      //   const tables = await this.getAllTables();
+      //   if (!tables.includes(tableName)) {
+      //     await indexDBOverlay.initializeDB([tableName]);
+      //   }
+      // }
+      async createTableIfNotExists(tableName: string): Promise<void> {
+        if (!this.isInitialized) {
+          await this.initialize(); // Ensure the worker is initialized
+        }
+      
+        // Check if the table already exists
+        const tables = await this.getAllTablesAsync();
+        if (tables.includes(tableName)) {
+          console.log(`Table "${tableName}" already exists.`);
+          return; // No need to create if it already exists
+        }
+      
+        // Define the new store configuration
+        const storeConfig = {
+          storeName: tableName,
+          keyPath: 'id', // or whatever keyPath you need
+        };
+      
+        try {
+          // Initialize the new store without affecting existing stores
+          await this.sendToWorkerWithRetry('initializeDB', { storeConfigs: [storeConfig], preserveExistingStores: true });
+          console.log(`Table "${tableName}" created.`);
+        } catch (error) {
+          console.error(`Failed to create table "${tableName}":`, error);
+          throw error;
+        }
+      }
+      
+
+      
+      
+      // async saveData(storeName: string, data: any, key?: string): Promise<void> {
+      //   try {
+      //     await this.ensureDBOpen();
+      
+      //     // Generate version and global timestamp if not present
+      //     if (!data.version) {
+      //       data.version = incrementVersion();
+      //     } else {
+      //       data.version += 1; // Increment version if already exists
+      //     }
+      //     data.globalTimestamp = generateGlobalTimestamp();
+
+      
+      //     // Conflict resolution logic for CRDT-like behavior
+      //     const existingItem = key ? await this.getItem(storeName, key) : null;
+      //     if (existingItem) {
+      //       // Compare existing data with new data based on version and global timestamp
+      //       if (
+      //         data.version > existingItem.version ||
+      //         (data.version === existingItem.version && data.globalTimestamp > existingItem.globalTimestamp)
+      //       ) {
+      //         // New data is considered "newer", so it overwrites the existing data
+      //         console.log(`Overwriting data for key ${key} in ${storeName} due to version/global timestamp comparison`);
+      //       } else {
+      //         // Existing data is newer or equally recent, skip saving
+      //         console.log(`Skipping save for key ${key} in ${storeName} - existing data is newer/equally recent`);
+      //         return;
+      //       }
+      //     }
+      
+      //     // Save the data (overwrites if key is already present)
+      //     const storeConfig = config.dbStores[storeName as keyof typeof config.dbStores];
+      //     if (storeConfig && 'keyPath' in storeConfig) {
+      //       await this.sendToWorkerWithRetry('saveData', { storeName, data });
+      //     } else {
+      //       await this.sendToWorkerWithRetry('saveData', { storeName, data, key });
+      //     }
+      
+      //     // Existing sync logic
+      //     if (!data?.isFromPeer && p2pSync.isConnected() && !config.excludedSyncTables.includes(storeName)) {
+      //       if(await !this.checkIfTableExists(storeName))
+      //         await this.createTableIfNotExists(storeName);
+
+      //       if (storeName === 'vector_hashIndex') {
+      //         storeName = 'vector_hashIndex_' + p2pSync.getCurrentPeerId()
+      //       }
+            
+      //       p2pSync.broadcastCustomMessage({
+      //         type: 'db_sync',
+      //         data: {
+      //           tableName: storeName,
+      //           data: data,
+      //           key: key,
+      //           isFromPeer: true,
+      //           version: data.version,
+      //           globalTimestamp: data.globalTimestamp,
+      //           versionNonce: generateVersionNonce(),
+      //           lastEditedBy: localStorage.getItem('login_block') || 'no_login'
+      //         }
+      //       });
+      //     }
+      //   } catch (error) {
+      //     console.error(`Failed to save data to ${storeName}:`, error);
+      //     throw error;
+      //   }
+      // }
+
       async saveData(storeName: string, data: any, key?: string): Promise<void> {
         try {
           await this.ensureDBOpen();
       
-          // Get the store configuration
-          const storeConfig = config.dbStores[storeName as keyof typeof config.dbStores];
-      
-          // If the store uses a keyPath (in-line keys), do not include the 'key' parameter
-          if (storeConfig && 'keyPath' in storeConfig) {
-            await this.sendToWorkerWithRetry('saveData', { 
-              storeName, 
-              data
-            });
+          // Generate version and global timestamp if not present
+          if (!data.version) {
+            data.version = incrementVersion();
           } else {
-            // If the store does not use a keyPath, include the 'key' parameter
-            await this.sendToWorkerWithRetry('saveData', { 
-              storeName, 
-              data,
-              key
-            });
+            data.version += 1; // Increment version if already exists
+          }
+          data.globalTimestamp = generateGlobalTimestamp();
+      
+          // Handle `vector_hashIndex` special case for creating peer-specific tables
+          if (data?.inFromPeer && storeName.includes('vectors_hashIndex')) {
+
+            console.log("my peer id is", p2pSync.getCurrentPeerId(), "data is", data)
+            console.log("i am saving data from a peer vectors_hashIndex", storeName)
+            // storeName = `vector_hashIndex_${p2pSync.getCurrentPeerId()}`;
+            // Ensure the table exists before saving data
+            if (!(await this.checkIfTableExists(storeName))) {
+              // await this.createTableIfNotExists(storeName);
+                 in_memory_store.createTableIfNotExists(storeName);
+                 in_memory_store.saveData(storeName, data);
+                 return
+            }
           }
       
-          console.log("saveData pre peer", data, "data?.isFromPeer", data?.isFromPeer);
+          // Conflict resolution logic for CRDT-like behavior
+          const existingItem = key ? await this.getItem(storeName, key) : null;
+          if (existingItem) {
+            // Compare existing data with new data based on version and global timestamp
+            if (
+              data.version > existingItem.version ||
+              (data.version === existingItem.version && data.globalTimestamp > existingItem.globalTimestamp)
+            ) {
+              // New data is considered "newer", so it overwrites the existing data
+              console.log(`Overwriting data for key ${key} in ${storeName} due to version/global timestamp comparison`);
+            } else {
+              // Existing data is newer or equally recent, skip saving
+              console.log(`Skipping save for key ${key} in ${storeName} - existing data is newer/equally recent`);
+              return;
+            }
+          }
       
-          // Check if `isFromPeer` is not present in data before broadcasting
+          // Save the data (overwrites if key is already present)
+          const storeConfig = config.dbStores[storeName as keyof typeof config.dbStores];
+          if (storeConfig && 'keyPath' in storeConfig) {
+            await this.sendToWorkerWithRetry('saveData', { storeName, data });
+          } else {
+            await this.sendToWorkerWithRetry('saveData', { storeName, data, key });
+          }
+      
+          // Existing sync logic for broadcasting changes
           if (!data?.isFromPeer && p2pSync.isConnected() && !config.excludedSyncTables.includes(storeName)) {
+            const currentPeerId = p2pSync.getCurrentPeerId();
+
+            console.log("currentPeerId", currentPeerId)
+    
+            if(storeName.includes('vectors_hashIndex') && currentPeerId){
+              storeName = `${storeName}_${currentPeerId}`;
+          }
             p2pSync.broadcastCustomMessage({
               type: 'db_sync',
               data: {
@@ -441,7 +806,8 @@ async initializeDB(storeNames: string[]): Promise<void> {
                 data: data,
                 key: key,
                 isFromPeer: true,
-                version: Date.now(),
+                version: data.version,
+                globalTimestamp: data.globalTimestamp,
                 versionNonce: generateVersionNonce(),
                 lastEditedBy: localStorage.getItem('login_block') || 'no_login'
               }
@@ -452,6 +818,12 @@ async initializeDB(storeNames: string[]): Promise<void> {
           throw error;
         }
       }
+      
+      async getTablesWithPrefix(prefix: string): Promise<string[]> {
+        const allTables = await this.getAllTablesAsync(); // Fetch all table names
+        return allTables.filter(tableName => tableName.startsWith(prefix));
+      }
+      
       
   
       async getItem(storeName: string, key: string): Promise<any> {

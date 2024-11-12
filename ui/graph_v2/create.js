@@ -30,6 +30,8 @@ import {
 } from "../../ai/umap.js";
 import MouseOverlayCanvas from "./MouseOverlayCanvas";
 import { Frustum, Matrix4 } from "three";
+import indexDBOverlay from '../../memory/local/file_worker';
+
 const frustum = new Frustum();
 const projScreenMatrix = new Matrix4();
 
@@ -1633,6 +1635,17 @@ export function reconstructScene(snapshot) {
   markNeedsRender();
   saveSceneSnapshot();
 }
+
+export function reconstructFromGraphData() {
+  setTimeout(async () => {
+      const graphData = await indexDBOverlay.getData("graph");
+      if (graphData && graphData.length > 0) {
+          reconstructScene(graphData);
+      }
+  }, 0);
+}
+
+
 
 function updateObjectProperties(object, objectState) {
   objectState.isUpdated = false;
