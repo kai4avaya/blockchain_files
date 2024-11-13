@@ -168,20 +168,6 @@ class P2PLeaderCoordinator {
     });
   }
 
-  // private async handleDatabaseSync(syncData: { tableName: string; data: any[] }) {
-  //   const { tableName, data } = syncData;
-
-  //   // Ensure no duplicate rows before saving
-  //   for (const item of data) {
-  //     const existingItems = await indexDBOverlay.getAll(tableName);
-  //     const itemExists = existingItems.some(
-  //       (existingItem) => existingItem.id === item.id
-  //     );
-  //     if (!itemExists) {
-  //       await indexDBOverlay.saveData(tableName, item, item.id);
-  //     }
-  //   }
-  // }
 
   // this will trigger a sync with the peer that just connected
   public triggerInitialDbSync(conn: DataConnection): void {
@@ -252,17 +238,6 @@ class P2PLeaderCoordinator {
     this.triggerSceneReconstruction();
     // if(tableName === "graph") this.triggerSceneReconstruction()
   }
-
-  // We will need to call a reconstruct scene here
-  // private reconstructSceneFromDB() {
-  //   // Fire and forget - don't await
-  //   setTimeout(async () => {
-  //     const graphData = await indexDBOverlay.getData("graph");
-  //     if (graphData && graphData.length > 0) {
-  //       sceneState.syncWithPeer(graphData);
-  //     }
-  //   }, 0);
-  // }
 
   private triggerSceneReconstruction() {
     setTimeout(async () => {

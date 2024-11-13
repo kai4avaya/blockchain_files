@@ -6,6 +6,16 @@ interface InMemoryData {
     [key: string]: any;
   }
   
+  enum Operation {
+    CreateTable,
+    GetAll,
+    SaveData,
+    DeleteData,
+    CheckExists,
+    GetData,
+    UpdateData,
+  }
+
   class InMemory {
     private inMemoryStore: Record<string, InMemoryData[]>;
   
@@ -13,6 +23,54 @@ interface InMemoryData {
       this.inMemoryStore = {}; // Initialize the in-memory store
       this.loadFromLocalStorage(); // Load existing data from localStorage
     }
+
+    async route(operation: string, tableName: string, data?: InMemoryData, key?: string): Promise<any> {
+      switch (operation) {
+        case "create table":
+          await this.createTableIfNotExists(tableName);
+          break;
+        case "get all":
+          return await this.getAll(tableName);
+        case "save data":
+          await this.saveData(tableName, data!, key);
+          break;
+        case "delete data":
+          await this.deleteData(tableName, key!);
+          break;
+        case "get data":
+          return await this.getData(tableName, key!);
+        case "update data":
+          await this.updateData(tableName, data!, key!);
+        default:
+          throw new Error(`Invalid operation: ${operation}`);
+      }
+    }
+
+    async getData(tableName: string, key: string): Promise<InMemoryData | undefined> {
+      if (!this.inMemoryStore[tableName]) {
+        console.warn(`Table "${tableName}" does not exist.`);
+        return undefined;
+      }
+  
+      return this.inMemoryStore[tableName].find(item => item.id === key || item.key === key);
+    }
+  
+    async updateData(tableName: string, data: InMemoryData, key: string): Promise<void> {
+      if (!this.inMemoryStore[tableName]) {
+        console.warn(`Table "${tableName}" does not exist.`);
+        return;
+      }
+  
+      const existingIndex = this.inMemoryStore[tableName].findIndex(item => item.id === key || item.key === key);
+      if (existingIndex !== -1) {
+        // Update the existing item
+        this.inMemoryStore[tableName][existingIndex] = data;
+        this.saveToLocalStorage();
+      } else {
+        console.warn(`Item with key "${key}" not found in table "${tableName}".`);
+      }
+    }
+  
   
     async createTableIfNotExists(tableName: string): Promise<void> {
       if (this.inMemoryStore[tableName]) {

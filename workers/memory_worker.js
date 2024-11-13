@@ -9,49 +9,6 @@ self.addEventListener('message', function(e) {
   }
 });
 
-// async function openDB(storeConfigs, version = undefined) {
-//   return new Promise((resolve, reject) => {
-//     const request = version
-//       ? indexedDB.open(DEFAULT_DB_NAME, version)
-//       : indexedDB.open(DEFAULT_DB_NAME);
-
-//     request.onupgradeneeded = function (event) {
-//       const db = event.target.result;
-      
-//       // Delete and recreate all stores defined in storeConfigs
-//       storeConfigs.forEach(({ storeName, keyPath }) => {
-//         if (db.objectStoreNames.contains(storeName)) {
-//           db.deleteObjectStore(storeName);
-//         }
-//         db.createObjectStore(storeName, { keyPath });
-//       });
-//     };
-
-//     request.onsuccess = function (event) {
-//       const db = event.target.result;
-//       dbs[DEFAULT_DB_NAME] = db;
-
-//       // Listen for close events
-//       db.onclose = () => {
-//         delete dbs[DEFAULT_DB_NAME];
-//       };
-
-//       resolve({ message: "Database opened successfully", version: db.version });
-//     };
-
-//     request.onerror = function (event) {
-//       console.error(
-//         `Error opening IndexedDB: ${event.target.error.message} | Database: ${DEFAULT_DB_NAME}`
-//       );
-//       reject(
-//         new Error(
-//           `Error opening IndexedDB: ${event.target.error.message} | Database: ${DEFAULT_DB_NAME}`
-//         )
-//       );
-//     };
-//   });
-// }
-
 async function openDB(storeConfigs, version = undefined, preserveExistingStores = false) {
   return new Promise((resolve, reject) => {
     const request = version
