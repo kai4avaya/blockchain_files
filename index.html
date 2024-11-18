@@ -1527,7 +1527,7 @@
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
           <circle cx="12" cy="7" r="4"></circle>
         </svg>
-        <span class="tooltip">Profile</span>
+        <span class="tooltip">Connect to peers</span>
       </div>
       <div class="sidebar-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -1585,37 +1585,14 @@
         <div class="tree" id="fileTree">
 
           <div class="tree">
-            <!-- <ul>
-              <li><i class="fa fa-folder-open"></i> Project
-                <ul>
-                  <li><i class="fa fa-folder-open"></i> Opened Folder <span>- 15kb</span>
-                    <ul>
-                      <li><i class="fa fa-folder-open"></i> css
-                        <ul>
-                          <li><i class="fa fa-code"></i> CSS Files <span>- 3kb</span>
-                          </li>
-
-                        </ul>
-                      </li>
-                      <li><i class="fa fa-folder"></i> Folder close <span>- 10kb</span>
-                      </li>
-                      <li><i class="fab fa-html5"></i> index.html</li>
-                      <li><i class="fa fa-picture-o"></i> favicon.ico</li>
-                    </ul>
-                  </li>
-                  <li><i class="fa fa-folder"></i> Folder close <span>- 420kb</span>
-
-                  </li>
-                </ul>
-              </li>
-            </ul> -->
+        
           </div>
         </div>
 
         </div>
       </div>
     </div>
-    <div class="modal" style=" pointer-events: all !important;">
+    <div class="modal" style="pointer-events: all !important;">
       <input type="text" class="p2p_peer_input" id="userIdInput" placeholder="Enter your user ID"
         style="pointer-events: all !important;">
       <input type="text" class="p2p_peer_input" id="peerIdInput" placeholder="Enter peer ID to connect"
@@ -1625,6 +1602,21 @@
         <span class="tooltip">Click to connect to the peer</span>
       </button>
       <div id="status"></div>
+    </div>
+
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal" style="display: none; pointer-events: all !important;">
+      <input type="text" class="settings-input" id="aiProviderInput" placeholder="Enter your AI provider">
+      <select class="modal-select" id="aiModelSelect">
+        <option value="">Select AI Model</option>
+        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+        <option value="gpt-4">GPT-4</option>
+        <option value="claude-2">Claude 2</option>
+        <option value="palm">PaLM</option>
+      </select>
+      <input type="text" class="settings-input" id="apiKeyInput" placeholder="Enter your API key">
+      <button id="saveSettingsButton">Save Settings</button>
     </div>
 
     <div id="popup"></div>
