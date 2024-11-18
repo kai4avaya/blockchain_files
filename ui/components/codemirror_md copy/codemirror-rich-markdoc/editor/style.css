@@ -1,0 +1,183 @@
+.cm-markdoc-hidden {
+  display: none;
+}
+
+.cm-markdoc-bullet * {
+  display: none;
+}
+
+.cm-markdoc-bullet::after {
+  display: inline !important;
+  color: darkgray;
+  content: '•';
+}
+
+.cm-markdoc-renderBlock {
+  font-family: sans-serif;
+}
+
+.cm-markdoc-renderBlock table {
+  border-collapse: collapse;
+  margin-left: 5px;
+}
+
+.cm-markdoc-renderBlock th,
+.cm-markdoc-renderBlock td {
+  border: 1px solid lightgray;
+  padding: 5px 10px;
+}
+
+.cm-markdoc-renderBlock blockquote {
+  border-left: 3px solid lightgray;
+  padding-left: 10px;
+  margin: 0 0 0 15px;
+}
+
+.cm-markdoc-renderBlock p {
+  margin: 3px;
+}
+
+.cm-markdoc-tag {
+  color: darkgray;
+}
+
+.cm-markdoc-fallbackTag {
+  border: 2px solid rgb(97, 70, 155);
+  border-radius: 3px;
+  margin: 0 5px;
+}
+
+.cm-markdoc-fallbackTag--name {
+  background-color: rgb(97, 70, 155);
+  color: white;
+  padding: 5px;
+}
+
+.cm-markdoc-fallbackTag--inner {
+  padding: 10px;
+}
+
+.cm-markdoc-callout {
+  border: 1px solid rgb(227, 232, 238);
+  background: rgb(247, 250, 252);
+  border-radius: 3px;
+  display: flex;
+  padding: 10px;
+  margin: 0 5px;
+}
+
+.cm-markdoc-callout .icon {
+  font-size: 24px;
+  margin-right: 10px;
+  color: rgb(164, 205, 254);
+}
+
+.cm-markdoc-callout--warning {
+  background-color: rgb(252, 249, 233);
+  border-color: rgb(249, 229, 185);
+}
+
+.cm-markdoc-callout--warning .icon {
+  color: rgb(229, 153, 62);
+}
+
+/* NEW */
+
+
+/* Updated styles for editor container and CodeMirror */
+#editor-container {
+  height: 100%; /* Takes full height of parent */
+  overflow: hidden; /* Prevents scrollbars on the container itself */
+}
+
+.cm-editor {
+  height: 100%;
+  overflow: hidden; /* Hide overflow on the editor wrapper */
+}
+
+
+.cm-scroller {
+  overflow-y: auto !important;
+  height: calc(100% - 50px) !important; /* Subtract 50px from height for padding */
+  padding-bottom: 50px !important; /* Add 50px padding at the bottom */
+}
+
+/* Optional: Style the scrollbar for webkit browsers */
+.cm-scroller::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cm-scroller::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.cm-scroller::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.cm-scroller::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Ensure the content area takes full width */
+.cm-content {
+  width: 100%;
+}
+
+/*  ai */
+
+.cm-ai-placeholder::before {
+  content: '// Send last input to AI | /// Send entire note to AI';
+  color: #888;
+  font-style: italic;
+  position: absolute;
+  left: 4px;
+}
+
+.overflow-button {
+  padding: 2px 8px;
+  cursor: pointer;
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+
+
+.dropdown-item:hover {
+  background: #f0f0f0;
+}
+
+.dropdown-tab {
+  cursor: pointer;
+  position: relative;
+}
+
+.tab-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  z-index: 1000;
+  min-width: 120px;
+}
+
+.dropdown-item {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.dropdown-item:hover {
+  background: #f0f0f0;
+}
+
+.editor-tab.dropdown-tab {
+  max-width: 80px;  /* Limit dropdown tab width */
+  position: relative;
+  margin-right: 40px; /* Make space for + button */
+}
+
