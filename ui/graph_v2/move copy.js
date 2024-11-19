@@ -15,13 +15,16 @@ import {
   createSceneSnapshot,
   getObjectById,
   getCubeContainingSphere,
+  findSpheresInCube
 } from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
 import * as THREE from "three";
-import { convertToThreeJSFormat, throttle } from "../../utils/utils";
+import { convertToThreeJSFormat, throttle, generateUniqueId } from "../../utils/utils";
 import { diffSceneChanges } from "../../memory/collaboration/scene_colab";
 import { updateConnectedLines } from "./lineGraphs.js";
-import { runOverallDebug } from "./sceneDebug.js";
+
+import { getFileSystem } from "../../memory/collaboration/file_colab";
+
 
 let isDragging = false;
 // let isClicking = false;
@@ -46,7 +49,28 @@ const planeNormal = new THREE.Vector3();
 const plane = new THREE.Plane();
 const loginName = localStorage.getItem("login_block") || "no_login";
 
+window.fileMetadata = new Map(); // Track file metadata globally
+
 setupDragAndDrop();
+
+
+// this function updates the folder metadata with the current sphere IDs
+async function updateCubeContents(cube, spheres) {
+  if (!cube?.userData?.folderId) return;
+  
+  const fileSystem = getFileSystem();
+  const folderMetadata = await fileSystem.getMetadata(cube.userData.folderId, 'directory');
+  
+  if (folderMetadata) {
+    // Update folder's fileIds with current sphere IDs
+    folderMetadata.fileIds = spheres.map(sphere => sphere.userData.id);
+    folderMetadata.lastModified = Date.now();
+    
+    // Update the folder in file system
+    await fileSystem.addOrUpdateItem(folderMetadata, 'directory');
+    window.dispatchEvent(new CustomEvent('updateFileTree'));
+  }
+}
 
 function getCubeUnderPointer(event, intersects) {
   const { camera, scene, nonBloomScene, controls, renderer } = share3dDat();
@@ -112,7 +136,9 @@ function getCubeUnderPointer(event, intersects) {
 }
 
 // Define a global drag plane (e.g., XZ-plane)
-const globalDragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Y-up plane
+// const globalDragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Y-up plane
+const dragPlane = new THREE.Plane();
+
 
 export function dragCube() {
   const { camera, raycaster } = share3dDat();
@@ -126,7 +152,13 @@ export function dragCube() {
 
   // Calculate the intersection point with the global drag plane
   const intersectionPoint = new THREE.Vector3();
-  raycaster.ray.intersectPlane(globalDragPlane, intersectionPoint);
+  dragPlane.setFromNormalAndCoplanarPoint(
+    camera.getWorldDirection(new THREE.Vector3()),
+    selectedObject.wireframeCube.position
+);
+  // raycaster.ray.intersectPlane(globalDragPlane, intersectionPoint);
+  raycaster.ray.intersectPlane(dragPlane, intersectionPoint);
+
 
   if (previousIntersectPoint === undefined) {
     previousIntersectPoint = intersectionPoint.clone();
@@ -167,57 +199,6 @@ export function dragCube() {
 export function labelListerners(labelDiv, sphere) {
   const { controls } = share3dDat();
 
-  //   // Add event listeners to enable dragging the sphere via its label
-  // labelDiv.addEventListener('pointerdown', (event) => {
-  //   event.preventDefault();
-  //   event.stopPropagation();
-  //   // Record initial pointer position
-  //   initialPointerPosition = { x: event.clientX, y: event.clientY };
-
-  //   isDragging = false; // We will set to true when moved enough
-  //   selectedSphere = sphere;
-  //   selectedObject = sphere;
-
-  //   // Disable controls during drag
-  //   controls.enabled = false;
-
-  //   // Set pointer capture
-  //   labelDiv.setPointerCapture(event.pointerId);
-  // });
-
-  // labelDiv.addEventListener('pointermove', (event) => {
-  //   if (!selectedSphere || selectedSphere !== sphere) return;
-
-  //   const deltaX = event.clientX - initialPointerPosition.x;
-  //   const deltaY = event.clientY - initialPointerPosition.y;
-  //   const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-  //   if (distanceMoved > DRAG_THRESHOLD) {
-  //     isDragging = true;
-  //     controls.enabled = false;
-  //   }
-
-  //   if (isDragging) {
-  //     moveSphere(event);
-  //     markNeedsRender();
-  //   }
-  // });
-
-  // labelDiv.addEventListener('pointerup', (event) => {
-  //   if (selectedSphere === sphere) {
-  //     // Always call onPointerUp to handle clicks and drags
-  //     onPointerUp(event);
-
-  //     // Reset variables
-  //     isDragging = false;
-  //     selectedSphere = null;
-  //     selectedObject = null;
-  //     controls.enabled = true;
-
-  //     // Release pointer capture
-  //     labelDiv.releasePointerCapture(event.pointerId);
-  //   }
-  // });
 
   labelDiv.style.pointerEvents = "none";
 }
@@ -287,45 +268,142 @@ export function getObjectUnderPointer(event, objectType = "") {
   return intersects[0].object;
 }
 
+// export function moveSphere(event, sphere, intersectPointIn = null) {
+//   const { camera, renderer } = share3dDat();
+//   const canvas = renderer.domElement;
+//   const rect = canvas.getBoundingClientRect();
+
+//   // Calculate mouse position relative to the canvas
+//   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+//   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+//   raycaster.setFromCamera(mouse, camera);
+
+//   const targetSphere = sphere || selectedSphere;
+
+//   if (!targetSphere) return;
+
+//   // Store the original distance from the camera
+//   const originalDistance = camera.position.distanceTo(targetSphere.position);
+
+//   planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+//   plane.setFromNormalAndCoplanarPoint(planeNormal, targetSphere.position);
+
+//   let newIntersectPoint = intersectPointIn || intersectPoint; //new THREE.Vector3();
+//   raycaster.ray.intersectPlane(plane, newIntersectPoint);
+
+//   // Move the sphere to the new position
+//   targetSphere.position.copy(newIntersectPoint);
+
+//   // Calculate the new distance from the camera
+//   const newDistance = camera.position.distanceTo(targetSphere.position);
+
+//   // Adjust the scale to maintain apparent size
+//   const scaleFactor = newDistance / originalDistance;
+//   targetSphere.scale.multiplyScalar(scaleFactor);
+
+//   updateConnectedLines();
+//   // handleFileDragOver(event);
+//   // render();
+//   markNeedsRender();
+// }
+
+// // ... existing code ...
+// export function moveSphere(event, sphere, intersectPointIn = null) {
+//   const { camera, renderer } = share3dDat();
+//   const canvas = renderer.domElement;
+//   const rect = canvas.getBoundingClientRect();
+
+//   // Calculate mouse position relative to the canvas
+//   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+//   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+//   raycaster.setFromCamera(mouse, camera);
+
+//   const targetSphere = sphere || selectedSphere;
+//   if (!targetSphere) return;
+
+//   // Store the original distance and size
+//   const originalDistance = camera.position.distanceTo(targetSphere.position);
+//   const originalScale = targetSphere.scale.clone();
+
+//   if (event.shiftKey) {
+//     // More responsive Z movement using mouse Y position instead of movement
+//     const mouseYNormalized = ((event.clientY - rect.top) / rect.height - 0.5) * 2; // Removed the negative sign
+//     const zSpeed = 2; // Adjust this value to control Z movement speed
+//     targetSphere.position.z = mouseYNormalized * zSpeed;
+// }else {
+//     // Regular X-Y plane movement
+//     planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+//     plane.setFromNormalAndCoplanarPoint(planeNormal, targetSphere.position);
+
+//     let newIntersectPoint = intersectPointIn || intersectPoint;
+//     raycaster.ray.intersectPlane(plane, newIntersectPoint);
+//     targetSphere.position.copy(newIntersectPoint);
+//   }
+
+//   // Calculate the new distance from the camera
+//   const newDistance = camera.position.distanceTo(targetSphere.position);
+
+//   // Adjust scale based on distance ratio
+//   const scaleFactor = originalDistance / newDistance; // Inverted ratio for correct scaling
+//   targetSphere.scale.copy(originalScale).multiplyScalar(scaleFactor);
+
+//   updateConnectedLines();
+//   markNeedsRender();
+// }
 export function moveSphere(event, sphere, intersectPointIn = null) {
   const { camera, renderer } = share3dDat();
   const canvas = renderer.domElement;
   const rect = canvas.getBoundingClientRect();
 
-  // Calculate mouse position relative to the canvas
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
 
   const targetSphere = sphere || selectedSphere;
-
   if (!targetSphere) return;
 
-  // Store the original distance from the camera
   const originalDistance = camera.position.distanceTo(targetSphere.position);
+  const originalScale = targetSphere.scale.clone();
 
-  planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
-  plane.setFromNormalAndCoplanarPoint(planeNormal, targetSphere.position);
+  if (event.shiftKey) {
+    // Get camera's forward direction
+    const cameraDirection = new THREE.Vector3();
+    camera.getWorldDirection(cameraDirection);
+    
+    // Use mouse movement delta instead of absolute position
+    const movementY = event.movementY || 0;
+    const moveSpeed = 0.15; // Adjust for smoother movement
+    
+    // Move along camera's view direction using delta
+  // Move along camera's view direction using delta
+targetSphere.position.addScaledVector(
+  cameraDirection,
+  -movementY * moveSpeed  // Added negative sign here
+);
+  } else {
+    // Regular X-Y plane movement in camera's view plane
+    planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+    plane.setFromNormalAndCoplanarPoint(planeNormal, targetSphere.position);
 
-  let newIntersectPoint = intersectPointIn || intersectPoint; //new THREE.Vector3();
-  raycaster.ray.intersectPlane(plane, newIntersectPoint);
-
-  // Move the sphere to the new position
-  targetSphere.position.copy(newIntersectPoint);
+    let newIntersectPoint = intersectPointIn || intersectPoint;
+    raycaster.ray.intersectPlane(plane, newIntersectPoint);
+    targetSphere.position.copy(newIntersectPoint);
+  }
 
   // Calculate the new distance from the camera
   const newDistance = camera.position.distanceTo(targetSphere.position);
 
-  // Adjust the scale to maintain apparent size
-  const scaleFactor = newDistance / originalDistance;
-  targetSphere.scale.multiplyScalar(scaleFactor);
+  // Adjust scale based on distance ratio
+  const scaleFactor = originalDistance / newDistance;
+  targetSphere.scale.copy(originalScale).multiplyScalar(scaleFactor);
 
   updateConnectedLines();
-  // handleFileDragOver(event);
-  // render();
   markNeedsRender();
 }
+
 
 function normalizeSize(fileSize) {
   const maxSize = 10;
@@ -404,114 +482,387 @@ function resetCubeHighlight() {
 }
 
 // async function handleFileDrop_sphere(event) {
-function handleFileDrop_sphere(event) {
+//   // If this is a custom event from tab drop, use the detail
+//   const processEvent = event.detail || event;
+  
+//   isFileDragging = false;
+//   resetCubeHighlight();
+//   const { camera, scene, nonBloomScene, renderer } = share3dDat();
+
+//   const dt = processEvent.dataTransfer;
+//   const fileList = dt?.files;
+
+//   // Check for duplicates before processing
+//   const { filteredFiles, duplicates } = await filterDuplicateFiles(fileList);
+  
+//   // If there were duplicates, notify the user
+//   if (duplicates.length > 0) {
+//       duplicates.forEach(({ file, original }) => {
+//           console.warn(`Duplicate file rejected: ${file.name} (Original: ${original.filename})`);
+//       });
+//   }
+
+//   // Update the dataTransfer with filtered files
+//   if (processEvent.dataTransfer) {
+//       processEvent.dataTransfer.files = filteredFiles;
+//   }
+
+//   // Continue with existing logic using filtered files
+//   const { fileIds, fileNames, fileEntries } = handleFileDrop(processEvent);
+
+//   // Rest of your existing code remains exactly the same
+//   console.log('fileIds:', filteredFiles, fileIds);
+
+//   const canvas = renderer.domElement;
+//   const rect = canvas.getBoundingClientRect();
+
+//   mouse.x = ((processEvent.clientX - rect.left) / rect.width) * 2 - 1;
+//   mouse.y = -((processEvent.clientY - rect.top) / rect.height) * 2 + 1;
+//   raycaster.setFromCamera(mouse, camera);
+
+//   let createdShapes = [];
+//   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+
+//   if (filteredFiles) {
+//     for (let i = 0; i < filteredFiles.length; i++) {
+//       const file = fileList[i];
+//       const fileId = fileIds[i] || generateUniqueId();
+//       const size = normalizeSize(file.size);
+
+//       if (allIntersects.length > 0) {
+//         const intersect = allIntersects[0];
+//         const dropPosition = intersect.point;
+
+//         const sphereData = convertToThreeJSFormat({
+//           position: [dropPosition.x, dropPosition.y, dropPosition.z],
+//           size: size,
+//           userData: { 
+//             id: fileId,
+//             filename: file.name,
+//             isTab: !!processEvent.tabId,
+//             content: processEvent.source?.data?.content
+//           },
+//           color: randomColorGenerator(),
+//           lastEditedBy: loginName,
+//         });
+
+//         createdShapes.push(createSphere(sphereData));
+//       } else {
+//         // Handle drop in empty space
+//         planeNormal.copy(camera.getWorldDirection(new THREE.Vector3()));
+//         const distance = 40;
+//         const planePoint = camera.position
+//           .clone()
+//           .add(planeNormal.clone().multiplyScalar(distance));
+//         plane.setFromNormalAndCoplanarPoint(planeNormal, planePoint);
+//         raycaster.ray.intersectPlane(plane, intersectPoint);
+
+//         const sphereData = convertToThreeJSFormat({
+//           position: [intersectPoint.x, intersectPoint.y, intersectPoint.z],
+//           size: size,
+//           userData: { 
+//             id: fileId,
+//             filename: file.name,
+//             isTab: !!processEvent.tabId,
+//             content: processEvent.source?.data?.content
+//           },
+//           color: randomColorGenerator(),
+//           lastEditedBy: loginName,
+//         });
+
+//         createdShapes.push(createSphere(sphereData));
+//       }
+//     }
+//   }
+
+//   // Reset cube highlighting
+//   if (CUBEINTERSECTED) {
+//     resetCubeColor(CUBEINTERSECTED);
+//     CUBEINTERSECTED = null;
+//   }
+// }
+
+function createFilteredEvent(originalEvent, validFiles) {
+  // Create new DataTransfer with only valid files
+  const newDataTransfer = new DataTransfer();
+  validFiles.forEach(file => newDataTransfer.items.add(file));
+
+  // Create a proxy event that preserves all original event methods and properties
+  return new Proxy(originalEvent, {
+      get: (target, prop) => {
+          if (prop === 'dataTransfer') {
+              return newDataTransfer;
+          }
+          // Preserve original methods and properties
+          return typeof target[prop] === 'function'
+              ? target[prop].bind(target)  // Bind methods to original event
+              : target[prop];              // Return original properties
+      }
+  });
+}
+
+// async function handleFileDrop_sphere(event) {
+//   const processEvent = event.detail || event;
+  
+//   isFileDragging = false;
+//   resetCubeHighlight();
+//   const { camera, scene, nonBloomScene, renderer } = share3dDat();
+
+//   const dt = processEvent.dataTransfer;
+//   const fileList = dt?.files;
+
+//   // This is now a synchronous operation
+//   const { validFiles, duplicates } = filterDuplicateFiles(fileList);
+  
+//   if (duplicates.length > 0) {
+//       duplicates.forEach(({ file }) => {
+//           console.warn(`Duplicate file rejected: ${file.name}`);
+//       });
+//   }
+
+//   if(validFiles.length === 0) {
+//       console.warn("No valid files to process.");
+//       return;
+//   }
+
+//   // Create filtered event that preserves all original event functionality
+//   const filteredEvent = createFilteredEvent(processEvent, validFiles);
+
+//   // Process only valid files
+//   const { fileIds, fileNames, fileEntries } = handleFileDrop(filteredEvent);
+
+//   console.log("fileIds, fileNames, fileEntries", fileIds, fileNames, fileEntries)
+//   // Rest of your code remains exactly the same...
+//   const canvas = renderer.domElement;
+//   const rect = canvas.getBoundingClientRect();
+
+//   mouse.x = ((processEvent.clientX - rect.left) / rect.width) * 2 - 1;
+//   mouse.y = -((processEvent.clientY - rect.top) / rect.height) * 2 + 1;
+//   raycaster.setFromCamera(mouse, camera);
+
+//   let createdShapes = [];
+//   const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+
+//   if (validFiles.length > 0) {
+//       for (let i = 0; i < validFiles.length; i++) {
+//           const file = validFiles[i];
+//           const fileId = fileIds[i] || generateUniqueId();
+//           const size = normalizeSize(file.size);
+
+//           if (allIntersects.length > 0) {
+//               const intersect = allIntersects[0];
+//               const dropPosition = intersect.point;
+
+//               const sphereData = convertToThreeJSFormat({
+//                   position: [dropPosition.x, dropPosition.y, dropPosition.z],
+//                   size: size,
+//                   userData: { 
+//                       id: fileId,
+//                       filename: file.name,
+//                       isTab: !!processEvent.tabId,
+//                       content: processEvent.source?.data?.content
+//                   },
+//                   color: randomColorGenerator(),
+//                   lastEditedBy: loginName,
+//               });
+
+//               createdShapes.push(createSphere(sphereData));
+//           } else {
+//               // Handle drop in empty space
+//               planeNormal.copy(camera.getWorldDirection(new THREE.Vector3()));
+//               const distance = 40;
+//               const planePoint = camera.position
+//                   .clone()
+//                   .add(planeNormal.clone().multiplyScalar(distance));
+//               plane.setFromNormalAndCoplanarPoint(planeNormal, planePoint);
+//               raycaster.ray.intersectPlane(plane, intersectPoint);
+
+//               const sphereData = convertToThreeJSFormat({
+//                   position: [intersectPoint.x, intersectPoint.y, intersectPoint.z],
+//                   size: size,
+//                   userData: { 
+//                       id: fileId,
+//                       filename: file.name,
+//                       isTab: !!processEvent.tabId,
+//                       content: processEvent.source?.data?.content
+//                   },
+//                   color: randomColorGenerator(),
+//                   lastEditedBy: loginName,
+//               });
+
+//               createdShapes.push(createSphere(sphereData));
+//           }
+//       }
+//   }
+
+//   // Reset cube highlighting
+//   if (CUBEINTERSECTED) {
+//       resetCubeColor(CUBEINTERSECTED);
+//       CUBEINTERSECTED = null;
+//   }
+// }
+function isFileDuplicate(fileName) {
+  const { labelMap } = share3dDat();
+  console.log("i am labelMap keys", labelMap.keys());
+  
+  // Check if the fileName exists as a key in labelMap
+  return labelMap.has(fileName);
+}
+
+// async function handleFileDrop_sphere(event) {
+//   const processEvent = event.detail || event;
+//   isFileDragging = false;
+//   resetCubeHighlight();
+//   const { camera, scene, nonBloomScene, renderer } = share3dDat();
+
+//   const dt = processEvent.dataTransfer;
+//   const fileList = dt?.files;
+//   const { validFiles, duplicates } = filterDuplicateFiles(fileList);
+
+//   if (duplicates.length > 0) {
+//     let alertMessage = "Duplicate files detected:\n";
+//     duplicates.forEach(({ file }) => {
+//       alertMessage += `- ${file.name}\n`;
+//     });
+//     alert(alertMessage);
+//   }
+
+//   if (validFiles.length === 0) {
+//     console.warn("No valid files to process.");
+//     return;
+//   }
+
+async function handleFileDrop_sphere(event) {
+  const processEvent = event.detail || event;
   isFileDragging = false;
   resetCubeHighlight();
   const { camera, scene, nonBloomScene, renderer } = share3dDat();
 
-  const dt = event.dataTransfer;
+  const dt = processEvent.dataTransfer;
   const fileList = dt?.files;
 
-  const canvas = renderer.domElement;
-  const rect = canvas.getBoundingClientRect();
+  // Check for duplicates using isFileDuplicate
+  const duplicates = [];
+  const validFiles = [];
 
-  // Calculate mouse position relative to the canvas
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-
-  let createdShapes = [];
-
-  const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
-  let dataObject = {};
-
-  const firstSphereIntersect = allIntersects.find(
-    (intersect) => intersect.object.geometry.type === "IcosahedronGeometry"
-  );
-
-  const { fileIds, fileNames, fileEntries } = handleFileDrop(event);
-  for (let i = 0; i < fileList.length; i++) {
-    const file = fileList[i];
-    const size = normalizeSize(file.size);
-
-    if (allIntersects.length > 0) {
-      const intersect = allIntersects[0];
-      const dropPosition = intersect.point;
-
-      const sphereData = convertToThreeJSFormat({
-        position: [dropPosition.x, dropPosition.y, dropPosition.z],
-        size: size,
-        userData: { id: fileIds[i], filename: fileNames[i] },
-        color: randomColorGenerator(),
-        lastEditedBy: loginName,
-      });
-
-      if (firstSphereIntersect) {
-        const intersectedSphere = firstSphereIntersect.object;
-
-        // Check if there's already a cube over this sphere
-        const existingCube = getCubeContainingSphere(intersectedSphere);
-
-        if (!existingCube) {
-          const createdSphere = createSphere(sphereData);
-          createdShapes.push(createdSphere);
-
-          // Create cube with a size relative to the sphere
-          const cubeSize = size; // * RESCALEFACTOR * SCALEFACTOR; // Adjust this factor as needed
-          const cubeData = convertToThreeJSFormat({
-            ...sphereData,
-            size: cubeSize,
-            position: [dropPosition.x, dropPosition.y, dropPosition.z],
-          });
-          const createdCube = createWireframeCube(cubeData);
-          createdShapes.push(createdCube);
-        } else {
-        }
-      } else {
-        // Handle case when object is not a sphere
-        createdShapes.push(createSphere(sphereData));
-      }
+  for (const file of fileList) {
+    console.log("file.name", file.name)
+    if (isFileDuplicate(file.name)) {
+      duplicates.push(file);
     } else {
-      // planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
-      // plane.normal.copy(planeNormal);
-      // raycaster.ray.intersectPlane(plane, intersectPoint);
-      // Get the camera's forward direction
-      planeNormal.copy(camera.getWorldDirection(new THREE.Vector3()));
-
-      // Set the plane at a certain distance in front of the camera
-      const distance = 40; // Adjust this value as needed
-      const planePoint = camera.position
-        .clone()
-        .add(planeNormal.clone().multiplyScalar(distance));
-
-      // Define the plane using the normal and a point on the plane
-      plane.setFromNormalAndCoplanarPoint(planeNormal, planePoint);
-
-      // Intersect the ray with the plane
-      raycaster.ray.intersectPlane(plane, intersectPoint);
-
-      dataObject = convertToThreeJSFormat({
-        position: new THREE.Vector3(
-          intersectPoint.x,
-          intersectPoint.y,
-          intersectPoint.z
-        ),
-        size: size,
-        color: randomColorGenerator(),
-        userData: { id: fileIds[i], filename: fileNames[i] },
-        lastEditedBy: loginName,
-      });
-
-      createdShapes.push(createSphere(dataObject));
+      validFiles.push(file);
     }
   }
 
-  // Reset cube highlighting after drop
+  if (duplicates.length > 0) {
+    let alertMessage = "Duplicate files detected:\n";
+    duplicates.forEach((file) => {
+      alertMessage += `- ${file.name}\n`;
+    });
+    alert(alertMessage);
+    return
+  }
+
+  if (validFiles.length === 0) {
+    console.warn("No valid files to process.");
+    return;
+  }
+
+  const filteredEvent = createFilteredEvent(processEvent, validFiles);
+  const { fileIds, fileNames, fileEntries } = handleFileDrop(filteredEvent);
+
+  const canvas = renderer.domElement;
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((processEvent.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((processEvent.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const allIntersects = checkIntersections(raycaster, [scene, nonBloomScene]);
+  const sphereIntersect = allIntersects.find(intersect => 
+    intersect.object.geometry instanceof THREE.IcosahedronGeometry ||
+    intersect.object.geometry instanceof THREE.SphereGeometry
+  );
+
+  let createdShapes = [];
+  let cubePosition;
+  let cubeSize;
+
+  if (sphereIntersect) {
+    // Dropping on existing sphere - create containing cube
+    const targetSphere = sphereIntersect.object;
+    const sphereRadius = targetSphere.geometry.parameters.radius;
+    cubeSize = sphereRadius * RESCALEFACTOR * 2; // Double size to fit multiple spheres
+    cubePosition = targetSphere.position.clone();
+    
+    // Create cube first
+    const cubeData = convertToThreeJSFormat({
+      position: cubePosition.toArray(),
+      size: cubeSize,
+      color: randomColorGenerator(),
+      userData: { id: `cube_${Date.now()}` },
+      lastEditedBy: loginName,
+    });
+    createWireframeCube(cubeData);
+  } else {
+    // Dropping in empty space
+    planeNormal.copy(camera.getWorldDirection(new THREE.Vector3()));
+    const distance = 40;
+    const planePoint = camera.position.clone().add(planeNormal.clone().multiplyScalar(distance));
+    plane.setFromNormalAndCoplanarPoint(planeNormal, planePoint);
+    raycaster.ray.intersectPlane(plane, intersectPoint);
+    cubePosition = intersectPoint.clone();
+  }
+
+  // Create spheres for all valid files
+  for (let i = 0; i < validFiles.length; i++) {
+    const file = validFiles[i];
+    const fileId = fileIds[i] || generateUniqueId();
+    const size = normalizeSize(file.size);
+
+    let spherePosition;
+    if (sphereIntersect) {
+      // Position inside cube with offset
+      const offset = getRandomOffset(cubeSize);
+      spherePosition = cubePosition.clone().add(offset);
+    } else {
+      spherePosition = cubePosition.clone();
+    }
+
+    const sphereData = convertToThreeJSFormat({
+      position: [spherePosition.x, spherePosition.y, spherePosition.z],
+      size: size,
+      userData: {
+        id: fileId,
+        filename: file.name,
+        isTab: !!processEvent.tabId,
+        content: processEvent.source?.data?.content
+      },
+      color: randomColorGenerator(),
+      lastEditedBy: loginName,
+    });
+
+    window.fileMetadata.set(fileId, {
+      filename: file.name,
+      id: fileId,
+      isSelected: false, // Initial bloom state
+      isTab: !!processEvent.tabId,
+      content: processEvent.source?.data?.content,
+      size: file.size,
+      lastModified: file.lastModified,
+      type: file.type,
+    });
+
+    createdShapes.push(createSphere(sphereData));
+  }
+
   if (CUBEINTERSECTED) {
     resetCubeColor(CUBEINTERSECTED);
     CUBEINTERSECTED = null;
   }
+
+  return createdShapes;
 }
+
 
 function resetCubeColor(cube) {
   if (cube && cube.originalMaterial) {
@@ -520,46 +871,6 @@ function resetCubeColor(cube) {
   }
 }
 
-function tabDrop(event){
-  console.log("i am event", event)
-   // Check if this is a tab drop
-   const dragData = event.dataTransfer?.getData('application/json');
-
-   console.log("dragData", dragData);
-   if (dragData) {
-     try {
-       const data = JSON.parse(dragData);
-       if (data.type === 'tab' && data.content) {
-         // Create a File object from the tab content
-         const file = new File(
-           [data.content],
-           `${data.title || 'Untitled'}.md`,
-           { type: 'text/markdown' }
-         );
-
-         // Create a new DataTransfer object with our file
-         const dt = new DataTransfer();
-         dt.items.add(file);
-
-         // Create a new drop event that looks like a file drop
-         const modifiedEvent = {
-           ...event,
-           dataTransfer: dt,
-           clientX: event.clientX,
-           clientY: event.clientY
-         };
-
-         // Use the existing file drop handler
-         handleFileDrop_sphere(modifiedEvent);
-         removeGhostCube();
-         onPointerUp(event);
-         return;
-       }
-     } catch (err) {
-       console.error('Error handling tab drop:', err);
-     }
-   }
-}
 
 function setupDragAndDrop() {
   const { renderer } = share3dDat(); // Access the renderer to get the canvas
@@ -580,7 +891,7 @@ function setupDragAndDrop() {
 
   canvas.addEventListener("drop", (event) => {
     event.preventDefault();
-    tabDrop(event);
+    // tabDrop(event);
     handleFileDrop_sphere(event);
     removeGhostCube();
     onPointerUp(event);
@@ -592,40 +903,69 @@ function setupDragAndDrop() {
     resetCubeHighlight();
     removeGhostCube();
   });
+  canvas.addEventListener('tabDrop', dropExporter);
 }
 
-function getObjectType(object) {
-  if (!object) return "No object";
-  if (!object.geometry) return "No geometry";
-
-  const geometryType = object.geometry.type;
-
-  // Check for specific geometry types
-  switch (geometryType) {
-    case "IcosahedronGeometry":
-    case "SphereGeometry":
-      return "Sphere";
-    case "BoxGeometry":
-      return "Cube";
-    default:
-      return geometryType;
-  }
+export function dropExporter(event) {
+  // Handle both regular events and custom events with detail
+  const processEvent = event.detail || event;
+  
+  handleFileDrop_sphere(processEvent);
+  removeGhostCube();
+  onPointerUp(processEvent);
 }
+
 
 let clickStartTime = 0;
 // const CLICK_DURATION_THRESHOLD = 200; // milliseconds
 const CLICK_DURATION_THRESHOLD = 300;
+
+function isAllowed(event) {
+  // First check if event exists
+  if (!event) {
+    return false;
+  }
+
+  // Safely check for target and its properties
+  const target = event.target || event.srcElement;
+  if (!target) {
+    return true; // Allow the event if there's no specific target
+  }
+
+  // Helper function to safely check closest
+  const isClosestTo = (element, selector) => {
+    try {
+      return element.closest && element.closest(selector);
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // Check for UI elements that should be excluded
+  const isUIElement = 
+    isClosestTo(target, '.modal') ||
+    isClosestTo(target, '.p2p_peer_input') ||
+    target.id === 'connectButton' ||
+    target.id === 'userIdInput' ||
+    target.id === 'peerIdInput';
+
+  if (isUIElement) {
+    console.log("Event blocked for UI element");
+    return false;
+  }
+
+  // Special handling for drag and drop events
+  if (event.type === 'drop' || event.type === 'dragover' || event.type === 'dragenter') {
+    return true;
+  }
+
+  return true;
+}
 // In move.js, modify the onPointerDown function:
 export function onPointerDown(event) {
-  if (event.target.closest('.modal') || 
-  event.target.closest('.p2p_peer_input') || 
-  event.target.id === 'connectButton' || 
-  event.target.id === 'userIdInput' || 
-  event.target.id === 'peerIdInput') {
-
-    console.log("by by mover ")
-return; // Let the event handle normally for UI elements
-}
+  if (!isAllowed(event)){
+    return
+  }
 
 
   const { mouse, raycaster, renderer, scene, nonBloomScene, camera, controls } =
@@ -664,7 +1004,7 @@ return; // Let the event handle normally for UI elements
 
   if (sphereIntersect) {
     console.log("Sphere selected:", sphereIntersect.object);
-    controls.enabled = false;
+    // controls.enabled = false;
     selectedSphere = sphereIntersect.object;
     selectedObject = selectedSphere;
 
@@ -679,7 +1019,10 @@ return; // Let the event handle normally for UI elements
     // }
     // // Ensure the sphere is always in the default layer (0)
     // selectedSphere.layers.enable(0);
-
+    
+    if (isDragging) {
+      controls.enabled = false;
+  }
     
     console.log("Sphere layers before toggle:", selectedSphere.layers.mask);
     // toggleBloom(selectedSphere);
@@ -721,38 +1064,108 @@ function getRandomOffset(cubeSize) {
   const offsetZ = (Math.random() - 0.5) * maxOffset;
   return new THREE.Vector3(offsetX, offsetY, offsetZ);
 }
-function toggleBloom(object) {
 
-  let isBloomEnabled = object.layers.test(BLOOM_SCENE);
+
+// function toggleBloom(object) {
+
+//   let isBloomEnabled = object.layers.test(BLOOM_SCENE);
 
   
-  console.log("i have toggleBloom PRE", isBloomEnabled)
+//   console.log("i have toggleBloom PRE", isBloomEnabled)
 
+//   object.layers.toggle(BLOOM_SCENE);
+  
+//   isBloomEnabled = object.layers.test(BLOOM_SCENE);
+
+//   console.log("i have toggleBloom POST", isBloomEnabled)
+  
+//   // Update selection state
+//   object.userData.selected = isBloomEnabled ? 1 : 0;
+  
+//   // Update global selection tracking KAI CHECK this!!
+  
+//   markNeedsRender();
+// }
+
+
+// function toggleBloom(object) {
+//   let isBloomEnabled = object.layers.test(BLOOM_SCENE);
+
+//   console.log("i have checkboxes toggleBloom PRE", isBloomEnabled)
+  
+//   object.layers.toggle(BLOOM_SCENE);
+//   isBloomEnabled = !isBloomEnabled;
+
+//   console.log("i have checkboxes toggleBloom POST", isBloomEnabled)
+  
+//   // Update selection state
+//   object.userData.selected = isBloomEnabled ? 1 : 0;
+  
+//   // Get fileId from object's userData
+//   const fileId = object.userData.id;
+  
+//   // Update metadata in global tracking
+//   if (window.fileMetadata.has(fileId)) {
+//     const metadata = window.fileMetadata.get(fileId);
+//     metadata.isSelected = isBloomEnabled;
+//     window.fileMetadata.set(fileId, metadata);
+//   }
+  
+//   // Dispatch event for checkbox update
+//   window.dispatchEvent(new CustomEvent('bloomStateChanged', {
+//     detail: {
+//       fileId: fileId,
+//       isSelected: isBloomEnabled
+//     }
+//   }));
+  
+//   markNeedsRender();
+// }
+
+function toggleBloom(object) {
+  // Check if either mask 1 (default) or 3 (default + bloom) is active
+  const isBloomEnabled = object.layers.mask === 3;
+  
+  console.log("i have checkboxes toggleBloom PRE", isBloomEnabled);
+  
+  // Keep the essential toggle that makes the bloom effect work
   object.layers.toggle(BLOOM_SCENE);
   
-  isBloomEnabled = object.layers.test(BLOOM_SCENE);
-
-  console.log("i have toggleBloom POST", isBloomEnabled)
+  // After toggle, mask will be either 1 (default only) or 3 (default + bloom)
+  const isNowBloomed = object.layers.mask === 3;
+  
+  console.log("i have checkboxes toggleBloom POST", isNowBloomed);
   
   // Update selection state
-  object.userData.selected = isBloomEnabled ? 1 : 0;
+  object.userData.selected = isNowBloomed ? 1 : 0;
   
-  // Update global selection tracking KAI CHECK this!!
+  // Get fileId from object's userData
+  const fileId = object.userData.id;
+  
+  // Update metadata in global tracking
+  if (window.fileMetadata.has(fileId)) {
+    const metadata = window.fileMetadata.get(fileId);
+    metadata.isSelected = isNowBloomed;
+    window.fileMetadata.set(fileId, metadata);
+  }
+  
+  // Dispatch event for checkbox update
+  window.dispatchEvent(new CustomEvent('bloomStateChanged', {
+    detail: {
+      fileId: fileId,
+      isSelected: isNowBloomed
+    }
+  }));
   
   markNeedsRender();
 }
+
+
 // Update the onPointerUp function to use this new handleSphereDragEnd
 async function onPointerUp(event) {
-  console.log("Pointer up event triggered");
-  if (event.target.closest('.modal') || 
-  event.target.closest('.p2p_peer_input') || 
-  event.target.id === 'connectButton' || 
-  event.target.id === 'userIdInput' || 
-  event.target.id === 'peerIdInput') {
-
-    console.log("by by mover ")
-return; // Let the event handle normally for UI elements
-}
+  if (!isAllowed(event)){
+    return
+  }
 
   const { controls, scene, nonBloomScene, ghostCube, sceneSnapshot } =
     share3dDat();
@@ -769,21 +1182,11 @@ return; // Let the event handle normally for UI elements
     distanceMoved < DRAG_THRESHOLD &&
     clickDuration < CLICK_DURATION_THRESHOLD;
 
-  console.log(
-    "Is click:",
-    isClick,
-    "Distance moved:",
-    distanceMoved,
-    "Click duration:",
-    clickDuration
-  );
 
   if (isClick && selectedSphere) {
-    console.log("Click detected on sphere:", selectedSphere);
     toggleBloom(selectedSphere);
     console.log("After toggling, layers.mask:", selectedSphere.layers.mask);
   } else if (isDragging || isFileDragging) {
-    console.log("Drag or file drag detected");
     isDragging = false;
     isFileDragging = false;
 
@@ -796,8 +1199,14 @@ return; // Let the event handle normally for UI elements
     diffSceneChanges(scene, nonBloomScene, sceneSnapshot);
   }
 
-  if (event.target.hasPointerCapture(event.pointerId)) {
-    event.target.releasePointerCapture(event.pointerId);
+  if (event.pointerId !== undefined && event.target?.hasPointerCapture) {
+    try {
+      if (event.target.hasPointerCapture(event.pointerId)) {
+        event.target.releasePointerCapture(event.pointerId);
+      }
+    } catch (err) {
+      console.log("Could not release pointer capture:", err);
+    }
   }
 
   controls.enabled = true;
@@ -820,7 +1229,6 @@ function handleSphereDragEnd(sphere, ghostCube) {
       sphere.position.copy(cubePosition.clone().add(offset));
 
       // Resize the existing cube to fit the new sphere
-      resizeCubeToFitSpheres(existingCube);
     } else {
       // Create a new cube to contain the sphere
       const cubeSize = sphereRadius * RESCALEFACTOR;
@@ -843,7 +1251,7 @@ function handleSphereDragEnd(sphere, ghostCube) {
     // Remove the ghost cube after handling the sphere
     removeGhostCube();
   }
-
+  cleanupOldCubes()
   // Update any necessary scene information
   markNeedsRender();
 }
@@ -854,18 +1262,15 @@ const onPointerMove = (event) => {
   const deltaX = event.clientX - initialPointerPosition.x;
   const deltaY = event.clientY - initialPointerPosition.y;
   const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-  console.log(
-    "distanceMoved > DRAG_THRESHOLD",
-    distanceMoved > DRAG_THRESHOLD,
-    distanceMoved,
-    DRAG_THRESHOLD
-  );
+
 
   if (distanceMoved > DRAG_THRESHOLD) {
     isDragging = true;
     // isClicking = false; // No longer a click, it's a drag
     controls.enabled = false; // Disable controls during drag
-    console.log("Drag started");
+    if (selectedSphere || selectedObject) {
+      controls.enabled = false;
+  }
   }
 
   if (isDragging) {
@@ -886,6 +1291,7 @@ const onPointerMove = (event) => {
       });
 
       if (sphereIntersect) {
+        controls.enabled = false; 
         const intersectedSphere = sphereIntersect.object;
 
         // Check if the intersected sphere is inside a cube
@@ -924,8 +1330,11 @@ function cleanupOldCubes() {
 
   const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
 
+  console.log("cubesToRemove", cubesToDelete)
+
   cubesToDelete?.forEach((cube) => {
     if (!cube.wireframe) return;
+    
     cube.wireframe.isDeleted = true;
     cube.solid.isDeleted = true;
   });
@@ -943,7 +1352,31 @@ function setupPointerEvents() {
     : 16;
   canvas.addEventListener("pointermove", throttle(onPointerMove, throttleTime));
   canvas.addEventListener("pointerup", onPointerUp);
-  // document.addEventListener("pointerup", onPointerUp);
 }
 
+// Modify the event listener to be simpler and only check the main scene
+window.addEventListener('checkboxStateChanged', (event) => {
+  const { fileId, isSelected } = event.detail;
+  const { scene } = share3dDat();
+
+  console.log("checkboxes! checkboxStateChanged", fileId, isSelected, scene);
+
+  // Only traverse the main scene for spheres
+  scene.traverse((object) => {
+    if (object.userData?.id === fileId) {
+      if (isSelected) {
+        object.layers.enable(BLOOM_SCENE);
+      } else {
+        object.layers.disable(BLOOM_SCENE);
+      }
+      object.userData.selected = isSelected ? 1 : 0;
+    }
+  });
+  
+  markNeedsRender();
+});
+
 setupPointerEvents();
+window.handleFileDrop_sphere = handleFileDrop_sphere;
+window.removeGhostCube = removeGhostCube;
+window.onPointerUp = onPointerUp;

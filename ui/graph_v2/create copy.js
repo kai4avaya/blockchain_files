@@ -31,6 +31,7 @@ import {
 import MouseOverlayCanvas from "./MouseOverlayCanvas";
 import { Frustum, Matrix4 } from "three";
 import indexDBOverlay from '../../memory/local/file_worker';
+import { getFileSystem } from "../../memory/collaboration/file_colab";
 
 
 const frustum = new Frustum();

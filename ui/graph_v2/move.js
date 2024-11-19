@@ -15,14 +15,16 @@ import {
   createSceneSnapshot,
   getObjectById,
   getCubeContainingSphere,
+  findSpheresInCube
 } from "./snapshot";
 import { handleFileDrop } from "../../memory/fileHandler.js";
 import * as THREE from "three";
 import { convertToThreeJSFormat, throttle, generateUniqueId } from "../../utils/utils";
 import { diffSceneChanges } from "../../memory/collaboration/scene_colab";
 import { updateConnectedLines } from "./lineGraphs.js";
-// import { runOverallDebug } from "./sceneDebug.js";
-// import {filterDuplicateFiles, FileHashTracker } from '../../utils/file_hash.js'
+
+import { getFileSystem } from "../../memory/collaboration/file_colab";
+
 
 let isDragging = false;
 // let isClicking = false;
@@ -50,6 +52,63 @@ const loginName = localStorage.getItem("login_block") || "no_login";
 window.fileMetadata = new Map(); // Track file metadata globally
 
 setupDragAndDrop();
+
+
+// this function updates the folder metadata with the current sphere IDs
+async function updateCubeContents(cube, spheres) {
+  if (!cube?.userData?.id) {
+    console.warn("no id for cube", cube);
+    return;
+  }
+  
+  console.log("Updating cube contents:", {
+    cubeId: cube.userData.id,
+    sphereCount: spheres?.length,
+    sphereIds: spheres?.map(s => s.userData.id)
+  });
+  
+  const fileSystem = getFileSystem();
+  let folderMetadata = await fileSystem.getMetadata(cube.userData.id, 'directory');
+  
+  console.log("Found folder metadata:", folderMetadata);
+  
+  if (!folderMetadata && spheres?.length > 0) {
+    // Create new folder metadata if it doesn't exist and we have spheres
+    folderMetadata = {
+      id: cube.userData.id,
+      name: `Group ${cube.userData.id.slice(-4)}`,
+      type: 'directory',
+      fileIds: [],
+      lastModified: Date.now(),
+      createdAt: Date.now(),
+      lastEditedBy: localStorage.getItem('login_block') || 'no_login'
+    };
+    console.log("Creating new folder metadata:", folderMetadata);
+  }
+
+  if (folderMetadata) {
+    if (!spheres || spheres.length === 0) {
+      console.log("Deleting empty folder:", cube.userData.id);
+      await fileSystem.deleteItem(cube.userData.id, 'directory', true);
+    } else {
+      // Update folder's fileIds with current sphere IDs
+      folderMetadata.fileIds = spheres.map(sphere => sphere.userData.id);
+      folderMetadata.lastModified = Date.now();
+      
+      console.log("Updating folder with new sphere IDs:", {
+        folderId: cube.userData.id,
+        fileIds: folderMetadata.fileIds
+      });
+      
+      await fileSystem.addOrUpdateItem(folderMetadata, 'directory');
+    }
+    
+    window.dispatchEvent(new CustomEvent('updateFileTree'));
+  } else {
+    console.log("No spheres to store, skipping folder creation for cube:", cube.userData.id);
+  }
+}
+
 
 function getCubeUnderPointer(event, intersects) {
   const { camera, scene, nonBloomScene, controls, renderer } = share3dDat();
@@ -247,45 +306,142 @@ export function getObjectUnderPointer(event, objectType = "") {
   return intersects[0].object;
 }
 
+// export function moveSphere(event, sphere, intersectPointIn = null) {
+//   const { camera, renderer } = share3dDat();
+//   const canvas = renderer.domElement;
+//   const rect = canvas.getBoundingClientRect();
+
+//   // Calculate mouse position relative to the canvas
+//   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+//   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+//   raycaster.setFromCamera(mouse, camera);
+
+//   const targetSphere = sphere || selectedSphere;
+
+//   if (!targetSphere) return;
+
+//   // Store the original distance from the camera
+//   const originalDistance = camera.position.distanceTo(targetSphere.position);
+
+//   planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+//   plane.setFromNormalAndCoplanarPoint(planeNormal, targetSphere.position);
+
+//   let newIntersectPoint = intersectPointIn || intersectPoint; //new THREE.Vector3();
+//   raycaster.ray.intersectPlane(plane, newIntersectPoint);
+
+//   // Move the sphere to the new position
+//   targetSphere.position.copy(newIntersectPoint);
+
+//   // Calculate the new distance from the camera
+//   const newDistance = camera.position.distanceTo(targetSphere.position);
+
+//   // Adjust the scale to maintain apparent size
+//   const scaleFactor = newDistance / originalDistance;
+//   targetSphere.scale.multiplyScalar(scaleFactor);
+
+//   updateConnectedLines();
+//   // handleFileDragOver(event);
+//   // render();
+//   markNeedsRender();
+// }
+
+// // ... existing code ...
+// export function moveSphere(event, sphere, intersectPointIn = null) {
+//   const { camera, renderer } = share3dDat();
+//   const canvas = renderer.domElement;
+//   const rect = canvas.getBoundingClientRect();
+
+//   // Calculate mouse position relative to the canvas
+//   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+//   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+//   raycaster.setFromCamera(mouse, camera);
+
+//   const targetSphere = sphere || selectedSphere;
+//   if (!targetSphere) return;
+
+//   // Store the original distance and size
+//   const originalDistance = camera.position.distanceTo(targetSphere.position);
+//   const originalScale = targetSphere.scale.clone();
+
+//   if (event.shiftKey) {
+//     // More responsive Z movement using mouse Y position instead of movement
+//     const mouseYNormalized = ((event.clientY - rect.top) / rect.height - 0.5) * 2; // Removed the negative sign
+//     const zSpeed = 2; // Adjust this value to control Z movement speed
+//     targetSphere.position.z = mouseYNormalized * zSpeed;
+// }else {
+//     // Regular X-Y plane movement
+//     planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+//     plane.setFromNormalAndCoplanarPoint(planeNormal, targetSphere.position);
+
+//     let newIntersectPoint = intersectPointIn || intersectPoint;
+//     raycaster.ray.intersectPlane(plane, newIntersectPoint);
+//     targetSphere.position.copy(newIntersectPoint);
+//   }
+
+//   // Calculate the new distance from the camera
+//   const newDistance = camera.position.distanceTo(targetSphere.position);
+
+//   // Adjust scale based on distance ratio
+//   const scaleFactor = originalDistance / newDistance; // Inverted ratio for correct scaling
+//   targetSphere.scale.copy(originalScale).multiplyScalar(scaleFactor);
+
+//   updateConnectedLines();
+//   markNeedsRender();
+// }
 export function moveSphere(event, sphere, intersectPointIn = null) {
   const { camera, renderer } = share3dDat();
   const canvas = renderer.domElement;
   const rect = canvas.getBoundingClientRect();
 
-  // Calculate mouse position relative to the canvas
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
 
   const targetSphere = sphere || selectedSphere;
-
   if (!targetSphere) return;
 
-  // Store the original distance from the camera
   const originalDistance = camera.position.distanceTo(targetSphere.position);
+  const originalScale = targetSphere.scale.clone();
 
-  planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
-  plane.setFromNormalAndCoplanarPoint(planeNormal, targetSphere.position);
+  if (event.shiftKey) {
+    // Get camera's forward direction
+    const cameraDirection = new THREE.Vector3();
+    camera.getWorldDirection(cameraDirection);
+    
+    // Use mouse movement delta instead of absolute position
+    const movementY = event.movementY || 0;
+    const moveSpeed = 0.15; // Adjust for smoother movement
+    
+    // Move along camera's view direction using delta
+  // Move along camera's view direction using delta
+targetSphere.position.addScaledVector(
+  cameraDirection,
+  -movementY * moveSpeed  // Added negative sign here
+);
+  } else {
+    // Regular X-Y plane movement in camera's view plane
+    planeNormal.set(0, 0, 1).applyQuaternion(camera.quaternion);
+    plane.setFromNormalAndCoplanarPoint(planeNormal, targetSphere.position);
 
-  let newIntersectPoint = intersectPointIn || intersectPoint; //new THREE.Vector3();
-  raycaster.ray.intersectPlane(plane, newIntersectPoint);
-
-  // Move the sphere to the new position
-  targetSphere.position.copy(newIntersectPoint);
+    let newIntersectPoint = intersectPointIn || intersectPoint;
+    raycaster.ray.intersectPlane(plane, newIntersectPoint);
+    targetSphere.position.copy(newIntersectPoint);
+  }
 
   // Calculate the new distance from the camera
   const newDistance = camera.position.distanceTo(targetSphere.position);
 
-  // Adjust the scale to maintain apparent size
-  const scaleFactor = newDistance / originalDistance;
-  targetSphere.scale.multiplyScalar(scaleFactor);
+  // Adjust scale based on distance ratio
+  const scaleFactor = originalDistance / newDistance;
+  targetSphere.scale.copy(originalScale).multiplyScalar(scaleFactor);
 
   updateConnectedLines();
-  // handleFileDragOver(event);
-  // render();
   markNeedsRender();
 }
+
 
 function normalizeSize(fileSize) {
   const maxSize = 10;
@@ -317,6 +473,8 @@ function handleFileDragOver(
   const canvas = renderer.domElement;
   const rect = canvas.getBoundingClientRect();
 
+  console.log("handleFileDragOver")
+
   // Calculate mouse position relative to the canvas
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -343,7 +501,10 @@ function handleFileDragOver(
     removeGhostCube();
   }
 
+  console.log("solidCubeIntersect", solidCubeIntersect)
+
   if (solidCubeIntersect) {
+    console.log("highlighting cube", solidCubeIntersect.object)
     highlightCube(solidCubeIntersect.object);
   } else {
     resetCubeHighlight();
@@ -614,21 +775,91 @@ function isFileDuplicate(fileName) {
 //     return;
 //   }
 
+// async function handleFileDrop_sphere(event) {
+//   const processEvent = event.detail || event;
+//   isFileDragging = false;
+//   resetCubeHighlight();
+//   const { camera, scene, nonBloomScene, renderer } = share3dDat();
+
+//   const dt = processEvent.dataTransfer;
+//   const fileList = dt?.files;
+
+//   // Check for duplicates using isFileDuplicate
+//   const duplicates = [];
+//   const validFiles = [];
+
+//   console.log("i am handleFileDrop_sphere processEvent", processEvent)
+
+//   console.log("i am handleFileDrop_sphere fileList", fileList)
+
+//   for (const file of fileList) {
+//     console.log("file.name", file.name)
+//     if (isFileDuplicate(file.name)) {
+//       duplicates.push(file);
+//     } else {
+//       validFiles.push(file);
+//     }
+//   }
+
+//   if (duplicates.length > 0) {
+//     let alertMessage = "Duplicate files detected:\n";
+//     duplicates.forEach((file) => {
+//       alertMessage += `- ${file.name}\n`;
+//     });
+//     alert(alertMessage);
+//     return
+//   }
+
+//   if (validFiles.length === 0) {
+//     console.warn("No valid files to process.");
+//     return;
+//   }
+
 async function handleFileDrop_sphere(event) {
   const processEvent = event.detail || event;
   isFileDragging = false;
   resetCubeHighlight();
   const { camera, scene, nonBloomScene, renderer } = share3dDat();
 
+  // Add more detailed logging
+  console.log("Full process event:", {
+    type: processEvent.type,
+    isTrusted: processEvent.isTrusted,
+    dataTransfer: processEvent.dataTransfer,
+    detail: processEvent.detail,
+    files: processEvent.dataTransfer?.files,
+    items: processEvent.dataTransfer?.items,
+  });
+
   const dt = processEvent.dataTransfer;
-  const fileList = dt?.files;
+  
+  // Handle both files and items
+  let fileList = [];
+  
+  if (dt?.files?.length > 0) {
+    fileList = Array.from(dt.files);
+  } else if (dt?.items?.length > 0) {
+    fileList = Array.from(dt.items)
+      .filter(item => item.kind === 'file')
+      .map(item => item.getAsFile())
+      .filter(Boolean); // Remove any null values
+  }
+
+  console.log("Processed fileList:", fileList);
 
   // Check for duplicates using isFileDuplicate
   const duplicates = [];
   const validFiles = [];
+  let newCube;  
+  let newSphere;
 
   for (const file of fileList) {
-    console.log("file.name", file.name)
+    console.log("Processing file:", {
+      name: file.name,
+      type: file.type,
+      size: file.size
+    });
+    
     if (isFileDuplicate(file.name)) {
       duplicates.push(file);
     } else {
@@ -636,22 +867,30 @@ async function handleFileDrop_sphere(event) {
     }
   }
 
+  console.log("Valid files:", validFiles.length);
+  console.log("Duplicate files:", duplicates.length);
+
   if (duplicates.length > 0) {
     let alertMessage = "Duplicate files detected:\n";
     duplicates.forEach((file) => {
       alertMessage += `- ${file.name}\n`;
     });
     alert(alertMessage);
-    return
+    return;
   }
 
   if (validFiles.length === 0) {
-    console.warn("No valid files to process.");
+    console.warn("No valid files to process. This might be because:", {
+      originalFilesLength: dt?.files?.length || 0,
+      originalItemsLength: dt?.items?.length || 0,
+      wasEventTrusted: processEvent.isTrusted,
+      eventType: processEvent.type
+    });
     return;
   }
 
   const filteredEvent = createFilteredEvent(processEvent, validFiles);
-  const { fileIds, fileNames, fileEntries } = handleFileDrop(filteredEvent);
+  const { fileIds, _, __} = handleFileDrop(filteredEvent);
 
   const canvas = renderer.domElement;
   const rect = canvas.getBoundingClientRect();
@@ -675,16 +914,17 @@ async function handleFileDrop_sphere(event) {
     const sphereRadius = targetSphere.geometry.parameters.radius;
     cubeSize = sphereRadius * RESCALEFACTOR * 2; // Double size to fit multiple spheres
     cubePosition = targetSphere.position.clone();
-    
+    const cubeId = `cube_${Date.now()}`;
     // Create cube first
     const cubeData = convertToThreeJSFormat({
       position: cubePosition.toArray(),
       size: cubeSize,
       color: randomColorGenerator(),
-      userData: { id: `cube_${Date.now()}` },
+      userData: { id: cubeId },
       lastEditedBy: loginName,
     });
-    createWireframeCube(cubeData);
+    newCube = createWireframeCube(cubeData);
+    
   } else {
     // Dropping in empty space
     planeNormal.copy(camera.getWorldDirection(new THREE.Vector3()));
@@ -734,12 +974,21 @@ async function handleFileDrop_sphere(event) {
       type: file.type,
     });
 
-    createdShapes.push(createSphere(sphereData));
+    newSphere = createSphere(sphereData);
+    createdShapes.push(newSphere);
   }
 
   if (CUBEINTERSECTED) {
     resetCubeColor(CUBEINTERSECTED);
     CUBEINTERSECTED = null;
+  }
+
+  if (newCube) {
+    const initialSpheres = [targetSphere, ...createdShapes];
+    updateCubeContents(newCube.wireframeCube, initialSpheres);
+  }
+  if (newSphere) {
+    toggleBloom(newSphere.sphere, true);
   }
 
   return createdShapes;
@@ -1004,14 +1253,16 @@ function getRandomOffset(cubeSize) {
 //   markNeedsRender();
 // }
 
-function toggleBloom(object) {
+function toggleBloom(object, isOnlyToCheckboxes = false) {
   // Check if either mask 1 (default) or 3 (default + bloom) is active
   const isBloomEnabled = object.layers.mask === 3;
   
   console.log("i have checkboxes toggleBloom PRE", isBloomEnabled);
   
+  if (!isOnlyToCheckboxes) {
   // Keep the essential toggle that makes the bloom effect work
   object.layers.toggle(BLOOM_SCENE);
+  }
   
   // After toggle, mask will be either 1 (default only) or 3 (default + bloom)
   const isNowBloomed = object.layers.mask === 3;
@@ -1097,7 +1348,64 @@ async function onPointerUp(event) {
   selectedObject = null;
   currentSnapshot = null;
 }
+
+
+// function handleSphereDragEnd(sphere, ghostCube) {
+//   const oldCube = getCubeContainingSphere(sphere);
+//   const sphereRadius = sphere.scale.x / 2 || sphere.geometry.parameters.radius;
+
+//   if (ghostCube) {
+//     if (ghostCube.existingCube) {
+//       // Handle adding sphere to existing cube
+//       const existingCube = ghostCube.existingCube;
+//       const cubeSize = existingCube.scale.x;
+//       const cubePosition = existingCube.position.clone();
+
+//       const offset = getRandomOffset(cubeSize, sphereRadius);
+//       sphere.position.copy(cubePosition.clone().add(offset));
+
+//       const containedSpheres = findSpheresInCube({
+//         wireframe: existingCube,
+//         solid: existingCube.userData.solidCube
+//       });
+      
+//       // Fire and forget, but with error handling
+//       updateCubeContents(existingCube, containedSpheres).catch(err => {
+//         console.error('Error updating existing cube contents:', err);
+//       });
+//     } else {
+//       // Create a new cube logic...
+//       const newCube = createWireframeCube(cubeData);
+//       const offset = getRandomOffset(cubeSize, sphereRadius);
+//       sphere.position.copy(cubePosition.clone().add(offset));
+
+//       const containedSpheres = findSpheresInCube({
+//         wireframe: newCube.wireframeCube,
+//         solid: newCube.solidCube
+//       });
+      
+//       // Fire and forget, but with error handling
+//       updateCubeContents(newCube.wireframeCube, containedSpheres).catch(err => {
+//         console.error('Error updating new cube contents:', err);
+//       });
+//     }
+
+//     if (oldCube && oldCube !== ghostCube?.existingCube) {
+//       const remainingSpheres = findSpheresInCube(oldCube);
+//       updateCubeContents(oldCube, remainingSpheres).catch(err => {
+//         console.error('Error updating old cube contents:', err);
+//       });
+//     }
+
+//     removeGhostCube();
+//   }
+  
+//   cleanupOldCubes();
+//   markNeedsRender();
+// }
+
 function handleSphereDragEnd(sphere, ghostCube) {
+  const oldCube = getCubeContainingSphere(sphere);
   const sphereRadius = sphere.scale.x / 2 || sphere.geometry.parameters.radius;
 
   if (ghostCube) {
@@ -1110,9 +1418,16 @@ function handleSphereDragEnd(sphere, ghostCube) {
       const offset = getRandomOffset(cubeSize, sphereRadius);
       sphere.position.copy(cubePosition.clone().add(offset));
 
-      // Resize the existing cube to fit the new sphere
+      const containedSpheres = findSpheresInCube({
+        wireframe: existingCube,
+        solid: existingCube.userData.solidCube
+      });
+      
+      // updateCubeContents(existingCube, containedSpheres).catch(err => {
+      //   console.error('Error updating existing cube contents:', err);
+      // });
     } else {
-      // Create a new cube to contain the sphere
+      // Create a new cube with proper data
       const cubeSize = sphereRadius * RESCALEFACTOR;
       const cubePosition = ghostCube.position.clone();
       const cubeColor = ghostCube.material.color.clone();
@@ -1124,19 +1439,52 @@ function handleSphereDragEnd(sphere, ghostCube) {
         userData: { id: `cube_${Date.now()}` },
         lastEditedBy: loginName,
       });
-      createWireframeCube(cubeData);
 
+      const newCube = createWireframeCube(cubeData);
       const offset = getRandomOffset(cubeSize, sphereRadius);
       sphere.position.copy(cubePosition.clone().add(offset));
+
+      const containedSpheres = findSpheresInCube({
+        wireframe: newCube.wireframeCube,
+        solid: newCube.solidCube
+      });
+      
+      // updateCubeContents(newCube.wireframeCube, containedSpheres).catch(err => {
+      //   console.error('Error updating new cube contents:', err);
+      // });
     }
 
-    // Remove the ghost cube after handling the sphere
+    if (oldCube && oldCube !== ghostCube?.existingCube) {
+      const remainingSpheres = findSpheresInCube(oldCube);
+      // try {
+      //    updateCubeContents(oldCube, remainingSpheres);
+      //   // Trigger file tree update after cube contents change
+      //   window.dispatchEvent(new CustomEvent('updateFileTree'));
+      // } catch (err) {
+      //   console.error('Error updating old cube contents:', err);
+      // }
+    }
+
     removeGhostCube();
   }
-  cleanupOldCubes()
-  // Update any necessary scene information
+
+  const { scene, nonBloomScene } = share3dDat();
+
+  const snapshot = createSceneSnapshot([scene, nonBloomScene]);
+    // Verify all cubes have correct contents
+    snapshot.boxes.forEach(box => {
+      if (box.wireframe) {
+        const actualSpheres = findSpheresInCube(box);
+        updateCubeContents(box.wireframe, actualSpheres).catch(err => {
+          console.error('Error updating cube contents during verification:', err);
+        });
+      }
+    });
+  
+  cleanupOldCubes();
   markNeedsRender();
 }
+
 
 const onPointerMove = (event) => {
   const { controls, camera, scene, nonBloomScene } = share3dDat();
@@ -1165,6 +1513,17 @@ const onPointerMove = (event) => {
 
       const intersects = checkIntersections(raycaster, [scene, nonBloomScene]);
 
+         // Check for cube intersections
+         const cubeIntersect = intersects.find(intersect => 
+          intersect.object.geometry.type === "BoxGeometry"
+        );
+        
+        if (cubeIntersect) {
+          highlightCube(cubeIntersect.object);
+        } else {
+          resetCubeHighlight();
+        }
+
       const sphereIntersect = intersects.find((intersect) => {
         return (
           intersect.object.geometry.type === "IcosahedronGeometry" &&
@@ -1186,6 +1545,7 @@ const onPointerMove = (event) => {
 
         // Create ghost cube, passing the existing cube if found
         createGhostCube(intersectedSphere.position, cubeSize, containingCube);
+         // Call handleFileDragOver to handle cube highlighting
       } else {
         removeGhostCube();
       }
@@ -1213,12 +1573,14 @@ function cleanupOldCubes() {
   const cubesToDelete = removeEmptyCubes(scene, nonBloomScene);
 
   console.log("cubesToRemove", cubesToDelete)
-
-  cubesToDelete?.forEach((cube) => {
+  cubesToDelete?.forEach(async (cube) => {
     if (!cube.wireframe) return;
     
     cube.wireframe.isDeleted = true;
     cube.solid.isDeleted = true;
+
+    // Use updateCubeContents with empty spheres array to trigger folder deletion
+     updateCubeContents(cube.wireframe, []);
   });
 }
 
@@ -1262,3 +1624,4 @@ setupPointerEvents();
 window.handleFileDrop_sphere = handleFileDrop_sphere;
 window.removeGhostCube = removeGhostCube;
 window.onPointerUp = onPointerUp;
+

@@ -136,16 +136,17 @@ class FileSystem {
     item.versionNonce = Math.floor(Math.random() * 1000000);
     return item;
   }
+
   async getMetadata<T extends FileMetadata | DirectoryMetadata>(id: string, type: 'file' | 'directory'): Promise<T | undefined> {
     // First, try to get the item from the snapshot
     const items = type === 'file' ? this.snapshot.files : this.snapshot.directories;
-    let item = items.find(item => item.id === id && !item.isDeleted) as T | undefined;
-  
+    let item = items.find(item => item.id === id) as T | undefined;
+
     // If not found in snapshot, try to get from IndexedDB
     if (!item) {
       item = await this.getItem<T>(id, type);
-      // Only add to snapshot if item exists and isn't deleted
-      if (item && !item.isDeleted) {
+      // Optionally, add it to the snapshot for future use
+      if (item) {
         if (type === 'file') {
           (this.snapshot.files as T[]).push(item);
         } else {
@@ -153,9 +154,8 @@ class FileSystem {
         }
       }
     }
-  
-    // Don't return deleted items
-    return item && !item.isDeleted ? item : undefined;
+
+    return item;
   }
 
   async addOrUpdateItem<T extends FileMetadata | DirectoryMetadata>(item: T, type: 'file' | 'directory'): Promise<void> {
@@ -165,50 +165,15 @@ class FileSystem {
     await this.applyUpdate({ [key]: updatedItems });
   }
 
-//   async deleteItem(id: string, type: 'file' | 'directory'): Promise<void> {
-//     const key = type === 'file' ? 'files' : 'directories';
-//     const item = this.snapshot[key].find(i => i.id === id);
-//     if (item) {
-//       item.isDeleted = true;
-//       this.updateMetadata(item);
-//       // Cast the filtered array to the correct type
-//       this.snapshot[key] = this.snapshot[key].filter(i => i.id !== id) as any;
-//       await this.applyUpdate({ [key]: this.snapshot[key] });
-      
-//       await indexDBOverlay.deleteItem(key, id);
-//     }
-// }
-
-// ... existing code ...
-
-async  deleteItem(id: string, type: 'file' | 'directory', isJustFolder: boolean = false): Promise<void> {
-  const key = type === 'file' ? 'files' : 'directories';
-  const item = this.snapshot[key].find(i => i.id === id);
-  if (item) {
-    item.isDeleted = true;
-    this.updateMetadata(item);
-    
-    // Remove the item from the snapshot array
-    this.snapshot[key] = this.snapshot[key].filter(i => i.id !== id) as any;
-    await this.applyUpdate({ [key]: this.snapshot[key] });
-    
-  
-    // If deleting a directory, also delete all contained files
-    if (type === 'directory' && 'fileIds' in item && !isJustFolder) {
-      for (const fileId of item.fileIds) {
-        await this.deleteItem(fileId, 'file');
-      }
+  async deleteItem(id: string, type: 'file' | 'directory'): Promise<void> {
+    const key = type === 'file' ? 'files' : 'directories';
+    const item = this.snapshot[key].find(i => i.id === id);
+    if (item) {
+      item.isDeleted = true;
+      this.updateMetadata(item);
+      await this.applyUpdate({ [key]: this.snapshot[key] });
     }
-    
-    // Trigger file tree update
-    window.dispatchEvent(new CustomEvent('updateFileTree'));
-
-    console.log("deleting item from indexDB", key, id)
-    
-    // await indexDBOverlay.deleteItem(key, id);
-    await indexDBOverlay.deleteItem_field(key, id);
   }
-}
 
   async addFileToDirectory(fileId: string, directoryId: string): Promise<void> {
     const directory = await this.getMetadata<DirectoryMetadata>(directoryId, 'directory');

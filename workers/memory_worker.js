@@ -212,6 +212,8 @@ async function saveDataMemoryWorker(storeName, data, key = null, retries = 3) {
 
 
 async function deleteItem(storeName, key) {
+
+  console.log("deleting item from indexDB 0 day", key, storeName)
   try {
     if (!dbs[DEFAULT_DB_NAME]) {
       throw new Error(`Database "${DEFAULT_DB_NAME}" is not open`);
@@ -222,6 +224,8 @@ async function deleteItem(storeName, key) {
       const tx = db.transaction([storeName], "readwrite");
       const store = tx.objectStore(storeName);
       const request = store.delete(key);
+
+      console.log("deleting item from indexDB", key, storeName) 
 
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(new Error(`Error deleting item from ${storeName}`));
@@ -414,6 +418,7 @@ self.onmessage = async function (event) {
         result = await getItem(data.storeName, key);
         break;
       case "deleteItem":
+        console.log("deleting item from indexDB 1 day", data.key, data.storeName)
         result = await deleteItem(data.storeName, data.key);
         break;
         case "closeConnections":

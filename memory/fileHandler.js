@@ -132,6 +132,8 @@ async function readFileContent(file) {
     }
   });
 }
+
+
 async function processFile(fileEntry, id) {
 
   return new Promise((resolve, reject) => {
@@ -535,16 +537,225 @@ function getElementPath(element) {
     updateParentCheckbox(parentLi);
   }
   
+  // export function updateFileTreeUI() {
+  //   const fileSystem = getFileSystem();
+  //   const snapshot = fileSystem.getSnapshot();
+  //   fileTree.innerHTML = "";
+  
+  //   const dirMap = new Map(snapshot.directories.map((dir) => [dir.id, dir]));
+  //   const rootDir = createFolderElement("Root");
+  //   fileTree.appendChild(rootDir);
+  
+  //   snapshot.files.forEach((file) => {
+  //     const fileElement = document.createElement("li");
+  //     const iconClass = getFileIcon(file.name);
+      
+  //     // Create the content wrapper
+  //     const contentWrapper = document.createElement("div");
+  //     contentWrapper.className = "content-wrapper";
+      
+  //     // Create file name section
+  //     const fileName = document.createElement("div");
+  //     fileName.className = "file-name";
+  //     fileName.innerHTML = `
+  //       <i class="fa ${iconClass}"></i>
+  //       <span>${file.name}</span>
+  //     `;
+      
+  //     // Create file details section
+  //     const fileDetails = document.createElement("div");
+  //     fileDetails.className = "file-details";
+      
+  //     const fileSize = document.createElement("span");
+  //     fileSize.className = "file-size";
+  //     fileSize.textContent = formatFileSize(file.size);
+      
+  //     const checkbox = document.createElement("input");
+  //     checkbox.type = "checkbox";
+  //     checkbox.checked = window.fileMetadata.get(file.id)?.isSelected ?? true;
+  //     checkbox.dataset.fileId = file.id;
+      
+  //     checkbox.addEventListener("change", (e) => {
+  //       const isChecked = e.target.checked;
+  //       const fileId = e.target.dataset.fileId;
+        
+  //       // Update metadata
+  //       if (window.fileMetadata.has(fileId)) {
+  //         const metadata = window.fileMetadata.get(fileId);
+  //         metadata.isSelected = isChecked;
+  //         window.fileMetadata.set(fileId, metadata);
+  //       }
+        
+  //       // Dispatch event for bloom update
+  //       window.dispatchEvent(new CustomEvent('checkboxStateChanged', {
+  //         detail: {
+  //           fileId: fileId,
+  //           isSelected: isChecked
+  //         }
+  //       }));
+        
+  //       updateParentCheckbox(fileElement);
+  //     });
+      
+  //     fileDetails.appendChild(fileSize);
+  //     fileDetails.appendChild(checkbox);
+      
+  //     contentWrapper.appendChild(fileName);
+  //     contentWrapper.appendChild(fileDetails);
+  //     fileElement.appendChild(contentWrapper);
+      
+  //     rootDir.querySelector("ul").appendChild(fileElement);
+  //   });
+  //   // Process directories
+  //   snapshot.directories.forEach((dir) => {
+  //     if (dir.id !== "0") {
+  //       const dirElement = createFolderElement(dir.name);
+  //       const parentDir = dirMap.get(dir.parentId) || rootDir;
+  //       parentDir.querySelector("ul").appendChild(dirElement);
+  
+  //       // Add files to directory
+  //       dir.fileIds.forEach((fileId) => {
+  //         const file = snapshot.files.find((f) => f.id === fileId);
+  //         if (file) {
+  //           const fileElement = document.createElement("li");
+  //           const iconClass = getFileIcon(file.name);
+            
+  //           // Create content wrapper
+  //           const contentWrapper = document.createElement("div");
+  //           contentWrapper.className = "content-wrapper";
+  //           contentWrapper.innerHTML = `
+  //             <i class="fa ${iconClass}"></i>
+  //             ${file.name}
+  //             <span>- ${formatFileSize(file.size)}</span>
+  //           `;
+            
+  //           // Create checkbox wrapper
+  //           const checkboxWrapper = document.createElement("div");
+  //           checkboxWrapper.className = "checkbox-wrapper";
+            
+  //           const checkbox = document.createElement("input");
+  //           checkbox.type = "checkbox";
+  //           checkbox.checked = true;
+  //           checkbox.dataset.fileId = file.id;
+            
+  //           checkbox.addEventListener("change", (e) => {
+  //             const isChecked = e.target.checked;
+  //             const fileId = e.target.dataset.fileId;
+              
+  //             // Update metadata
+  //             if (window.fileMetadata.has(fileId)) {
+  //               const metadata = window.fileMetadata.get(fileId);
+  //               metadata.isSelected = isChecked;
+  //               window.fileMetadata.set(fileId, metadata);
+  //             }
+              
+  //             // Dispatch event for bloom update
+  //             window.dispatchEvent(new CustomEvent('checkboxStateChanged', {
+  //               detail: {
+  //                 fileId: fileId,
+  //                 isSelected: isChecked
+  //               }
+  //             }));
+              
+  //             updateParentCheckbox(fileElement);
+  //           });
+            
+  //           checkboxWrapper.appendChild(checkbox);
+            
+  //           fileElement.appendChild(contentWrapper);
+  //           fileElement.appendChild(checkboxWrapper);
+            
+  //           dirElement.querySelector("ul").appendChild(fileElement);
+  //         }
+  //       });
+  //     }
+  //   });
+  //   addRowInteractions();
+  // }
+
+
+
   export function updateFileTreeUI() {
     const fileSystem = getFileSystem();
     const snapshot = fileSystem.getSnapshot();
     fileTree.innerHTML = "";
+
   
     const dirMap = new Map(snapshot.directories.map((dir) => [dir.id, dir]));
     const rootDir = createFolderElement("Root");
     fileTree.appendChild(rootDir);
+  // Track which files have been processed in directories
+  const processedFiles = new Set();
+
+     snapshot.directories.forEach((dir) => {
+      if (dir.id !== "0") {
+        const dirElement = createFolderElement(dir.name);
+        const parentDir = dirMap.get(dir.parentId) || rootDir;
+        parentDir.querySelector("ul").appendChild(dirElement);
+  
+        // Add files to directory
+        dir.fileIds.forEach((fileId) => {
+          const file = snapshot.files.find((f) => f.id === fileId);
+          if (file) {
+               // Add file to processed set
+          processedFiles.add(file.id);
+          
+            const fileElement = document.createElement("li");
+            const iconClass = getFileIcon(file.name);
+            
+            // Create content wrapper
+            const contentWrapper = document.createElement("div");
+            contentWrapper.className = "content-wrapper";
+            contentWrapper.innerHTML = `
+              <i class="fa ${iconClass}"></i>
+              ${file.name}
+              <span>- ${formatFileSize(file.size)}</span>
+            `;
+            
+            // Create checkbox wrapper
+            const checkboxWrapper = document.createElement("div");
+            checkboxWrapper.className = "checkbox-wrapper";
+            
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = true;
+            checkbox.dataset.fileId = file.id;
+            
+            checkbox.addEventListener("change", (e) => {
+              const isChecked = e.target.checked;
+              const fileId = e.target.dataset.fileId;
+              
+              // Update metadata
+              if (window.fileMetadata.has(fileId)) {
+                const metadata = window.fileMetadata.get(fileId);
+                metadata.isSelected = isChecked;
+                window.fileMetadata.set(fileId, metadata);
+              }
+              
+              // Dispatch event for bloom update
+              window.dispatchEvent(new CustomEvent('checkboxStateChanged', {
+                detail: {
+                  fileId: fileId,
+                  isSelected: isChecked
+                }
+              }));
+              
+              updateParentCheckbox(fileElement);
+            });
+            
+            checkboxWrapper.appendChild(checkbox);
+            
+            fileElement.appendChild(contentWrapper);
+            fileElement.appendChild(checkboxWrapper);
+            
+            dirElement.querySelector("ul").appendChild(fileElement);
+          }
+        });
+      }
+    });
   
     snapshot.files.forEach((file) => {
+      if (!processedFiles.has(file.id)) {
       const fileElement = document.createElement("li");
       const iconClass = getFileIcon(file.name);
       
@@ -603,71 +814,10 @@ function getElementPath(element) {
       fileElement.appendChild(contentWrapper);
       
       rootDir.querySelector("ul").appendChild(fileElement);
+    }
     });
     // Process directories
-    snapshot.directories.forEach((dir) => {
-      if (dir.id !== "0") {
-        const dirElement = createFolderElement(dir.name);
-        const parentDir = dirMap.get(dir.parentId) || rootDir;
-        parentDir.querySelector("ul").appendChild(dirElement);
-  
-        // Add files to directory
-        dir.fileIds.forEach((fileId) => {
-          const file = snapshot.files.find((f) => f.id === fileId);
-          if (file) {
-            const fileElement = document.createElement("li");
-            const iconClass = getFileIcon(file.name);
-            
-            // Create content wrapper
-            const contentWrapper = document.createElement("div");
-            contentWrapper.className = "content-wrapper";
-            contentWrapper.innerHTML = `
-              <i class="fa ${iconClass}"></i>
-              ${file.name}
-              <span>- ${formatFileSize(file.size)}</span>
-            `;
-            
-            // Create checkbox wrapper
-            const checkboxWrapper = document.createElement("div");
-            checkboxWrapper.className = "checkbox-wrapper";
-            
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.checked = true;
-            checkbox.dataset.fileId = file.id;
-            
-            checkbox.addEventListener("change", (e) => {
-              const isChecked = e.target.checked;
-              const fileId = e.target.dataset.fileId;
-              
-              // Update metadata
-              if (window.fileMetadata.has(fileId)) {
-                const metadata = window.fileMetadata.get(fileId);
-                metadata.isSelected = isChecked;
-                window.fileMetadata.set(fileId, metadata);
-              }
-              
-              // Dispatch event for bloom update
-              window.dispatchEvent(new CustomEvent('checkboxStateChanged', {
-                detail: {
-                  fileId: fileId,
-                  isSelected: isChecked
-                }
-              }));
-              
-              updateParentCheckbox(fileElement);
-            });
-            
-            checkboxWrapper.appendChild(checkbox);
-            
-            fileElement.appendChild(contentWrapper);
-            fileElement.appendChild(checkboxWrapper);
-            
-            dirElement.querySelector("ul").appendChild(fileElement);
-          }
-        });
-      }
-    });
+   
     addRowInteractions();
   }
   
@@ -688,10 +838,14 @@ export function refreshFileTree() {
 window.addEventListener('bloomStateChanged', (event) => {
   const { fileId, isSelected } = event.detail;
 
-  console.log("checkboxes! bloomStateChanged", fileId, isSelected)
   
   const checkbox = document.querySelector(`input[type="checkbox"][data-file-id="${fileId}"]`);
   if (checkbox) {
     checkbox.checked = isSelected;
   }
+});
+
+
+window.addEventListener('updateFileTree', () => {
+  refreshFileTree();
 });

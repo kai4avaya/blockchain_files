@@ -419,7 +419,7 @@ export function saveObjectChanges(
   objectData,
   options?: { deferReconstruct?: boolean; fromPeer?: boolean }
 ) {
-  console.log("saveObjectChanges", objectData);
+  // console.log("saveObjectChanges", objectData);
   if (!objectData) return;
 
   const commonData = serializeThreeObject(objectData);
