@@ -2,7 +2,7 @@
 
 
 import config from '../../configs/config.json';
-import {generateVersionNonce} from '../../utils/utils';
+import {generateVersionNonce, generateUniqueId} from '../../utils/utils';
 import { p2pSync } from '../../network/peer2peer_simple';
 import { generateGlobalTimestamp, incrementVersion} from '../../utils/utils'
 import in_memory_store from './in_memory'
@@ -25,6 +25,7 @@ interface StoreConfig {
 
 class IndexDBWorkerOverlay {
   private worker: Worker;
+  private db: IDBDatabase | null = null;
   private callbacks: Map<string, (data: any) => void> = new Map();
   private isDBOpen: boolean = false;
   private dbName: string = config.dbName;
@@ -50,7 +51,8 @@ public async initialize(dbName?: string): Promise<void> {
   if (this.isInitialized) return; // Prevent multiple initializations
 
   // Determine the database name to use
-  const lastOpenedDB = localStorage.getItem('last_opened_db');
+  // const lastOpenedDB = localStorage.getItem('last_opened_db');
+  const lastOpenedDB = localStorage.getItem('latestDBName');
   this.dbName = dbName || lastOpenedDB || config.dbName;
 
   // Post initial config to the worker
@@ -69,7 +71,9 @@ public async initialize(dbName?: string): Promise<void> {
   }
 
   // Update localStorage with the last opened database
-  localStorage.setItem('last_opened_db', this.dbName);
+  // localStorage.setItem('last_opened_db', this.dbName);
+  localStorage.setItem('latestDBName', this.dbName);
+
 
   this.isInitialized = true;
 }
@@ -396,21 +400,35 @@ private async ensureDBOpen(): Promise<void> {
     }
   }
 }
-  
-private async closeAllConnections(dbName: string): Promise<void> {
-  return new Promise((resolve) => {
-    const closeRequest = indexedDB.open(dbName);
-    closeRequest.addEventListener('success', (event: Event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      db.close();
+
+public async closeAllConnections(dbName: string): Promise<void> {
+  return new Promise(async (resolve) => {
+    try {
+      console.log(`Attempting to close connections for: ${dbName}`);
+      
+      // First close our local connection if it exists
+      if (this.db) {
+        this.db.close();
+        this.db = null;
+      }
+
+      // Reset internal state
+      this.isDBOpen = false;
+      this.isInitialized = false;
+
+      // Add delay to ensure connections are properly closed
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log(`Successfully closed connections to ${dbName}`);
       resolve();
-    }, { once: true });
-    
-    closeRequest.addEventListener('error', () => {
-      resolve(); // Resolve even on error to continue operation
-    }, { once: true });
+    } catch (error) {
+      console.error('Error in closeAllConnections:', error);
+      resolve(); // Resolve anyway to allow deletion to proceed
+    }
   });
 }
+
+
+
 async initializeDB(storeNames: string[]): Promise<void> {
   if (!this.isInitialized) {
     await this.initialize(); // Ensure the worker is initialized

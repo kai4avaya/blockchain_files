@@ -1,45 +1,60 @@
 import {generateUniqueId} from '../../utils/utils'
 import indexDBOverlay from './file_worker';
+import config from '../../configs/config.json';
 
 
-export async function createAndInitializeNewDatabaseInstance() {
-    // Step 1: Ensure all pending operations are completed
-    if (indexDBOverlay.isDBOpen) {
-      await Promise.all(indexDBOverlay.pendingOperations.values());
-      await indexDBOverlay.closeAllConnections(config.dbName);
-    }
-  
-    // Step 2: Generate a unique name for the new database
-    const randomCode = generateUniqueId();
-    const newDbName = `fileGraphDB_${randomCode}`;
-  
-    // Step 3: Update the configuration with the new database name
-    config.dbName = newDbName;
-    localStorage.setItem('latestDBName', newDbName);
-  
-    // Step 4: Reopen and initialize the new database
+export async function createAndInitializeNewDatabaseInstance(customName = null) {
     try {
-      // Ensure the database worker is aware of the new database name
-      indexDBOverlay.worker.postMessage({
-        type: 'INIT_CONFIG',
-        config: { dbName: newDbName }
-      });
-  
-      // Reopen and initialize the database with the configured stores
-      await indexDBOverlay.openDB(); // No need for forceRefresh if the old DB is closed
-      const storeConfigs = Object.entries(config.dbStores).map(([storeName, storeConfig]) => ({
-        storeName,
-        keyPath: storeConfig.keyPath || null,
-        vectorConfig: storeConfig.vectorConfig || null
-      }));
-      await indexDBOverlay.initializeDB(storeConfigs.map(config => config.storeName));
-  
-      console.log(`New database "${newDbName}" created and initialized successfully.`);
+        // Step 1: Close current database connection first
+        const currentDb = config.dbName;
+        if (currentDb) {
+            console.log(`Closing current database: ${currentDb}`);
+            await indexDBOverlay.closeAllConnections(currentDb);
+            // Add small delay to ensure connection is fully closed
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        // Step 2: Generate a unique name for the new database
+        const randomCode = generateUniqueId().slice(-3);
+        const newDbName = customName 
+            ? `fileGraphDB_${randomCode}_${customName.trim()}`
+            : `fileGraphDB_${randomCode}`;
+
+        console.log(`Creating new database: ${newDbName}`);
+
+        // Step 3: Update the configuration with the new database name
+        config.dbName = newDbName;
+        localStorage.setItem('latestDBName', newDbName);
+
+        // Step 4: Initialize the new database
+        await indexDBOverlay.worker.postMessage({
+            type: 'INIT_CONFIG',
+            config: { dbName: newDbName }
+        });
+
+        // Step 5: Open and initialize the new database
+        await indexDBOverlay.openDB();
+        const storeConfigs = Object.entries(config.dbStores).map(([storeName, storeConfig]) => ({
+            storeName,
+            keyPath: storeConfig.keyPath || null,
+            vectorConfig: storeConfig.vectorConfig || null
+        }));
+        await indexDBOverlay.initializeDB(storeConfigs.map(config => config.storeName));
+
+        // Step 6: Update databases list in localStorage
+        const databases = JSON.parse(localStorage.getItem('databases')) || [];
+        if (!databases.includes(newDbName)) {
+            databases.push(newDbName);
+            localStorage.setItem('databases', JSON.stringify(databases));
+        }
+
+        console.log(`New database "${newDbName}" created and initialized successfully.`);
+        return newDbName;
     } catch (error) {
-      console.error(`Failed to create and initialize the new database "${newDbName}":`, error);
-      throw error;
+        console.error('Error in createAndInitializeNewDatabaseInstance:', error);
+        throw error;
     }
-  }
+}
   
 
   function getOrCreateDatabaseName() {

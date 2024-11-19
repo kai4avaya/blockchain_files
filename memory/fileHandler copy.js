@@ -335,31 +335,8 @@ function addFileToTree(file) {
     
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.checked = window.fileMetadata.get(file.id)?.isSelected ?? false;
+    checkbox.checked = true;
     checkbox.dataset.fileId = file.id;
-    
-    // Add event listener for checkbox changes
-    checkbox.addEventListener("change", (e) => {
-      const isChecked = e.target.checked;
-      const fileId = e.target.dataset.fileId;
-      
-      // Update metadata
-      if (window.fileMetadata.has(fileId)) {
-        const metadata = window.fileMetadata.get(fileId);
-        metadata.isSelected = isChecked;
-        window.fileMetadata.set(fileId, metadata);
-      }
-      
-      // Dispatch event for bloom update
-      window.dispatchEvent(new CustomEvent('checkboxStateChanged', {
-        detail: {
-          fileId: fileId,
-          isSelected: isChecked
-        }
-      }));
-      
-      updateParentCheckbox(fileElement);
-    });
     
     fileDetails.appendChild(fileSize);
     fileDetails.appendChild(checkbox);
@@ -498,33 +475,14 @@ function getElementPath(element) {
   }
   
   // New function to update parent folder checkbox state
-  // function updateParentCheckbox(element) {
-  //   const parentLi = element.closest("li").parentElement?.closest("li");
-  //   if (!parentLi) return;
-    
-  //   const parentCheckbox = parentLi.querySelector("> .checkbox-wrapper input[type='checkbox']");
-  //   if (!parentCheckbox) return;
-    
-  //   const siblingCheckboxes = parentLi.querySelectorAll("ul > li > .checkbox-wrapper input[type='checkbox']");
-  //   const allChecked = Array.from(siblingCheckboxes).every(cb => cb.checked);
-  //   const anyChecked = Array.from(siblingCheckboxes).some(cb => cb.checked);
-    
-  //   parentCheckbox.checked = allChecked;
-  //   parentCheckbox.indeterminate = !allChecked && anyChecked;
-    
-  //   // Recursively update parent folders
-  //   updateParentCheckbox(parentLi);
-  // }
   function updateParentCheckbox(element) {
     const parentLi = element.closest("li").parentElement?.closest("li");
     if (!parentLi) return;
     
-    // Update selector to match your DOM structure
-    const parentCheckbox = parentLi.querySelector(".file-details input[type='checkbox']");
+    const parentCheckbox = parentLi.querySelector("> .checkbox-wrapper input[type='checkbox']");
     if (!parentCheckbox) return;
     
-    // Update sibling selector to match your DOM structure
-    const siblingCheckboxes = parentLi.querySelectorAll("ul > li .file-details input[type='checkbox']");
+    const siblingCheckboxes = parentLi.querySelectorAll("ul > li > .checkbox-wrapper input[type='checkbox']");
     const allChecked = Array.from(siblingCheckboxes).every(cb => cb.checked);
     const anyChecked = Array.from(siblingCheckboxes).some(cb => cb.checked);
     
@@ -570,28 +528,10 @@ function getElementPath(element) {
       
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
-      checkbox.checked = window.fileMetadata.get(file.id)?.isSelected ?? true;
+      checkbox.checked = true;
       checkbox.dataset.fileId = file.id;
       
-      checkbox.addEventListener("change", (e) => {
-        const isChecked = e.target.checked;
-        const fileId = e.target.dataset.fileId;
-        
-        // Update metadata
-        if (window.fileMetadata.has(fileId)) {
-          const metadata = window.fileMetadata.get(fileId);
-          metadata.isSelected = isChecked;
-          window.fileMetadata.set(fileId, metadata);
-        }
-        
-        // Dispatch event for bloom update
-        window.dispatchEvent(new CustomEvent('checkboxStateChanged', {
-          detail: {
-            fileId: fileId,
-            isSelected: isChecked
-          }
-        }));
-        
+      checkbox.addEventListener("change", () => {
         updateParentCheckbox(fileElement);
       });
       
@@ -636,25 +576,7 @@ function getElementPath(element) {
             checkbox.checked = true;
             checkbox.dataset.fileId = file.id;
             
-            checkbox.addEventListener("change", (e) => {
-              const isChecked = e.target.checked;
-              const fileId = e.target.dataset.fileId;
-              
-              // Update metadata
-              if (window.fileMetadata.has(fileId)) {
-                const metadata = window.fileMetadata.get(fileId);
-                metadata.isSelected = isChecked;
-                window.fileMetadata.set(fileId, metadata);
-              }
-              
-              // Dispatch event for bloom update
-              window.dispatchEvent(new CustomEvent('checkboxStateChanged', {
-                detail: {
-                  fileId: fileId,
-                  isSelected: isChecked
-                }
-              }));
-              
+            checkbox.addEventListener("change", () => {
               updateParentCheckbox(fileElement);
             });
             
@@ -683,15 +605,3 @@ export function refreshFileTree() {
     updateFileTreeUI();
   });
 }
-
-// Add event listeners for state synchronization
-window.addEventListener('bloomStateChanged', (event) => {
-  const { fileId, isSelected } = event.detail;
-
-  console.log("checkboxes! bloomStateChanged", fileId, isSelected)
-  
-  const checkbox = document.querySelector(`input[type="checkbox"][data-file-id="${fileId}"]`);
-  if (checkbox) {
-    checkbox.checked = isSelected;
-  }
-});

@@ -259,71 +259,87 @@ async function getItem(storeName, key) {
   }
 }
 
-async function closeDatabaseConnections() {
-  if (!DEFAULT_DB_NAME || !dbs[DEFAULT_DB_NAME]) {
-    console.warn(`Database "${DEFAULT_DB_NAME}" is not open, no connections to close.`);
-    return;
-  }
+async function closeConnections(dbName) {
+    return new Promise((resolve) => {
+        const maxAttempts = 3;
+        let attempts = 0;
+        
+        const tryClose = () => {
+            attempts++;
+            console.log(`Attempt ${attempts} to close connections for "${dbName}"`);
 
-  const db = dbs[DEFAULT_DB_NAME];
+            if (dbs[dbName]) {
+                const db = dbs[dbName];
+                
+                // Check for active transactions
+                if (db.transaction && db.transaction.db === db) {
+                    if (attempts < maxAttempts) {
+                        console.log("Active transactions found, retrying in 300ms...");
+                        setTimeout(tryClose, 300);
+                        return;
+                    }
+                }
 
-  // Wait for any active transactions to complete before closing
-  const closePromise = new Promise((resolve) => {
-    const interval = setInterval(() => {
-      if (db.transaction && db.transaction.db === db) {
-        // Still a transaction in progress; wait
-        console.log("Waiting for active transactions to complete...");
-      } else {
-        // No more active transactions
-        clearInterval(interval);
-        db.close();
-        delete dbs[DEFAULT_DB_NAME];
-        resolve();
-      }
-    }, 100);
-  });
+                // Close the connection
+                db.close();
+                delete dbs[dbName];
+                
+                // Add delay before confirming closure
+                setTimeout(() => {
+                    resolve(`Connections to "${dbName}" closed successfully`);
+                }, 200);
+            } else {
+                console.warn(`Database "${dbName}" is not open, no connections to close.`);
+                resolve(`No open connections for "${dbName}"`);
+            }
+        };
 
-  return closePromise;
+        // Start the close attempt process
+        tryClose();
+    });
 }
 
 async function deleteDatabase() {
-  try {
-    // First, close any active database connections
-    await closeDatabaseConnections();
+    try {
+        if (!DEFAULT_DB_NAME) {
+            throw new Error("No default database specified");
+        }
 
-    return new Promise((resolve, reject) => {
-      if (!DEFAULT_DB_NAME) {
-        reject(new Error("No default database specified"));
-        return;
-      }
+        // First ensure all connections are closed
+        await closeConnections(DEFAULT_DB_NAME);
+        
+        // Add delay after closing connections
+        await new Promise(resolve => setTimeout(resolve, 300));
 
-      const deleteRequest = indexedDB.deleteDatabase(DEFAULT_DB_NAME);
+        return new Promise((resolve, reject) => {
+            const deleteRequest = indexedDB.deleteDatabase(DEFAULT_DB_NAME);
 
-      deleteRequest.onsuccess = function () {
-        delete dbs[DEFAULT_DB_NAME]; // Remove from the map if necessary
-        resolve(`Database "${DEFAULT_DB_NAME}" deleted successfully`);
-      };
+            deleteRequest.onsuccess = function () {
+                delete dbs[DEFAULT_DB_NAME];
+                resolve(`Database "${DEFAULT_DB_NAME}" deleted successfully`);
+            };
 
-      deleteRequest.onerror = function (event) {
-        reject(
-          new Error(
-            `Error deleting database "${DEFAULT_DB_NAME}": ${event.target.error.message}`
-          )
-        );
-      };
+            deleteRequest.onerror = function (event) {
+                reject(new Error(
+                    `Error deleting database "${DEFAULT_DB_NAME}": ${event.target.error.message}`
+                ));
+            };
 
-      deleteRequest.onblocked = function () {
-        reject(
-          new Error(
-            `Database "${DEFAULT_DB_NAME}" deletion is blocked, please close other connections`
-          )
-        );
-      };
-    });
-  } catch (error) {
-    console.error(`Failed to close database connections before deleting: ${error.message}`);
-    throw error;
-  }
+            deleteRequest.onblocked = function () {
+                // Try one more time to close connections
+                closeConnections(DEFAULT_DB_NAME).then(() => {
+                    setTimeout(() => {
+                        const retryDelete = indexedDB.deleteDatabase(DEFAULT_DB_NAME);
+                        retryDelete.onsuccess = () => resolve(`Database "${DEFAULT_DB_NAME}" deleted successfully after retry`);
+                        retryDelete.onerror = (e) => reject(new Error(`Final deletion attempt failed: ${e.target.error.message}`));
+                    }, 300);
+                });
+            };
+        });
+    } catch (error) {
+        console.error(`Failed to delete database: ${error.message}`);
+        throw error;
+    }
 }
 
 
@@ -400,7 +416,13 @@ self.onmessage = async function (event) {
       case "deleteItem":
         result = await deleteItem(data.storeName, data.key);
         break;
+        case "closeConnections":
+        result = await closeConnections(data.dbName);
+        break;
         case "deleteDatabase":
+        // First close connections
+        await closeConnections(DEFAULT_DB_NAME);
+        // Then actually delete the database
         result = await deleteDatabase();
         break;
       default:

@@ -47,6 +47,8 @@ const planeNormal = new THREE.Vector3();
 const plane = new THREE.Plane();
 const loginName = localStorage.getItem("login_block") || "no_login";
 
+window.fileMetadata = new Map(); // Track file metadata globally
+
 setupDragAndDrop();
 
 function getCubeUnderPointer(event, intersects) {
@@ -721,6 +723,17 @@ async function handleFileDrop_sphere(event) {
       lastEditedBy: loginName,
     });
 
+    window.fileMetadata.set(fileId, {
+      filename: file.name,
+      id: fileId,
+      isSelected: false, // Initial bloom state
+      isTab: !!processEvent.tabId,
+      content: processEvent.source?.data?.content,
+      size: file.size,
+      lastModified: file.lastModified,
+      type: file.type,
+    });
+
     createdShapes.push(createSphere(sphereData));
   }
 
@@ -933,26 +946,103 @@ function getRandomOffset(cubeSize) {
   const offsetZ = (Math.random() - 0.5) * maxOffset;
   return new THREE.Vector3(offsetX, offsetY, offsetZ);
 }
-function toggleBloom(object) {
 
-  let isBloomEnabled = object.layers.test(BLOOM_SCENE);
+
+// function toggleBloom(object) {
+
+//   let isBloomEnabled = object.layers.test(BLOOM_SCENE);
 
   
-  console.log("i have toggleBloom PRE", isBloomEnabled)
+//   console.log("i have toggleBloom PRE", isBloomEnabled)
 
+//   object.layers.toggle(BLOOM_SCENE);
+  
+//   isBloomEnabled = object.layers.test(BLOOM_SCENE);
+
+//   console.log("i have toggleBloom POST", isBloomEnabled)
+  
+//   // Update selection state
+//   object.userData.selected = isBloomEnabled ? 1 : 0;
+  
+//   // Update global selection tracking KAI CHECK this!!
+  
+//   markNeedsRender();
+// }
+
+
+// function toggleBloom(object) {
+//   let isBloomEnabled = object.layers.test(BLOOM_SCENE);
+
+//   console.log("i have checkboxes toggleBloom PRE", isBloomEnabled)
+  
+//   object.layers.toggle(BLOOM_SCENE);
+//   isBloomEnabled = !isBloomEnabled;
+
+//   console.log("i have checkboxes toggleBloom POST", isBloomEnabled)
+  
+//   // Update selection state
+//   object.userData.selected = isBloomEnabled ? 1 : 0;
+  
+//   // Get fileId from object's userData
+//   const fileId = object.userData.id;
+  
+//   // Update metadata in global tracking
+//   if (window.fileMetadata.has(fileId)) {
+//     const metadata = window.fileMetadata.get(fileId);
+//     metadata.isSelected = isBloomEnabled;
+//     window.fileMetadata.set(fileId, metadata);
+//   }
+  
+//   // Dispatch event for checkbox update
+//   window.dispatchEvent(new CustomEvent('bloomStateChanged', {
+//     detail: {
+//       fileId: fileId,
+//       isSelected: isBloomEnabled
+//     }
+//   }));
+  
+//   markNeedsRender();
+// }
+
+function toggleBloom(object) {
+  // Check if either mask 1 (default) or 3 (default + bloom) is active
+  const isBloomEnabled = object.layers.mask === 3;
+  
+  console.log("i have checkboxes toggleBloom PRE", isBloomEnabled);
+  
+  // Keep the essential toggle that makes the bloom effect work
   object.layers.toggle(BLOOM_SCENE);
   
-  isBloomEnabled = object.layers.test(BLOOM_SCENE);
-
-  console.log("i have toggleBloom POST", isBloomEnabled)
+  // After toggle, mask will be either 1 (default only) or 3 (default + bloom)
+  const isNowBloomed = object.layers.mask === 3;
+  
+  console.log("i have checkboxes toggleBloom POST", isNowBloomed);
   
   // Update selection state
-  object.userData.selected = isBloomEnabled ? 1 : 0;
+  object.userData.selected = isNowBloomed ? 1 : 0;
   
-  // Update global selection tracking KAI CHECK this!!
+  // Get fileId from object's userData
+  const fileId = object.userData.id;
+  
+  // Update metadata in global tracking
+  if (window.fileMetadata.has(fileId)) {
+    const metadata = window.fileMetadata.get(fileId);
+    metadata.isSelected = isNowBloomed;
+    window.fileMetadata.set(fileId, metadata);
+  }
+  
+  // Dispatch event for checkbox update
+  window.dispatchEvent(new CustomEvent('bloomStateChanged', {
+    detail: {
+      fileId: fileId,
+      isSelected: isNowBloomed
+    }
+  }));
   
   markNeedsRender();
 }
+
+
 // Update the onPointerUp function to use this new handleSphereDragEnd
 async function onPointerUp(event) {
   if (!isAllowed(event)){
@@ -1145,6 +1235,28 @@ function setupPointerEvents() {
   canvas.addEventListener("pointermove", throttle(onPointerMove, throttleTime));
   canvas.addEventListener("pointerup", onPointerUp);
 }
+
+// Modify the event listener to be simpler and only check the main scene
+window.addEventListener('checkboxStateChanged', (event) => {
+  const { fileId, isSelected } = event.detail;
+  const { scene } = share3dDat();
+
+  console.log("checkboxes! checkboxStateChanged", fileId, isSelected, scene);
+
+  // Only traverse the main scene for spheres
+  scene.traverse((object) => {
+    if (object.userData?.id === fileId) {
+      if (isSelected) {
+        object.layers.enable(BLOOM_SCENE);
+      } else {
+        object.layers.disable(BLOOM_SCENE);
+      }
+      object.userData.selected = isSelected ? 1 : 0;
+    }
+  });
+  
+  markNeedsRender();
+});
 
 setupPointerEvents();
 window.handleFileDrop_sphere = handleFileDrop_sphere;

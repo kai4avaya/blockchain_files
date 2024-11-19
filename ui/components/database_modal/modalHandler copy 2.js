@@ -1,7 +1,7 @@
 // ui\components\database_modal\modalHandler.js
 
 import indexDBOverlay from '../../../memory/local/file_worker';
-// import { generateUniqueId } from '../../../utils/utils';
+import { generateUniqueId } from '../../../utils/utils';
 import config from '../../../configs/config.json'
 import { showNotification } from '../notifications/popover.js';
 import { createAndInitializeNewDatabaseInstance } from '../../../memory/local/start_new_db';
@@ -16,27 +16,15 @@ const buttonSpinnerTemplate = `
 // Move loadDatabases outside setupDatabaseModal
 async function loadDatabases() {
     const databasesContainer = document.getElementById('databasesContainer');
-    databasesContainer.innerHTML = '';
+    databasesContainer.innerHTML = ''; // Clear previous content
     const databases = JSON.parse(localStorage.getItem('databases')) || [];
-    const currentDB = localStorage.getItem('latestDBName');
-
-    console.log('Current databas loading active'); // DO NOIT  DELETE ADDS A DELAY AND ENABLES IT TO WORK??
-    
-  
-    // First, remove any existing active-database classes
-    document.querySelectorAll('.active-database').forEach(el => {
-
-        console.log('Removing loading active-database class from:', el); // DO NOT DELETE
-        el.classList.remove('active-database');
-    });
   
     for (const dbName of databases) {
+        // Extract the user-generated name after the last two underscores
         const displayName = dbName.split('_').slice(2).join('_');
-        const isActive = dbName === currentDB;
   
         const dbAccordion = document.createElement('div');
-        dbAccordion.className = `accordion ${isActive ? 'active-database' : ''}`;
-        dbAccordion.setAttribute('data-db-name', dbName);
+        dbAccordion.className = 'accordion';
         const peers = await fetchPeersForDB(dbName); // Fetch peers here
         dbAccordion.innerHTML = `
             <div class="accordion-header">
@@ -143,8 +131,7 @@ export function setupDatabaseModal() {
         });
     });
     
-    // Function to handle modal closing
-    const handleModalClose = () => {
+    closeModal.addEventListener('click', () => {
         modal.classList.remove('show');
         overlay.classList.remove('show');
     
@@ -154,27 +141,13 @@ export function setupDatabaseModal() {
                 modal.style.display = 'none';
             }
         }, { once: true });
-    };
-
-    // ESC key handler
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && modal.style.display === 'block') {
-            handleModalClose();
+    });
+    
+    window.addEventListener('click', (event) => {
+        if (event.target === modal || event.target === overlay) {
+            closeModal.click(); // Reuse existing close logic
         }
     });
-
-    // Click outside handler
-    document.addEventListener('mousedown', (event) => {
-        // Check if the click is outside both the modal and the messages button
-        if (!modal.contains(event.target) && 
-            !messagesButton.contains(event.target) && 
-            modal.style.display === 'block') {
-            handleModalClose();
-        }
-    });
-
-    // Update existing close button handler to use the new function
-    closeModal.addEventListener('click', handleModalClose);
   
     // Event listener for creating a new database
     createDbButton.addEventListener('click', async () => {
@@ -230,12 +203,6 @@ async function revokePeerSharing(dbName, peer) {
 async function openDatabase(dbName) {
     try {
         console.log(`Opening database: ${dbName}`);
-        
-        // Remove highlight from previously active database
-        const previousActive = document.querySelector('.active-database');
-        if (previousActive) {
-            previousActive.classList.remove('active-database');
-        }
         
         // Close current database connections first
         await indexDBOverlay.closeAllConnections(config.dbName);

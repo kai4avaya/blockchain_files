@@ -1221,10 +1221,6 @@ const throttledRender = throttle(() => {
     }
   });
 
-  // Render bloom pass only for visible objects
-  // renderer.setClearColor(0x000000, 0);
-  // renderer.setClearColor(0x050510, 1);
-  // setBackgroundBasedOnTime(scene, nonBloomScene);
 
   // setBackgroundBasedOnTime(scene, nonBloomScene);
   bloomComposer.renderToScreen = false;
