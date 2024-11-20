@@ -317,23 +317,27 @@ async insert(object) {
     const { limit, minResults } = options;
     let collectedVectors = new Set();
     let resultObjects = [];
-    let activeFileIds = Array.from(window.fileMetadata.keys());
-  
+    
     try {
       const hashes = this.#lsh.hashVector(queryVector);
       let processedBuckets = 0;
+      
+      // Only get activeFileIds if window.fileMetadata exists
+      const hasFileMetadata = typeof window.fileMetadata !== 'undefined';
+      const activeFileIds = hasFileMetadata ? Array.from(window.fileMetadata.keys()) : [];
       
       for (let hash of hashes) {
         const hashBucket = await indexDBOverlay.getItem(this.#hashIndexStore, hash);
         if (!hashBucket || !hashBucket.vectorIds) continue;
   
         processedBuckets++;
-        // updateStatus(`Processing bucket ${processedBuckets}/${hashes.length}`);
   
-        // Filter vectors by active files
-        const activeVectorIds = hashBucket.vectorIds.filter(vectorId => 
-          activeFileIds.includes(hashBucket.fileIds[vectorId])
-        );
+        // Skip file filtering if window.fileMetadata is undefined
+        const activeVectorIds = hasFileMetadata
+          ? hashBucket.vectorIds.filter(vectorId => 
+              activeFileIds.includes(hashBucket.fileIds[vectorId])
+            )
+          : hashBucket.vectorIds;
   
         for (let vectorId of activeVectorIds) {
           if (!collectedVectors.has(vectorId)) {
@@ -351,37 +355,9 @@ async insert(object) {
           }
         }
   
-        // Check if we have enough results
         if (resultObjects.length >= limit) break;
       }
   
-      // If we don't have minimum results, process more buckets with relaxed file filtering
-      if (resultObjects.length < minResults) {
-        updateStatus('Expanding search for more results...');
-        // Process remaining buckets without file filtering
-        for (let hash of hashes) {
-          const hashBucket = await indexDBOverlay.getItem(this.#hashIndexStore, hash);
-          if (!hashBucket || !hashBucket.vectorIds) continue;
-  
-          for (let vectorId of hashBucket.vectorIds) {
-            if (!collectedVectors.has(vectorId)) {
-              collectedVectors.add(vectorId);
-              const vector = await indexDBOverlay.getItem(this.#objectStore, vectorId);
-              if (vector) {
-                const similarity = cosineSimilarity(queryVector, vector[this.#vectorPath]);
-                resultObjects.push({
-                  vectorId,
-                  fileId: vector.fileId,
-                  similarity,
-                  object: vector
-                });
-              }
-            }
-          }
-        }
-      }
-  
-      updateStatus('Sorting results...');
       resultObjects.sort((a, b) => b.similarity - a.similarity);
       return resultObjects.slice(0, limit);
     } catch (error) {

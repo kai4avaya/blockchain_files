@@ -10,7 +10,7 @@ class ContextManager {
   constructor() {
     this.vectorDB = new VectorDB();
     this.aiManager = new StreamingAIManager(config);
-    this.providerOrder = ['openrouter', 'gemini', 'groq', 'cerebras'];
+    this.providerOrder = ['OPEN', 'GEMINI', 'GROQ', 'CEREBRAS'];
     this.currentProviderIndex = 0;
   }
 
@@ -20,9 +20,9 @@ class ContextManager {
   }
 
   async getModelForProvider(provider) {
-    const models = config.apiConfig.models[provider];
-    const modelKey = Object.keys(models)[0]; // Get first available model
-    return `${provider}/${modelKey}`;
+    const models = config.apiConfig.models[provider.toLowerCase()];
+    const modelKey = Object.keys(models)[0];
+    return `${provider.toLowerCase()}/${modelKey}`;
   }
 
   async getContextualResponse(userPrompt, options = { limit: 5 }) {
@@ -40,8 +40,8 @@ class ContextManager {
     while (attempts < maxAttempts) {
       try {
         const currentProvider = this.providerOrder[this.currentProviderIndex];
-        const prevStatus = attempts > 0 ? `${this.providerOrder[this.currentProviderIndex - 1].toUpperCase()} failed. ` : '';
-        updateStatus(`${prevStatus}Attempting with ${currentProvider.toUpperCase()} provider...`);
+        const prevStatus = attempts > 0 ? `${this.providerOrder[this.currentProviderIndex - 1]} failed. ` : '';
+        updateStatus(`${prevStatus}Attempting with ${currentProvider} provider...`);
         
         updateStatus('Generating embedding for query...');
         const [queryEmbedding] = await embeddingWorker.generateEmbeddings(
@@ -77,7 +77,7 @@ class ContextManager {
       } catch (error) {
         console.error(`Error with provider ${this.providerOrder[this.currentProviderIndex]}:`, error);
         toast.show(
-          `${this.providerOrder[this.currentProviderIndex].toUpperCase()} provider failed. Trying next provider...`,
+          `${this.providerOrder[this.currentProviderIndex]} provider failed. Trying next provider...`,
           'error'
         );
         await this.getNextProvider();
