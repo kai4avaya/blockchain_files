@@ -98,9 +98,9 @@ class ContextManager {
         const timeoutId = setTimeout(() => {
           if (!hasInitialResponse) {
             this.aiManager.stopAllStreams();
-            throw new Error(`No response after 5s from ${currentProvider}`);
+            throw new Error(`No response after ${this.config.apiConfig.timeout/1000}s from ${currentProvider}`);
           }
-        }, 5000);
+        }, this.config.apiConfig.timeout);
 
         try {
           const response = await this.aiManager.streamCompletion(

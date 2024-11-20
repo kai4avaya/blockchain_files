@@ -1,5 +1,3 @@
-
-
 import { NODE_ENV, LUMI_ENDPOINT, LOCAL_ENDPOINT } from '../../configs/env_configs.js';
 
 class StreamingAIManager {
@@ -95,9 +93,17 @@ class StreamingAIManager {
                   }
                 }
               }
+            } catch (error) {
+              console.warn('Stream interrupted:', error);
             } finally {
-              reader.releaseLock();
-              this.activeStreams.delete(streamId);
+              try {
+                reader.releaseLock();
+                if (this.activeStreams.has(streamId)) {
+                  this.activeStreams.delete(streamId);
+                }
+              } catch (e) {
+                console.warn('Error cleaning up stream:', e);
+              }
             }
           }
         };

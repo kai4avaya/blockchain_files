@@ -187,14 +187,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--background-color, #fff);
-  border: 1px solid var(--border-color, #ddd);
+  background: #f44336;
+  color: white;
+  border: none;
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 13px;
-  color: var(--text-color, #333);
   cursor: pointer;
   opacity: 0;
+  visibility: hidden;
   transform: translateY(10px);
   transition: all 0.2s ease;
   z-index: 9999;
@@ -203,11 +204,26 @@
 
 .cm-stop-button.visible {
   opacity: 1;
+  visibility: visible;
   transform: translateY(0);
 }
 
 .cm-stop-button:hover {
-  background: var(--hover-background, #f5f5f5);
+  background: #d32f2f;
+}
+
+.cm-stop-button .key-combo {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 11px;
+}
+
+.cm-stop-button .key {
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-size: 11px;
 }
 
 .key-combo {

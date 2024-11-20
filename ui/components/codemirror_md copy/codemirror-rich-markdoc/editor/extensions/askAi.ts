@@ -15,10 +15,11 @@ class AIPluginView {
   private lastLineLength: number = 0;
   private isStreaming: boolean = false;
   private currentStreamId: string | null = null;
-  // private streamBuffer: string = '';
   private stopButton!: HTMLButtonElement;
+  private view: EditorView;
 
   constructor(view: EditorView) {
+    this.view = view;
     this.decorations = this.createDecorations(view);
     this.createStopButton();
   }
@@ -26,21 +27,35 @@ class AIPluginView {
   private createStopButton() {
     this.stopButton = document.createElement('button');
     this.stopButton.className = 'cm-stop-button';
+    
+    // Updated HTML to show ctrl/cmd in keyboard-like element
     this.stopButton.innerHTML = `
-      <svg width="12" height="12" viewBox="0 0 24 24">
-        <rect x="6" y="6" width="12" height="12" fill="currentColor"/>
-      </svg>
-      Stop <span class="key-combo"><span class="key">⌘</span><span class="key">⌫</span></span>
+      <span class="key-combo">
+        <span class="key">${navigator.platform.includes('Mac') ? 'cmd' : 'ctrl'}</span>
+        <span class="key">⌫</span>
+      </span>
+      <span class="stop-text">to stop</span>
     `;
-    this.stopButton.onclick = () => this.stopStream();
+    
+    this.stopButton.onclick = () => {
+      // Hide button immediately before any other operations
+      this.hideStopButton();
+      
+      if (this.currentStreamId) {
+        contextManager.stopResponse(this.currentStreamId);
+        this.stopStream();
+      }
+    };
     document.body.appendChild(this.stopButton);
   }
 
   private showStopButton() {
+    console.log('Showing stop button');
     this.stopButton.classList.add('visible');
   }
 
   private hideStopButton() {
+    console.log('Hiding stop button');
     this.stopButton.classList.remove('visible');
   }
 
@@ -154,12 +169,28 @@ class AIPluginView {
     return Decoration.set(decorations);
   }
 
-  stopStream() {
+  private stopStream() {
+    this.isStreaming = false;  // Set this first
+    
     if (this.currentStreamId) {
       contextManager.stopResponse(this.currentStreamId);
-      this.isStreaming = false;
       this.currentStreamId = null;
-      this.hideStopButton();
+      
+      // Get the current view
+      const view = this.view;
+      if (view) {
+        const lastLine = view.state.doc.line(view.state.doc.lines);
+        
+        requestAnimationFrame(() => {
+          view.dispatch({
+            changes: {
+              from: lastLine.from,
+              to: view.state.doc.length,
+              insert: '\n[Stopped]'
+            }
+          });
+        });
+      }
     }
   }
 

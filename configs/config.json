@@ -33,6 +33,7 @@
       "development": "http://localhost:37621",
       "production": "https://lumi.kak2594.workers.dev/"
     },
+    "timeout" : 20000,
     "models": {
       "open": {
         "nousresearch/hermes-3-llama-3.1-405b:free": {
@@ -43,7 +44,7 @@
             "X-Title": "Lumi AI Assistant"
           },
           "parameters": {
-            "model": "liquid/lfm-40b:free",
+            "model": "nousresearch/hermes-3-llama-3.1-405b:free",
             "temperature": 0.7,
             "max_tokens": 2000,
             "stream": true
