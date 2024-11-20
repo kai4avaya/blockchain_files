@@ -1,5 +1,5 @@
 import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate } from "@codemirror/view";
-import { Range, StateEffect } from "@codemirror/state";
+import { Range } from "@codemirror/state";
 // @ts-ignore
 import contextManager from '../../../../../../ai/providers/context_manager.js';
 
@@ -7,15 +7,11 @@ const placeholderDecoration = Decoration.line({
   attributes: { class: "cm-ai-placeholder" }
 });
 
-// Create a StateEffect for streaming updates
-const addStreamContent = StateEffect.define<string>();
-
 const aiPlugin = ViewPlugin.fromClass(class {
   decorations: DecorationSet;
   private lastLineLength: number = 0;
   private isStreaming: boolean = false;
   private currentStreamId: string | null = null;
-  private streamBuffer: string = '';
 
   constructor(view: EditorView) {
     this.decorations = this.createDecorations(view);
@@ -31,12 +27,13 @@ const aiPlugin = ViewPlugin.fromClass(class {
       let line = update.state.doc.lineAt(pos);
       
       if (line.length > this.lastLineLength) {
+        // Keep original test trigger
         if (line.text.endsWith(">>>")) {
           this.handleTestResponse(update.view, line);
         }
+        // Add new AI trigger
         else if (line.text.endsWith("//")) {
-          // Use setTimeout to avoid update-in-progress error
-          setTimeout(() => this.handleAIRequest(update.view, line), 0);
+          this.handleAIRequest(update.view, line);
         }
       }
       
@@ -44,67 +41,7 @@ const aiPlugin = ViewPlugin.fromClass(class {
     }
   }
 
-  async handleAIRequest(view: EditorView, line: any) {
-    try {
-      this.isStreaming = true;
-      const prompt = line.text.slice(0, -2);
-
-      // Initial newline
-      view.dispatch({
-        changes: {
-          from: line.to,
-          insert: '\n'
-        }
-      });
-      
-      const startPos = line.to + 1;
-      const response = await contextManager.getContextualResponse(prompt);
-      
-      if (!response || !response[Symbol.asyncIterator]) {
-        throw new Error('Invalid response from AI');
-      }
-
-      let accumulatedText = '';
-      
-      // Stream the response
-      for await (const chunk of response) {
-        if (!this.isStreaming) break;
-        
-        accumulatedText += chunk;
-        
-        // Use requestAnimationFrame to batch updates
-        requestAnimationFrame(() => {
-          if (!this.isStreaming) return;
-          
-          view.dispatch({
-            changes: {
-              from: startPos,
-              to: view.state.doc.length,
-              insert: accumulatedText
-            },
-            scrollIntoView: true
-          });
-        });
-      }
-
-    } catch (error) {
-      console.error('Error getting AI response:', error);
-      
-      requestAnimationFrame(() => {
-        view.dispatch({
-          changes: {
-            from: line.to,
-            insert: `\nError: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
-          }
-        });
-      });
-      
-    } finally {
-      this.isStreaming = false;
-      this.currentStreamId = null;
-    }
-  }
-
+  // Keep original test function
   handleTestResponse(view: EditorView, line: any) {
     view.dispatch({
       changes: {
@@ -113,6 +50,45 @@ const aiPlugin = ViewPlugin.fromClass(class {
         insert: "Hello from CodeMirror!"
       }
     });
+  }
+
+  async handleAIRequest(view: EditorView, line: any) {
+    try {
+      this.isStreaming = true;
+      
+      // Get the entire document content as context
+      const docContent = view.state.doc.toString();
+      
+      // Remove the triggering //
+      const prompt = docContent.slice(0, -2);
+
+      // Start streaming response
+      const response = await contextManager.getContextualResponse(prompt, {
+        onToken: (token: string) => {
+          view.dispatch({
+            changes: { 
+              from: line.to, 
+              insert: token 
+            },
+            scrollIntoView: true
+          });
+        }
+      });
+
+      this.currentStreamId = response.streamId;
+
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      view.dispatch({
+        changes: {
+          from: line.to,
+          insert: `\nError: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+        }
+      });
+    } finally {
+      this.isStreaming = false;
+      this.currentStreamId = null;
+    }
   }
 
   createDecorations(view: EditorView) {

@@ -12,6 +12,7 @@ class ContextManager {
     this.aiManager = new StreamingAIManager(config);
     this.providerOrder = ['OPEN', 'GEMINI', 'GROQ', 'CEREBRAS'];
     this.currentProviderIndex = 0;
+    this.config = config;
   }
 
   async getNextProvider() {
@@ -20,26 +21,53 @@ class ContextManager {
   }
 
   async getModelForProvider(provider) {
-    const models = config.apiConfig.models[provider.toLowerCase()];
+    const providerKey = provider.toLowerCase();
+    if (!this.config.apiConfig.models[providerKey]) {
+      throw new Error(`No models configured for provider: ${provider}`);
+    }
+    
+    const models = this.config.apiConfig.models[providerKey];
     const modelKey = Object.keys(models)[0];
-    return `${provider.toLowerCase()}/${modelKey}`;
+    if (!modelKey) {
+      throw new Error(`No models available for provider: ${provider}`);
+    }
+    
+    return `${providerKey}/${modelKey}`;
+  }
+
+  async checkProviderHealth(provider) {
+    try {
+      const response = await fetch(`${this.aiManager.workerEndpoint}/health`);
+      if (!response.ok) return false;
+      
+      const health = await response.json();
+      switch(provider) {
+        case 'OPEN': return health.environment.hasOpenRouterKey;
+        case 'GEMINI': return health.environment.hasGeminiKey;
+        case 'GROQ': return health.environment.hasGroqKey;
+        case 'CEREBRAS': return health.environment.hasCerebrasKey;
+        default: return false;
+      }
+    } catch {
+      return false;
+    }
   }
 
   async getContextualResponse(userPrompt, options = { limit: 5 }) {
     let attempts = 0;
     const maxAttempts = this.providerOrder.length;
 
-    // Check for window.fileMetadata
-    if (!window.fileMetadata) {
-      toast.show(
-        'File metadata not available. Searching across all files.',
-        'warning'
-      );
-    }
-
     while (attempts < maxAttempts) {
+      const currentProvider = this.providerOrder[this.currentProviderIndex];
+      
+      if (!await this.checkProviderHealth(currentProvider)) {
+        console.warn(`Provider ${currentProvider} is not available`);
+        await this.getNextProvider();
+        attempts++;
+        continue;
+      }
+
       try {
-        const currentProvider = this.providerOrder[this.currentProviderIndex];
         const prevStatus = attempts > 0 ? `${this.providerOrder[this.currentProviderIndex - 1]} failed. ` : '';
         updateStatus(`${prevStatus}Attempting with ${currentProvider} provider...`);
         
@@ -61,35 +89,48 @@ class ContextManager {
         updateStatus('Creating AI prompt...');
         const systemPrompt = this.createSystemPrompt(contextString);
 
-        const modelId = await this.getModelForProvider(currentProvider);
         updateStatus('Generating AI response...');
-        const response = await this.aiManager.streamCompletion(
-          modelId,
-          [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          options
-        );
+        const modelId = await this.getModelForProvider(currentProvider);
+        
+        let hasInitialResponse = false;
+        const timeoutId = setTimeout(() => {
+          if (!hasInitialResponse) {
+            this.aiManager.stopAllStreams();
+            throw new Error(`No response after 5s from ${currentProvider}`);
+          }
+        }, 5000);
 
-        updateStatus('Done');
-        return response;
+        try {
+          const response = await this.aiManager.streamCompletion(
+            modelId,
+            [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            options
+          );
+
+          hasInitialResponse = true;
+          clearTimeout(timeoutId);
+          updateStatus('Done');
+          return response;
+
+        } catch (error) {
+          clearTimeout(timeoutId);
+          throw error;
+        }
+
       } catch (error) {
-        console.error(`Error with provider ${this.providerOrder[this.currentProviderIndex]}:`, error);
-        toast.show(
-          `${this.providerOrder[this.currentProviderIndex]} provider failed. Trying next provider...`,
-          'error'
-        );
+        console.error(`Error with provider ${currentProvider}:`, error);
+        toast.show(`Provider ${currentProvider} failed: ${error.message}`, 'error');
         await this.getNextProvider();
         attempts++;
-
-        if (attempts >= maxAttempts) {
-          updateStatus('All providers failed. Please try again later.');
-          toast.show('All AI providers are currently unavailable', 'error');
-          throw new Error('All AI providers are currently unavailable');
-        }
       }
     }
+
+    updateStatus('All providers failed');
+    toast.show('All available providers failed to respond', 'error');
+    throw new Error('All providers failed to respond');
   }
 
    formatContextForPrompt(results) {
