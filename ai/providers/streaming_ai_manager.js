@@ -1,3 +1,5 @@
+
+
 import { NODE_ENV, LUMI_ENDPOINT, LOCAL_ENDPOINT } from '../../configs/env_configs.js';
 
 class StreamingAIManager {
@@ -114,10 +116,10 @@ class StreamingAIManager {
     }
   
     stopAllStreams() {
-      for (const controller of this.activeStreams.values()) {
+      for (const [streamId, controller] of this.activeStreams.entries()) {
         controller.abort();
+        this.activeStreams.delete(streamId);
       }
-      this.activeStreams.clear();
     }
   }
   

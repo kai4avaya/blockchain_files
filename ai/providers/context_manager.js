@@ -1,3 +1,5 @@
+// mayne call all at once
+
 import { VectorDB } from '../../memory/vectorDB/vectordb';
 import StreamingAIManager from './streaming_ai_manager';
 import embeddingWorker from '../embeddings.js';

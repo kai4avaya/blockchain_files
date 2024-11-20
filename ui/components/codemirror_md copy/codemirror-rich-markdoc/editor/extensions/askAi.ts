@@ -10,15 +10,38 @@ const placeholderDecoration = Decoration.line({
 // Create a StateEffect for streaming updates
 const addStreamContent = StateEffect.define<string>();
 
-const aiPlugin = ViewPlugin.fromClass(class {
+class AIPluginView {
   decorations: DecorationSet;
   private lastLineLength: number = 0;
   private isStreaming: boolean = false;
   private currentStreamId: string | null = null;
-  private streamBuffer: string = '';
+  // private streamBuffer: string = '';
+  private stopButton!: HTMLButtonElement;
 
   constructor(view: EditorView) {
     this.decorations = this.createDecorations(view);
+    this.createStopButton();
+  }
+
+  private createStopButton() {
+    this.stopButton = document.createElement('button');
+    this.stopButton.className = 'cm-stop-button';
+    this.stopButton.innerHTML = `
+      <svg width="12" height="12" viewBox="0 0 24 24">
+        <rect x="6" y="6" width="12" height="12" fill="currentColor"/>
+      </svg>
+      Stop <span class="key-combo"><span class="key">⌘</span><span class="key">⌫</span></span>
+    `;
+    this.stopButton.onclick = () => this.stopStream();
+    document.body.appendChild(this.stopButton);
+  }
+
+  private showStopButton() {
+    this.stopButton.classList.add('visible');
+  }
+
+  private hideStopButton() {
+    this.stopButton.classList.remove('visible');
   }
 
   update(update: ViewUpdate) {
@@ -47,9 +70,9 @@ const aiPlugin = ViewPlugin.fromClass(class {
   async handleAIRequest(view: EditorView, line: any) {
     try {
       this.isStreaming = true;
+      this.showStopButton();
       const prompt = line.text.slice(0, -2);
 
-      // Initial newline
       view.dispatch({
         changes: {
           from: line.to,
@@ -60,10 +83,11 @@ const aiPlugin = ViewPlugin.fromClass(class {
       const startPos = line.to + 1;
       const response = await contextManager.getContextualResponse(prompt);
       
-      if (!response || !response[Symbol.asyncIterator]) {
-        throw new Error('Invalid response from AI');
+      if (!response) {
+        throw new Error('No response from AI');
       }
 
+      this.currentStreamId = response.streamId; // Store the streamId
       let accumulatedText = '';
       
       // Stream the response
@@ -72,7 +96,6 @@ const aiPlugin = ViewPlugin.fromClass(class {
         
         accumulatedText += chunk;
         
-        // Use requestAnimationFrame to batch updates
         requestAnimationFrame(() => {
           if (!this.isStreaming) return;
           
@@ -100,8 +123,12 @@ const aiPlugin = ViewPlugin.fromClass(class {
       });
       
     } finally {
+      if (this.currentStreamId) {
+        contextManager.stopResponse(this.currentStreamId);
+      }
       this.isStreaming = false;
       this.currentStreamId = null;
+      this.hideStopButton();
     }
   }
 
@@ -132,13 +159,20 @@ const aiPlugin = ViewPlugin.fromClass(class {
       contextManager.stopResponse(this.currentStreamId);
       this.isStreaming = false;
       this.currentStreamId = null;
+      this.hideStopButton();
     }
   }
-}, {
+
+  destroy() {
+    this.stopButton.remove();
+  }
+}
+
+const aiPlugin = ViewPlugin.fromClass(AIPluginView, {
   decorations: v => v.decorations,
   eventHandlers: {
     keydown: (e: KeyboardEvent, view: EditorView) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' || (e.key === 'Backspace' && (e.metaKey || e.ctrlKey))) {
         const plugin = view.plugin(aiPlugin);
         if (plugin) plugin.stopStream();
       }

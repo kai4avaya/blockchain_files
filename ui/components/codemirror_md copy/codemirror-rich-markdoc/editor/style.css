@@ -180,4 +180,46 @@
   position: relative;
   margin-right: 40px; /* Make space for + button */
 }
+.cm-stop-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--background-color, #fff);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-color, #333);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.2s ease;
+  z-index: 9999;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
 
+.cm-stop-button.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cm-stop-button:hover {
+  background: var(--hover-background, #f5f5f5);
+}
+
+.key-combo {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.key {
+  padding: 2px 6px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  font-size: 11px;
+  background: var(--key-background, #f5f5f5);
+}
