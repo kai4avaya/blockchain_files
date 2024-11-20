@@ -13,3 +13,8 @@ reorganize 3d space by smilar articles using embeddings matches
 3) double click cube brings up direct input of cube
  -- maybe this appears inside of the note pad with the files at the top highlighted
 4) file selector needs to correctly load the files I've used
+
+
+****
+embedding pool workers
+enter your name for record keeping

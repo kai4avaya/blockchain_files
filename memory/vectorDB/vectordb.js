@@ -5,15 +5,6 @@ import { generateUniqueId } from "../../utils/utils";  // Add this import!
 
 // vectorDb.js
 
-
-// let DB_DEFAULTS = {
-//     dbName: config.dbName, //"vectorDB_new",
-//     objectStore: "vectors",
-//     hyperplanes: 10,
-//     dimensions: 384,
-//     numPlanes: 5
-//   };
-
 let DB_DEFAULTS = {
   dbName: config.dbName,
   objectStore: config.dbStores.vectors.storeName || "vectors",
@@ -114,6 +105,56 @@ let DB_DEFAULTS = {
   }
 
    
+// async insert(object) {
+//   const vector = object[this.#vectorPath];
+//   if (!Array.isArray(vector) && !(vector instanceof Int8Array)) {
+//     throw new Error(`${this.#vectorPath} on 'object' is expected to be an Array or Int8Array`);
+//   }
+
+//   try {
+//     if (!object.fileId) {
+//       throw new Error('Cannot insert record without fileId');
+//     }
+
+//     // Generate a 4-char vector ID
+//     const vectorId = generateUniqueId(4);
+//     const recordToSave = {
+//       id: vectorId,
+//       fileId: object.fileId,
+//       ...object
+//     };
+//     await indexDBOverlay.saveData(this.#objectStore, recordToSave);
+
+//     // Save hash buckets with explicit keys
+//     const hashes = this.#lsh.hashVector(vector);
+//     for (let hash of hashes) {
+//       const existingBucket = await indexDBOverlay.getItem(this.#hashIndexStore, hash);
+      
+//       // Use Set to ensure unique vectorIds
+//       const uniqueVectorIds = new Set(existingBucket?.vectorIds || []);
+//       uniqueVectorIds.add(vectorId);
+
+//       const hashBucket = {
+//         vectorIds: Array.from(uniqueVectorIds)
+//       };
+      
+//       await indexDBOverlay.saveData(
+//         this.#hashIndexStore, 
+//         hashBucket,
+//         hash
+//       );
+//     }
+
+//     return {
+//       vectorId,
+//       fileId: object.fileId
+//     };
+//   } catch (error) {
+//     console.error('Database error during insertion:', error);
+//     throw error;
+//   }
+// }
+
 async insert(object) {
   const vector = object[this.#vectorPath];
   if (!Array.isArray(vector) && !(vector instanceof Int8Array)) {
@@ -125,7 +166,6 @@ async insert(object) {
       throw new Error('Cannot insert record without fileId');
     }
 
-    // Generate a 4-char vector ID
     const vectorId = generateUniqueId(4);
     const recordToSave = {
       id: vectorId,
@@ -134,22 +174,19 @@ async insert(object) {
     };
     await indexDBOverlay.saveData(this.#objectStore, recordToSave);
 
-    // Save hash buckets with explicit keys
+    // Modified hash bucket structure to include fileIds
     const hashes = this.#lsh.hashVector(vector);
     for (let hash of hashes) {
       const existingBucket = await indexDBOverlay.getItem(this.#hashIndexStore, hash);
       
-      // Use Set to ensure unique vectorIds
-      const uniqueVectorIds = new Set(existingBucket?.vectorIds || []);
-      uniqueVectorIds.add(vectorId);
-
-      const hashBucket = {
-        vectorIds: Array.from(uniqueVectorIds)
-      };
+      // Update structure to track both vectorIds and their corresponding fileIds
+      const bucket = existingBucket || { vectorIds: [], fileIds: {} };
+      bucket.vectorIds = [...new Set([...bucket.vectorIds, vectorId])];
+      bucket.fileIds[vectorId] = object.fileId;
       
       await indexDBOverlay.saveData(
         this.#hashIndexStore, 
-        hashBucket,
+        bucket,
         hash
       );
     }
@@ -163,6 +200,7 @@ async insert(object) {
     throw error;
   }
 }
+
 
   async delete(key) {
     if (key == null) {
@@ -275,39 +313,75 @@ async insert(object) {
     }, newHash);
   }
   
-
-  async query(queryVector, options = { limit: 10 }) {
-    const { limit } = options;
+  async query(queryVector, options = { limit: 10, minResults: 3 }) {
+    const { limit, minResults } = options;
     let collectedVectors = new Set();
     let resultObjects = [];
-
+    let activeFileIds = Array.from(window.fileMetadata.keys());
+  
     try {
-      // Get hash buckets for query vector
       const hashes = this.#lsh.hashVector(queryVector);
+      let processedBuckets = 0;
       
       for (let hash of hashes) {
         const hashBucket = await indexDBOverlay.getItem(this.#hashIndexStore, hash);
         if (!hashBucket || !hashBucket.vectorIds) continue;
-
-        // Process each vector ID in the bucket
-        for (let vectorId of hashBucket.vectorIds) {
+  
+        processedBuckets++;
+        // updateStatus(`Processing bucket ${processedBuckets}/${hashes.length}`);
+  
+        // Filter vectors by active files
+        const activeVectorIds = hashBucket.vectorIds.filter(vectorId => 
+          activeFileIds.includes(hashBucket.fileIds[vectorId])
+        );
+  
+        for (let vectorId of activeVectorIds) {
           if (!collectedVectors.has(vectorId)) {
             collectedVectors.add(vectorId);
             const vector = await indexDBOverlay.getItem(this.#objectStore, vectorId);
             if (vector) {
               const similarity = cosineSimilarity(queryVector, vector[this.#vectorPath]);
               resultObjects.push({
-                vectorId,              // ID of the specific chunk/vector
-                fileId: vector.fileId, // ID of the original file
+                vectorId,
+                fileId: vector.fileId,
                 similarity,
                 object: vector
               });
             }
           }
         }
+  
+        // Check if we have enough results
+        if (resultObjects.length >= limit) break;
       }
-
-      // Sort by similarity and limit results
+  
+      // If we don't have minimum results, process more buckets with relaxed file filtering
+      if (resultObjects.length < minResults) {
+        updateStatus('Expanding search for more results...');
+        // Process remaining buckets without file filtering
+        for (let hash of hashes) {
+          const hashBucket = await indexDBOverlay.getItem(this.#hashIndexStore, hash);
+          if (!hashBucket || !hashBucket.vectorIds) continue;
+  
+          for (let vectorId of hashBucket.vectorIds) {
+            if (!collectedVectors.has(vectorId)) {
+              collectedVectors.add(vectorId);
+              const vector = await indexDBOverlay.getItem(this.#objectStore, vectorId);
+              if (vector) {
+                const similarity = cosineSimilarity(queryVector, vector[this.#vectorPath]);
+                resultObjects.push({
+                  vectorId,
+                  fileId: vector.fileId,
+                  similarity,
+                  object: vector
+                });
+              }
+            }
+          }
+        }
+      }
+  
+      updateStatus('Sorting results...');
       resultObjects.sort((a, b) => b.similarity - a.similarity);
       return resultObjects.slice(0, limit);
     } catch (error) {

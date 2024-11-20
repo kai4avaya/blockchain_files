@@ -27,5 +27,61 @@
     },
     "vectors_hashIndex": {
     }
+  },
+  "apiConfig": {
+    "endpoints": {
+      "development": "http://localhost:8787/",
+      "production": "https://lumi.kak2594.workers.dev/"
+    },
+    "models": {
+      "openrouter": {
+        "liquid/lfm-40b:free": {
+          "provider": "OPEN",
+          "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+          "headers": {
+            "HTTP-Referer": "https://yoursite.com",
+            "X-Title": "YourAppName"
+          }
+        },
+        "google/gemma-2-9b-it": {
+          "provider": "OPEN",
+          "endpoint": "https://openrouter.ai/api/v1/chat/completions"
+        },
+        "meta-llama/llama-3-1": {
+          "provider": "OPEN",
+          "endpoint": "https://openrouter.ai/api/v1/chat/completions"
+        }
+      },
+      "gemini": {
+        "gemini-1.5-flash": {
+          "provider": "GEMINI",
+          "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+          "messageFormat": "google",
+          "defaultParams": {
+            "generationConfig": {
+              "temperature": 1,
+              "topK": 40,
+              "topP": 0.95,
+              "maxOutputTokens": 8192,
+              "responseMimeType": "text/plain"
+            }
+          }
+        }
+      },
+      "groq": {
+        "mixtral-8x7b-32768": {
+          "provider": "GROQ",
+          "endpoint": "https://api.groq.com/openai/v1/chat/completions",
+          "messageFormat": "openai"
+        }
+      },
+      "cerebras": {
+        "llama3.1-70b": {
+          "provider": "CEREBRAS",
+          "endpoint": "https://api.cerebras.ai/v1/chat/completions",
+          "messageFormat": "openai"
+        }
+      }
+    }
   }
 }

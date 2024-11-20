@@ -4,11 +4,23 @@ class StatusIndicator {
         this.statuses = [];
         this.isVisible = false;
         this.setupEventListener();
+        this.setupScrollbar();
     }
 
     setupEventListener() {
         window.addEventListener('statusUpdate', (event) => {
             this.addStatus(event.detail.status);
+        });
+    }
+
+    setupScrollbar() {
+        this.container.classList.add('custom-scrollbar');
+    }
+
+    scrollToBottom() {
+        this.container.scrollTo({
+            top: this.container.scrollHeight,
+            behavior: 'smooth'
         });
     }
 
@@ -39,21 +51,40 @@ class StatusIndicator {
             `;
             this.container.appendChild(statusItem);
             this.statuses.push(statusItem);
+            this.scrollToBottom();
 
             setTimeout(() => {
                 statusItem.querySelector('.spinner').outerHTML = '<span class="checkmark">✓</span>';
-            }, 2000);
+                setTimeout(() => {
+                    statusItem.classList.add('fade-out');
+                    setTimeout(() => {
+                        if (this.container.contains(statusItem)) {
+                            this.container.removeChild(statusItem);
+                            this.statuses = this.statuses.filter(item => item !== statusItem);
+                        }
+                        if (this.statuses.length === 0) {
+                            this.hide();
+                        }
+                    }, 300);
+                }, 1000);
+            }, 1000);
         }
     }
 
     complete() {
+        this.statuses.forEach(statusItem => {
+            if (statusItem.querySelector('.spinner')) {
+                statusItem.querySelector('.spinner').outerHTML = '<span class="checkmark">✓</span>';
+            }
+        });
+
         setTimeout(() => {
             this.hide();
             setTimeout(() => {
                 this.container.innerHTML = '';
                 this.statuses = [];
-            }, 500); // Wait for fade out to complete before clearing
-        }, 2000);
+            }, 500);
+        }, 1000);
     }
 }
 
