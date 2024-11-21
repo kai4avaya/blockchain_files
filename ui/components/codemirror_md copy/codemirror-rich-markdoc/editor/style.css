@@ -239,3 +239,84 @@
   font-size: 11px;
   background: var(--key-background, #f5f5f5);
 }
+
+/* Context Menu Styles */
+.context-menu {
+  position: fixed;
+  background: white;
+  border-radius: 8px;
+  padding: 8px 0;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transform: scale(0.95);
+  transition: all 0.2s ease;
+  z-index: 9999;
+  pointer-events: none; 
+  display: none; /* Hide by default */
+}
+
+.context-menu.visible {
+  opacity: 1;
+  transform: scale(1);
+  display: block; /* Show when visible class is added */
+  pointer-events: auto;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  color: #374151;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+  background-color: #e5e7eb; /* Darker gray */
+}
+
+.context-menu-item svg {
+  width: 20px;
+  height: 20px;
+  margin-right: 12px;
+  color: #6b7280;
+}
+
+/* URL Input styles */
+.url-input-container {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  gap: 4px;
+}
+
+.url-input {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.url-input:focus {
+  border-color: #6b7280;
+}
+
+.url-button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background: #4b5563;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.url-button:hover {
+  background: #374151;
+}

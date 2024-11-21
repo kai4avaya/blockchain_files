@@ -22,7 +22,7 @@ import { labelListerners } from "./move.js";
 import {
   createSceneSnapshot,
   findSpheresInCube,
-  logSceneContents,
+  // logSceneContents,
 } from "./snapshot.js";
 import {
   isUMAPWorkerActive,
@@ -31,6 +31,7 @@ import {
 import MouseOverlayCanvas from "./MouseOverlayCanvas";
 import { Frustum, Matrix4 } from "three";
 import indexDBOverlay from '../../memory/local/file_worker';
+import { showContextMenu , contextMenu, hideContextMenu} from "./canvas_menu.js";
 
 
 const frustum = new Frustum();
@@ -608,6 +609,33 @@ function setupScene() {
 
   window.addEventListener("resize", resizeCanvases);
   resizeCanvases(); // Initial resize
+
+  // renderer.domElement.addEventListener('dblclick', (event) => {
+  //   const canvas = renderer.domElement;
+  //   const rect = canvas.getBoundingClientRect();
+  
+  //   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  //   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  
+  //   raycaster.setFromCamera(mouse, camera);
+  //   const intersects = raycaster.intersectObjects([...scene.children, ...nonBloomScene.children], true);
+  
+  //   if (intersects.length === 0) {
+  //     // Store intersection point with an invisible plane at z=0
+  //     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1));
+  //     const intersectPoint = new THREE.Vector3();
+  //     raycaster.ray.intersectPlane(plane, intersectPoint);
+      
+  //     showContextMenu(event.clientX, event.clientY, intersectPoint);
+  //   }
+  // });
+
+  // // Close context menu when clicking outside
+  // document.addEventListener('click', (event) => {
+  //   if (contextMenu && !contextMenu.contains(event.target)) {
+  //     hideContextMenu();
+  //   }
+  // });
 
   markNeedsRender();
 }

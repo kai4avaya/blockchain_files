@@ -663,6 +663,14 @@ class IndexDBWorkerOverlay {
   }
 
   async getItem(storeName: string, key: string): Promise<any> {
+    // Check if this is a vector hash index operation
+    if (storeName.includes('vectors_hashIndex_')) {
+        // Use in-memory store for vector hash indices
+        in_memory_store.createTableIfNotExists(storeName);
+        return in_memory_store.route('get item', storeName, { key });
+    }
+
+    // Regular IndexDB handling for non-vector hash index tables
     await this.ensureDBOpen();
     return this.sendToWorkerWithRetry("getItem", { storeName, key });
   }

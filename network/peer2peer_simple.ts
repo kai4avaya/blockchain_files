@@ -4,6 +4,7 @@ import { Peer, DataConnection } from "peerjs";
 import MousePositionManager from "../memory/collaboration/mouse_colab";
 import { TabManager } from "../ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
 import leaderCoordinator from './elections';
+import indexDBOverlay from '../memory/local/file_worker';
 
 interface SceneState {
   getSerializableState: () => any;
@@ -28,6 +29,21 @@ interface CustomMessage {
   type: string;
   data: any;
 }
+
+// Add new interface for peer status
+interface PeerStatus {
+  connected: boolean;
+  connecting: boolean;
+}
+
+// Add interface for peer storage
+interface StoredPeer {
+  peerId: string;
+  status: 'connected' | 'disconnected' | 'failed';
+  lastAttempt: number;
+  retryCount: number;
+}
+
 class P2PSync {
   private static instance: P2PSync | null = null;
   private tabManager: TabManager | null = null;
@@ -47,6 +63,11 @@ class P2PSync {
 
   private peerConnectHandlers: Set<PeerConnectHandler> = new Set();
 
+  private peerStatuses: Map<string, PeerStatus> = new Map();
+
+  private retryInterval: number = 2 * 60 * 1000; // 2 minutes
+  private maxRetries: number = 5;
+
   private constructor() {}
 
   static getInstance(): P2PSync {
@@ -60,18 +81,36 @@ class P2PSync {
     // this.sceneState = sceneState;
     this.loadKnownPeers();
 
-    const storedPeerId = localStorage.getItem("myPeerId");
- 
-    const peerId = storedPeerId || `${userId}-${Date.now()}`;
+    const peerId = localStorage.getItem("myPeerId") || userId;
     this.peer = new Peer(peerId);
+
+    // Add localStorage listener for userIdInput
+    const userIdInput = document.getElementById("userIdInput") as HTMLInputElement;
+    if (userIdInput) {
+      userIdInput.value = peerId;
+      userIdInput.addEventListener('input', (e) => {
+        const newUserId = (e.target as HTMLInputElement).value;
+        localStorage.setItem("myPeerId", newUserId);
+        localStorage.setItem("login_block", newUserId);
+      });
+    }
+
+    // Add peer input handler
+    const peerIdInput = document.getElementById("peerIdInput") as HTMLInputElement;
+    if (peerIdInput) {
+      peerIdInput.addEventListener('input', (e) => {
+        const input = (e.target as HTMLInputElement).value;
+        this.handlePeerInputChange(input);
+      });
+    }
 
     this.peer.on("open", (id) => {
       localStorage.setItem("myPeerId", id);
       updateStatus(`Initialized with peer ID: ${id}`);
       this.updateUserIdInput(id);
-
-      // Wrap the connection attempts in a safe connect method
-      this.knownPeers.forEach((peerId) => this.safeConnectToSpecificPeer(peerId));
+      
+      // Load peers from DB and create pills
+      this.loadPeersFromDB();
       this.startHeartbeat();
     });
 
@@ -99,6 +138,10 @@ class P2PSync {
       console.error("PeerJS error:", error);
       updateStatus(`PeerJS error: ${error.type}`);
     });
+
+    // Load peers from DB and start retry interval
+    this.loadPeersFromDB();
+    setInterval(() => this.retryFailedConnections(), this.retryInterval);
   }
   setMouseOverlay(overlay: MouseOverlayCanvas): void {
     this.mouseOverlay = overlay;
@@ -176,6 +219,17 @@ class P2PSync {
 
 
   connectToSpecificPeer(peerId: string): void {
+    if (!peerId || peerId === this.peer?.id) {
+      return;
+    }
+
+    // Check if already connected or connecting
+    if (this.connections.has(peerId) || 
+        document.querySelector(`#connected-peers-container .peer-pill[data-peer-id="${peerId}"]`)) {
+      console.log(`Already connected or connecting to peer: ${peerId}`);
+      return;
+    }
+
     this.safeConnectToSpecificPeer(peerId);
   }
 
@@ -199,10 +253,10 @@ class P2PSync {
     this.connections.set(conn.peer, conn);
     updateStatus(`Connected to peer: ${conn.peer}`);
     this.saveKnownPeer(conn.peer);
-
-     // Call leader coordinator to handle the connection and election
-     leaderCoordinator.connectToPeer(conn.peer);
-
+  
+    // Call leader coordinator to handle the connection and election
+    leaderCoordinator.connectToPeer(conn.peer);
+  
     const checkConnection = setInterval(() => {
       if (!conn.open) {
         clearInterval(checkConnection);
@@ -210,14 +264,18 @@ class P2PSync {
         this.scheduleReconnect(conn.peer);
       }
     }, 5000);
-
+  
     this.peerConnectHandlers.forEach((handler) => handler(conn.peer));
-
+  
+    // Update pill status when connection is established
+    this.updatePeerPillStatus(conn.peer, true);
+  
     // Send current state immediately after connection
     this.sendCurrentState(conn);
     conn.send({ type: "known_peers", data: Array.from(this.knownPeers) });
-
+  
     leaderCoordinator.triggerInitialDbSync(conn);
+  
 
     conn.on("data", (rawData: unknown) => {
       const data = rawData as { type: string; docId?: string; data?: any };
@@ -336,12 +394,16 @@ class P2PSync {
       if (this.mouseOverlay) {
         this.mouseOverlay.removePeerCursor(conn.peer);
       }
+      this.updatePeerPillStatus(conn.peer, false);
+      this.savePeerToDB(conn.peer, 'disconnected');
     });
 
     conn.on("error", (err) => {
       console.error(`Connection error with peer ${conn.peer}:`, err);
       updateStatus(`Connection error with peer ${conn.peer}: ${err.message}`);
       this.scheduleReconnect(conn.peer);
+      this.savePeerToDB(conn.peer, 'failed');
+      this.updatePeerPillStatus(conn.peer, false);
     });
 
     this.updateConnectionStatus();
@@ -528,6 +590,233 @@ class P2PSync {
       }
     });
   }
+
+  private handlePeerInputChange(input: string): void {
+    // Only process if input ends with comma or if this was triggered by connect button
+    if (!input.endsWith(',') && !this.isConnectButtonPress) return;
+  
+    const peers = input.split(',').map(p => p.trim()).filter(p => p);
+    const peersContainer = document.getElementById('connected-peers-container');
+    
+    if (!peersContainer) return;
+  
+    // Remove trailing comma from input
+    const peerIdInput = document.getElementById('peerIdInput') as HTMLInputElement;
+    if (peerIdInput && input.endsWith(',')) {
+      peerIdInput.value = peers.join(', ') + ', ';  // Keep the trailing comma
+    }
+  
+    // Create pills for new peers only
+    peers.forEach(peerId => {
+      if (!peerId) return;
+      // Check if pill already exists
+      if (!peersContainer.querySelector(`.peer-pill[data-peer-id="${peerId}"]`)) {
+        this.createPeerPill(peerId, peersContainer);
+      }
+    });
+  }
+  
+  private createPeerPill(peerId: string, container: HTMLElement): void {
+    const pill = document.createElement('div');
+    pill.className = 'peer-pill';
+    pill.setAttribute('data-peer-id', peerId);
+    pill.innerHTML = `
+      <span class="peer-name">${peerId}</span>
+      <span class="peer-status">
+        <svg class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <svg class="connected-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+        </svg>
+      </span>
+      <span class="disconnect-btn">×</span>
+    `;
+
+    // Add styles if not already added
+    if (!document.getElementById('peer-pill-styles')) {
+      const style = document.createElement('style');
+      style.id = 'peer-pill-styles';
+      style.textContent = `
+        #connected-peers-container {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          margin: 0.5rem 0;
+        }
+        .peer-pill {
+          display: inline-flex;
+          align-items: center;
+          background: #4b5563;
+          color: white;
+          padding: 0.15rem 0.5rem;
+          border-radius: 9999px;
+          font-size: 0.75rem;
+          height: 1.5rem;
+        }
+        .peer-status {
+          display: inline-flex;
+          margin: 0 0.25rem;
+        }
+        .spinner {
+          animation: spin 1s linear infinite;
+          width: 0.875rem;
+          height: 0.875rem;
+        }
+        .connected-icon {
+          width: 0.875rem;
+          height: 0.875rem;
+          color: #22c55e;
+        }
+        .hidden {
+          display: none;
+        }
+        .disconnect-btn {
+          cursor: pointer;
+          padding: 0 0.25rem;
+          opacity: 0.7;
+          font-size: 1rem;
+          line-height: 1;
+        }
+        .disconnect-btn:hover {
+          opacity: 1;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Add disconnect handler
+    const disconnectBtn = pill.querySelector('.disconnect-btn');
+    disconnectBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.disconnectPeer(peerId);
+      pill.remove();
+      // Update peerIdInput to remove this peer but keep the format
+      const peerIdInput = document.getElementById('peerIdInput') as HTMLInputElement;
+      if (peerIdInput) {
+        const peers = peerIdInput.value.split(',').map(p => p.trim());
+        const filteredPeers = peers.filter(p => p !== peerId);
+        peerIdInput.value = filteredPeers.length > 0 ? filteredPeers.join(', ') + ', ' : '';
+      }
+    });
+  
+    container.appendChild(pill);
+    this.safeConnectToSpecificPeer(peerId);
+  }
+
+  private updatePeerPillStatus(peerId: string, connected: boolean): void {
+    const peersContainer = document.getElementById('connected-peers-container');
+    if (!peersContainer) return;
+
+    const pill = peersContainer.querySelector(`[data-peer-id="${peerId}"]`);
+    if (!pill) return;
+
+    const spinner = pill.querySelector('.spinner');
+    const connectedIcon = pill.querySelector('.connected-icon');
+
+    if (spinner && connectedIcon) {
+      if (connected) {
+        spinner.classList.add('hidden');
+        connectedIcon.classList.remove('hidden');
+      } else {
+        spinner.classList.remove('hidden');
+        connectedIcon.classList.add('hidden');
+      }
+    }
+  }
+  
+  private disconnectPeer(peerId: string): void {
+    const conn = this.connections.get(peerId);
+    if (conn) {
+      conn.close();
+      this.connections.delete(peerId);
+      this.knownPeers.delete(peerId);
+      localStorage.setItem("knownPeers", JSON.stringify(Array.from(this.knownPeers)));
+    }
+    this.savePeerToDB(peerId, 'disconnected');
+  }
+
+  // Add this property to track connect button clicks
+  private isConnectButtonPress: boolean = false;
+
+  // Add this method to handle connect button clicks
+  public handleConnectButtonClick(): void {
+    this.isConnectButtonPress = true;
+    const peerIdInput = document.getElementById('peerIdInput') as HTMLInputElement;
+    if (peerIdInput) {
+      this.handlePeerInputChange(peerIdInput.value);
+    }
+    this.isConnectButtonPress = false;
+  }
+
+  private async savePeerToDB(peerId: string, status: StoredPeer['status']): Promise<void> {
+    try {
+      const existingPeer = await indexDBOverlay.getItem('peers', peerId);
+      const peerData: StoredPeer = {
+        peerId,
+        status,
+        lastAttempt: Date.now(),
+        retryCount: existingPeer ? existingPeer.retryCount || 0 : 0
+      };
+      
+      if (status === 'failed') {
+        peerData.retryCount = (existingPeer?.retryCount || 0) + 1;
+      }
+
+      await indexDBOverlay.saveData('peers', peerData);
+    } catch (error) {
+      console.warn('Failed to save peer to DB:', error);
+    }
+  }
+
+  private async loadPeersFromDB(): Promise<void> {
+    try {
+      const peers = await indexDBOverlay.getAll('peers');
+      const peersContainer = document.getElementById('connected-peers-container');
+      
+      if (peersContainer) {
+        peers.forEach(peer => {
+          if (!peer.isDeleted && peer.peerId !== this.peer?.id) {
+            // Create pill for each stored peer
+            this.createPeerPill(peer.peerId, peersContainer);
+            // Attempt to connect
+            this.safeConnectToSpecificPeer(peer.peerId);
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to load peers from DB:', error);
+    }
+  }
+
+  private async retryFailedConnections(): Promise<void> {
+    try {
+      const peers = await indexDBOverlay.getAll('peers');
+      const now = Date.now();
+      
+      peers.forEach(async (peer: StoredPeer) => {
+        if (
+          peer.status !== 'connected' && 
+          peer.retryCount < this.maxRetries &&
+          now - peer.lastAttempt > this.retryInterval
+        ) {
+          this.safeConnectToSpecificPeer(peer.peerId);
+        }
+      });
+    } catch (error) {
+      console.warn('Failed to retry connections:', error);
+    }
+  }
+
+  // Add this method to the P2PSync class
+  public isConnectedToPeer(peerId: string): boolean {
+    return this.connections.has(peerId);
+  }
 }
 let isInitialized = false;
 
@@ -624,13 +913,32 @@ userIdInput?.addEventListener("change", initializeP2PSync);
 
 // Connect to peer when button is clicked
 connectButton?.addEventListener("click", () => {
-  const peerId = peerIdInput?.value.trim();
-  if (peerId) {
-    p2pSync.connectToSpecificPeer(peerId);
-    updateStatus(`Attempting to connect to peer: ${peerId}`);
-  } else {
+  const peerIdInput = document.getElementById("peerIdInput") as HTMLInputElement;
+  if (!peerIdInput?.value.trim()) {
     updateStatus("Please enter a peer ID to connect.");
+    return;
   }
+
+  // Split by comma and filter out empty strings
+  const peerIds = peerIdInput.value.split(',').map(id => id.trim()).filter(id => id);
+  
+  // Only try to connect to peers that aren't already connected
+  const newPeers = peerIds.filter(peerId => {
+    const isAlreadyConnected = p2pSync.isConnectedToPeer(peerId);
+    const hasExistingPill = document.querySelector(`#connected-peers-container .peer-pill[data-peer-id="${peerId}"]`);
+    return !isAlreadyConnected && !hasExistingPill;
+  });
+
+  if (newPeers.length === 0) {
+    updateStatus("All peers are already connected or pending connection.");
+    return;
+  }
+
+  p2pSync.handleConnectButtonClick();
+  newPeers.forEach(peerId => {
+    p2pSync.connectToSpecificPeer(peerId);
+  });
+  updateStatus(`Attempting to connect to new peers: ${newPeers.join(', ')}`);
 });
 
 window.addEventListener("beforeunload", () => {

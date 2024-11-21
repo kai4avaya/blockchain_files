@@ -24,6 +24,9 @@ import { diffSceneChanges } from "../../memory/collaboration/scene_colab";
 import { updateConnectedLines } from "./lineGraphs.js";
 
 import { getFileSystem } from "../../memory/collaboration/file_colab";
+import { showContextMenu , contextMenu, hideContextMenu} from "./canvas_menu.js";
+let lastClickTime = 0;
+const DOUBLE_CLICK_DELAY = 300; // milliseconds
 
 
 let isDragging = false;
@@ -178,6 +181,64 @@ function getCubeUnderPointer(event, intersects) {
 const dragPlane = new THREE.Plane();
 
 
+// export function dragCube() {
+//   const { camera, raycaster } = share3dDat();
+//   if (!selectedObject || !selectedObject.wireframeCube) return;
+
+//   // Store the initial position of the wireframe cube
+//   const initialPosition = selectedObject.wireframeCube.position.clone();
+
+//   // Update the raycaster with the current mouse position
+//   raycaster.setFromCamera(mouse, camera);
+
+//   // Calculate the intersection point with the global drag plane
+//   const intersectionPoint = new THREE.Vector3();
+//   dragPlane.setFromNormalAndCoplanarPoint(
+//     camera.getWorldDirection(new THREE.Vector3()),
+//     selectedObject.wireframeCube.position
+// );
+//   // raycaster.ray.intersectPlane(globalDragPlane, intersectionPoint);
+//   raycaster.ray.intersectPlane(dragPlane, intersectionPoint);
+
+
+//   if (previousIntersectPoint === undefined) {
+//     previousIntersectPoint = intersectionPoint.clone();
+//   }
+
+//   // Calculate the movement delta based on the change in intersect point
+//   const movementDelta = new THREE.Vector3().subVectors(
+//     intersectionPoint,
+//     previousIntersectPoint
+//   );
+
+//   // Move the wireframe and solid cubes
+//   selectedObject.wireframeCube.position.add(movementDelta);
+//   selectedObject.solidCube.position.copy(selectedObject.wireframeCube.position);
+
+//   // Calculate the actual movement of the cube
+//   const actualMovement = new THREE.Vector3().subVectors(
+//     selectedObject.wireframeCube.position,
+//     initialPosition
+//   );
+
+//   // Move all spheres inside this cube
+//   selectedObject.containedSpheres.forEach((sphere) => {
+//     sphere.object.position.add(actualMovement);
+//     // Update the position in the selectedObject
+//     sphere.position = sphere.object.position.toArray();
+//   });
+
+//   // Update the previous intersect point for the next drag event
+//   previousIntersectPoint.copy(intersectionPoint);
+
+//   markNeedsRender();
+
+//   // Return the actual movement for synchronization purposes
+//   return actualMovement;
+// }
+
+// ... existing code ...
+
 export function dragCube() {
   const { camera, raycaster } = share3dDat();
   if (!selectedObject || !selectedObject.wireframeCube) return;
@@ -185,53 +246,64 @@ export function dragCube() {
   // Store the initial position of the wireframe cube
   const initialPosition = selectedObject.wireframeCube.position.clone();
 
-  // Update the raycaster with the current mouse position
-  raycaster.setFromCamera(mouse, camera);
+  if (event.shiftKey) {
+    // Get camera's forward direction
+    const cameraDirection = new THREE.Vector3();
+    camera.getWorldDirection(cameraDirection);
+    
+    // Use mouse movement delta for smoother control
+    const movementY = event.movementY || 0;
+    const moveSpeed = 0.15; // Adjust this value to control movement speed
+    
+    // Move cube and its contents along camera's view direction
+    const movement = cameraDirection.multiplyScalar(-movementY * moveSpeed);
+    
+    // Move the wireframe and solid cubes
+    selectedObject.wireframeCube.position.add(movement);
+    selectedObject.solidCube.position.copy(selectedObject.wireframeCube.position);
+    
+    // Move all contained spheres
+    selectedObject.containedSpheres.forEach((sphere) => {
+      sphere.object.position.add(movement);
+      sphere.position = sphere.object.position.toArray();
+    });
+  } else {
+    // Original X-Y plane movement
+    raycaster.setFromCamera(mouse, camera);
+    
+    // Calculate the intersection point with the drag plane
+    const intersectionPoint = new THREE.Vector3();
+    dragPlane.setFromNormalAndCoplanarPoint(
+      camera.getWorldDirection(new THREE.Vector3()),
+      selectedObject.wireframeCube.position
+    );
+    raycaster.ray.intersectPlane(dragPlane, intersectionPoint);
 
-  // Calculate the intersection point with the global drag plane
-  const intersectionPoint = new THREE.Vector3();
-  dragPlane.setFromNormalAndCoplanarPoint(
-    camera.getWorldDirection(new THREE.Vector3()),
-    selectedObject.wireframeCube.position
-);
-  // raycaster.ray.intersectPlane(globalDragPlane, intersectionPoint);
-  raycaster.ray.intersectPlane(dragPlane, intersectionPoint);
+    if (previousIntersectPoint === undefined) {
+      previousIntersectPoint = intersectionPoint.clone();
+    }
 
+    // Calculate the movement delta based on the change in intersect point
+    const movementDelta = new THREE.Vector3().subVectors(
+      intersectionPoint,
+      previousIntersectPoint
+    );
 
-  if (previousIntersectPoint === undefined) {
-    previousIntersectPoint = intersectionPoint.clone();
+    // Move the wireframe and solid cubes
+    selectedObject.wireframeCube.position.add(movementDelta);
+    selectedObject.solidCube.position.copy(selectedObject.wireframeCube.position);
+
+    // Move all spheres inside this cube
+    selectedObject.containedSpheres.forEach((sphere) => {
+      sphere.object.position.add(movementDelta);
+      sphere.position = sphere.object.position.toArray();
+    });
+
+    // Update the previous intersect point for the next drag event
+    previousIntersectPoint.copy(intersectionPoint);
   }
 
-  // Calculate the movement delta based on the change in intersect point
-  const movementDelta = new THREE.Vector3().subVectors(
-    intersectionPoint,
-    previousIntersectPoint
-  );
-
-  // Move the wireframe and solid cubes
-  selectedObject.wireframeCube.position.add(movementDelta);
-  selectedObject.solidCube.position.copy(selectedObject.wireframeCube.position);
-
-  // Calculate the actual movement of the cube
-  const actualMovement = new THREE.Vector3().subVectors(
-    selectedObject.wireframeCube.position,
-    initialPosition
-  );
-
-  // Move all spheres inside this cube
-  selectedObject.containedSpheres.forEach((sphere) => {
-    sphere.object.position.add(actualMovement);
-    // Update the position in the selectedObject
-    sphere.position = sphere.object.position.toArray();
-  });
-
-  // Update the previous intersect point for the next drag event
-  previousIntersectPoint.copy(intersectionPoint);
-
   markNeedsRender();
-
-  // Return the actual movement for synchronization purposes
-  return actualMovement;
 }
 
 export function labelListerners(labelDiv, sphere) {
@@ -1092,11 +1164,19 @@ function isAllowed(event) {
 
   return true;
 }
-// In move.js, modify the onPointerDown function:
+
+
 export function onPointerDown(event) {
   if (!isAllowed(event)){
     return
   }
+
+  console.log("onPointerDown")
+
+    // Add double-click detection at the start
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastClickTime;
+    lastClickTime = currentTime;
 
 
   const { mouse, raycaster, renderer, scene, nonBloomScene, camera, controls } =
@@ -1120,8 +1200,21 @@ export function onPointerDown(event) {
     true
   );
 
-  console.log("Bloom intersects:", intersectsBloom);
-  console.log("Non-bloom intersects:", intersectsNonBloom);
+  console.log("intersectsBloom", intersectsBloom)
+  console.log("intersectsNonBloom", intersectsNonBloom)
+  if (intersectsBloom.length === 0 && intersectsNonBloom.length === 0 && timeDiff < DOUBLE_CLICK_DELAY) {
+    const planeForMenu = new THREE.Plane(new THREE.Vector3(0, 0, 1));
+    const menuIntersectPoint = new THREE.Vector3();
+    raycaster.ray.intersectPlane(planeForMenu, menuIntersectPoint);
+    
+    showContextMenu(event.clientX, event.clientY, menuIntersectPoint);
+
+    console.log("showContextMenu")
+    event.stopPropagation(); // Prevent event from bubbling
+    return;
+
+  }
+
 
   initialPointerPosition = { x: event.clientX, y: event.clientY };
   clickStartTime = Date.now();
@@ -1155,11 +1248,8 @@ export function onPointerDown(event) {
       controls.enabled = false;
   }
     
-    console.log("Sphere layers before toggle:", selectedSphere.layers.mask);
     // toggleBloom(selectedSphere);
-    console.log("Sphere layers after toggle:", selectedSphere.layers.mask)
 
-    console.log("Sphere layers after toggle:", selectedSphere.layers.mask);
     markNeedsRender();
   } else if (intersectsNonBloom.length > 0) {
     const selectedCube = getCubeUnderPointer(event, intersectsNonBloom);
@@ -1404,87 +1494,153 @@ async function onPointerUp(event) {
 //   markNeedsRender();
 // }
 
+// function handleSphereDragEnd(sphere, ghostCube) {
+//   const oldCube = getCubeContainingSphere(sphere);
+//   const sphereRadius = sphere.scale.x / 2 || sphere.geometry.parameters.radius;
+
+//   if (ghostCube) {
+//     if (ghostCube.existingCube) {
+//       // Handle adding sphere to existing cube
+//       const existingCube = ghostCube.existingCube;
+//       const cubeSize = existingCube.scale.x;
+//       const cubePosition = existingCube.position.clone();
+
+//       const offset = getRandomOffset(cubeSize, sphereRadius);
+//       sphere.position.copy(cubePosition.clone().add(offset));
+
+//       const containedSpheres = findSpheresInCube({
+//         wireframe: existingCube,
+//         solid: existingCube.userData.solidCube
+//       });
+      
+//     } else {
+//       // Create a new cube with proper data
+//       const cubeSize = sphereRadius * RESCALEFACTOR;
+//       const cubePosition = ghostCube.position.clone();
+//       const cubeColor = ghostCube.material.color.clone();
+
+//       const cubeData = convertToThreeJSFormat({
+//         position: cubePosition.toArray(),
+//         size: cubeSize,
+//         color: cubeColor.getHex(),
+//         userData: { id: `cube_${Date.now()}` },
+//         lastEditedBy: loginName,
+//       });
+
+//       const newCube = createWireframeCube(cubeData);
+//       const offset = getRandomOffset(cubeSize, sphereRadius);
+//       sphere.position.copy(cubePosition.clone().add(offset));
+
+//       const containedSpheres = findSpheresInCube({
+//         wireframe: newCube.wireframeCube,
+//         solid: newCube.solidCube
+//       });
+      
+//       // updateCubeContents(newCube.wireframeCube, containedSpheres).catch(err => {
+//       //   console.error('Error updating new cube contents:', err);
+//       // });
+//     }
+
+//     if (oldCube && oldCube !== ghostCube?.existingCube) {
+//       const remainingSpheres = findSpheresInCube(oldCube);
+//       // try {
+//       //    updateCubeContents(oldCube, remainingSpheres);
+//       //   // Trigger file tree update after cube contents change
+//       //   window.dispatchEvent(new CustomEvent('updateFileTree'));
+//       // } catch (err) {
+//       //   console.error('Error updating old cube contents:', err);
+//       // }
+//     }
+
+//     removeGhostCube();
+//   }
+
+//   const { scene, nonBloomScene } = share3dDat();
+
+//   const snapshot = createSceneSnapshot([scene, nonBloomScene]);
+//     // Verify all cubes have correct contents
+//     snapshot.boxes.forEach(box => {
+//       if (box.wireframe) {
+//         const actualSpheres = findSpheresInCube(box);
+//         updateCubeContents(box.wireframe, actualSpheres).catch(err => {
+//           console.error('Error updating cube contents during verification:', err);
+//         });
+//       }
+//     });
+  
+//   cleanupOldCubes();
+//   markNeedsRender();
+// }
+
 function handleSphereDragEnd(sphere, ghostCube) {
   const oldCube = getCubeContainingSphere(sphere);
   const sphereRadius = sphere.scale.x / 2 || sphere.geometry.parameters.radius;
 
   if (ghostCube) {
-    if (ghostCube.existingCube) {
-      // Handle adding sphere to existing cube
-      const existingCube = ghostCube.existingCube;
-      const cubeSize = existingCube.scale.x;
-      const cubePosition = existingCube.position.clone();
+    try {
+      if (ghostCube.existingCube) {
+        // Handle adding sphere to existing cube
+        const existingCube = ghostCube.existingCube;
+        const cubeSize = existingCube.scale.x;
+        const cubePosition = existingCube.position.clone();
 
-      const offset = getRandomOffset(cubeSize, sphereRadius);
-      sphere.position.copy(cubePosition.clone().add(offset));
+        const offset = getRandomOffset(cubeSize);
+        sphere.position.copy(cubePosition.clone().add(offset));
 
-      const containedSpheres = findSpheresInCube({
-        wireframe: existingCube,
-        solid: existingCube.userData.solidCube
-      });
-      
-      // updateCubeContents(existingCube, containedSpheres).catch(err => {
-      //   console.error('Error updating existing cube contents:', err);
-      // });
-    } else {
-      // Create a new cube with proper data
-      const cubeSize = sphereRadius * RESCALEFACTOR;
-      const cubePosition = ghostCube.position.clone();
-      const cubeColor = ghostCube.material.color.clone();
-
-      const cubeData = convertToThreeJSFormat({
-        position: cubePosition.toArray(),
-        size: cubeSize,
-        color: cubeColor.getHex(),
-        userData: { id: `cube_${Date.now()}` },
-        lastEditedBy: loginName,
-      });
-
-      const newCube = createWireframeCube(cubeData);
-      const offset = getRandomOffset(cubeSize, sphereRadius);
-      sphere.position.copy(cubePosition.clone().add(offset));
-
-      const containedSpheres = findSpheresInCube({
-        wireframe: newCube.wireframeCube,
-        solid: newCube.solidCube
-      });
-      
-      // updateCubeContents(newCube.wireframeCube, containedSpheres).catch(err => {
-      //   console.error('Error updating new cube contents:', err);
-      // });
-    }
-
-    if (oldCube && oldCube !== ghostCube?.existingCube) {
-      const remainingSpheres = findSpheresInCube(oldCube);
-      // try {
-      //    updateCubeContents(oldCube, remainingSpheres);
-      //   // Trigger file tree update after cube contents change
-      //   window.dispatchEvent(new CustomEvent('updateFileTree'));
-      // } catch (err) {
-      //   console.error('Error updating old cube contents:', err);
-      // }
-    }
-
-    removeGhostCube();
-  }
-
-  const { scene, nonBloomScene } = share3dDat();
-
-  const snapshot = createSceneSnapshot([scene, nonBloomScene]);
-    // Verify all cubes have correct contents
-    snapshot.boxes.forEach(box => {
-      if (box.wireframe) {
-        const actualSpheres = findSpheresInCube(box);
-        updateCubeContents(box.wireframe, actualSpheres).catch(err => {
-          console.error('Error updating cube contents during verification:', err);
+        const containedSpheres = findSpheresInCube({
+          wireframe: existingCube,
+          solid: existingCube.userData.solidCube
         });
-      }
-    });
-  
-  cleanupOldCubes();
-  markNeedsRender();
-}
+        
+        // Immediately update cube contents
+        updateCubeContents(existingCube, containedSpheres);
+      } else {
+        // Immediately create a new cube
+        const cubeSize = sphereRadius * RESCALEFACTOR;
+        const cubePosition = ghostCube.position.clone();
+        const cubeColor = ghostCube.material.color.clone();
 
+        const cubeData = convertToThreeJSFormat({
+          position: cubePosition.toArray(),
+          size: cubeSize,
+          color: cubeColor.getHex(),
+          userData: { id: `cube_${Date.now()}` },
+          lastEditedBy: loginName,
+        });
+
+        const newCube = createWireframeCube(cubeData);
+        const offset = getRandomOffset(cubeSize);
+        sphere.position.copy(cubePosition.clone().add(offset));
+
+        // Immediately find and update the new cube's contents
+        const containedSpheres = findSpheresInCube({
+          wireframe: newCube.wireframeCube,
+          solid: newCube.solidCube
+        });
+        
+        updateCubeContents(newCube.wireframeCube, containedSpheres);
+      }
+
+      // Handle the old cube if it exists
+      if (oldCube && oldCube !== ghostCube?.existingCube) {
+        const remainingSpheres = findSpheresInCube(oldCube);
+        updateCubeContents(oldCube, remainingSpheres);
+      }
+
+      // Force an immediate render
+      markNeedsRender();
+      
+      // Trigger file tree update
+      window.dispatchEvent(new CustomEvent('updateFileTree'));
+    } catch (err) {
+      console.error('Error in handleSphereDragEnd:', err);
+    } finally {
+      // Always remove the ghost cube and clean up
+      removeGhostCube();
+      cleanupOldCubes();
+    }
+  }
+}
 
 const onPointerMove = (event) => {
   const { controls, camera, scene, nonBloomScene } = share3dDat();

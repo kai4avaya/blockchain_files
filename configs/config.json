@@ -14,7 +14,13 @@
     "summaries": { "keyPath": "fileId" },
     "tabs": { "keyPath": "docId" },
     "docs": { "keyPath": "docId" },
-    "peers": { "keyPath": "peerId" },
+    "peers": {
+      "keyPath": "peerId",
+      "indexes": [
+        { "name": "status", "keyPath": "status" },
+        { "name": "lastAttempt", "keyPath": "lastAttempt" }
+      ]
+    },
     "vectors": {
       "keyPath": "id",
       "vectorConfig": {
