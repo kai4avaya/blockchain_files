@@ -12,14 +12,18 @@ class ContextManager {
   constructor() {
     this.vectorDB = new VectorDB();
     this.aiManager = new StreamingAIManager(config);
-    this.providerOrder = ['OPEN', 'GEMINI', 'GROQ', 'CEREBRAS'];
+    this.providerOrder = config.providerOrder;
     this.currentProviderIndex = 0;
     this.config = config;
   }
 
   async getNextProvider() {
+    console.log('Current providers:', this.providerOrder);
+    console.log('Current index:', this.currentProviderIndex);
     this.currentProviderIndex = (this.currentProviderIndex + 1) % this.providerOrder.length;
-    return this.providerOrder[this.currentProviderIndex];
+    const nextProvider = this.providerOrder[this.currentProviderIndex];
+    console.log('Next provider:', nextProvider);
+    return nextProvider;
   }
 
   async getModelForProvider(provider) {

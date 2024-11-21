@@ -12,22 +12,18 @@ class StreamingAIManager {
         
         const [provider, ...modelParts] = modelId.split('/');
         const providerKey = provider.toLowerCase();
-        const modelKey = modelParts.join('/'); // Keep the full model name including slashes
+        const modelKey = modelParts.join('/');
         
         try {
-          if (!this.config.apiConfig.models[providerKey]) {
-            throw new Error(`Invalid provider configuration: ${provider}`);
-          }
-          
-          const modelConfig = this.config.apiConfig.models[providerKey][modelKey];
+          const modelConfig = this.config.apiConfig.models[providerKey]?.[modelKey];
           if (!modelConfig) {
             throw new Error(`Invalid model configuration for: ${modelId}`);
           }
       
           this.activeStreams.set(streamId, controller);
       
-          // Format request body based on provider
-          let requestBody = provider.toUpperCase() === 'GEMINI' ? {
+          // Use provider-specific configuration from config.json
+          const requestBody = provider.toUpperCase() === 'GEMINI' ? {
             contents: messages.map(msg => ({
               role: msg.role === 'system' ? 'user' : msg.role,
               parts: [{ text: msg.content }]
@@ -43,7 +39,7 @@ class StreamingAIManager {
               'Content-Type': 'application/json',
               'X-Provider': provider.toUpperCase(),
               'X-Endpoint': modelConfig.endpoint,
-              ...modelConfig.headers
+              ...modelConfig.headers  // Use headers from config
             },
             body: JSON.stringify(requestBody),
             signal: controller.signal
@@ -68,41 +64,85 @@ class StreamingAIManager {
           streamId,
           async* [Symbol.asyncIterator]() {
             try {
+              let buffer = '';
+              let jsonBuffer = '';
+              let inJson = false;
+              
               while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-  
+
                 const chunk = new TextDecoder().decode(value);
-                const lines = chunk
-                  .split('\n')
-                  .filter(line => line.trim() !== '');
-  
-                for (const line of lines) {
-                  if (line.includes('[DONE]')) return;
-                  if (line.startsWith('data: ')) {
-                    try {
-                      const data = JSON.parse(line.slice(5));
-                      if (provider.toUpperCase() === 'GEMINI') {
-                        yield data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                      } else {
-                        yield data.choices?.[0]?.delta?.content || '';
+                // console.log(`[${provider.toU/pperCase()}] Raw chunk:`, chunk);
+                buffer += chunk;
+
+                // Split by data: prefix
+                const parts = buffer.split('data: ');
+                buffer = parts.pop() || ''; // Keep the last part in buffer
+
+                for (const part of parts) {
+                  if (part.trim() === '') continue;
+                  if (part.includes('[DONE]')) {
+                    console.log(`[${provider.toUpperCase()}] Stream complete`);
+                    return;
+                  }
+                  
+                  try {
+                    // Try to parse as complete JSON
+                    const data = JSON.parse(part);
+                    // console.log(`[${provider.toUpperCase()}] Parsed data:`, data);
+                    
+                    if (provider.toUpperCase() === 'GEMINI') {
+                      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                      if (text) {
+                        console.log('[GEMINI] Extracted text:', text);
+                        yield text;
                       }
-                    } catch (e) {
-                      console.warn('Error parsing streaming response:', e);
+                    } else {
+                      const content = data.choices?.[0]?.delta?.content;
+                      if (content) {
+                        console.log(`[${provider.toUpperCase()}] Extracted content:`, content);
+                        yield content;
+                      }
+                    }
+                  } catch (e) {
+                    // If parsing fails, accumulate until we have valid JSON
+                    if (part.includes('{')) {
+                      console.log(`[${provider.toUpperCase()}] Starting new JSON object`);
+                      jsonBuffer = part;
+                      inJson = true;
+                    } else if (inJson) {
+                      jsonBuffer += part;
+                      if (part.includes('}')) {
+                        inJson = false;
+                        console.log(`[${provider.toUpperCase()}] Complete JSON buffer:`, jsonBuffer);
+                        try {
+                          const data = JSON.parse(jsonBuffer);
+                          if (provider.toUpperCase() === 'GEMINI') {
+                            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                            if (text) yield text;
+                          } else {
+                            const content = data.choices?.[0]?.delta?.content;
+                            if (content) yield content;
+                          }
+                        } catch (e) {
+                          if (!jsonBuffer.includes('{') || !jsonBuffer.includes('}')) {
+                            console.warn(`[${provider.toUpperCase()}] Error parsing complete JSON:`, e);
+                          }
+                        }
+                        jsonBuffer = '';
+                      }
                     }
                   }
                 }
               }
-            } catch (error) {
-              console.warn('Stream interrupted:', error);
             } finally {
-              try {
+              console.log(`[${provider.toUpperCase()}] Stream cleanup`);
+              if (reader) {
                 reader.releaseLock();
-                if (this.activeStreams.has(streamId)) {
-                  this.activeStreams.delete(streamId);
-                }
-              } catch (e) {
-                console.warn('Error cleaning up stream:', e);
+              }
+              if (this.activeStreams?.has(streamId)) {
+                this.activeStreams.delete(streamId);
               }
             }
           }

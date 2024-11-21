@@ -87,7 +87,11 @@ class AIPluginView {
       this.isStreaming = true;
       this.showStopButton();
       const prompt = line.text.slice(0, -2);
-
+      
+      // First ensure we're at a valid position
+      const docLength = view.state.doc.length;
+      const insertPos = Math.min(line.to + 1, docLength);
+      
       view.dispatch({
         changes: {
           from: line.to,
@@ -95,56 +99,82 @@ class AIPluginView {
         }
       });
       
-      const startPos = line.to + 1;
-      const response = await contextManager.getContextualResponse(prompt);
+      const startPos = insertPos;
       
-      if (!response) {
-        throw new Error('No response from AI');
-      }
-
-      this.currentStreamId = response.streamId; // Store the streamId
-      let accumulatedText = '';
+      // Don't await the entire response, just get the Promise
+      const responsePromise = contextManager.getContextualResponse(prompt);
       
-      // Stream the response
-      for await (const chunk of response) {
-        if (!this.isStreaming) break;
+      responsePromise.then((response: { 
+        streamId: string;
+        [Symbol.asyncIterator](): AsyncIterator<string>;
+      }) => {
+        if (!response) {
+          throw new Error('No response from AI');
+        }
         
-        accumulatedText += chunk;
+        this.currentStreamId = response.streamId;
         
-        requestAnimationFrame(() => {
-          if (!this.isStreaming) return;
+        if (response[Symbol.asyncIterator]) {
+          let accumulatedText = '';
           
-          view.dispatch({
-            changes: {
-              from: startPos,
-              to: view.state.doc.length,
-              insert: accumulatedText
-            },
-            scrollIntoView: true
+          const processStream = async () => {
+            for await (const chunk of response) {
+              if (!this.isStreaming) break;
+              
+              // Ensure view is still valid
+              if (!view.state) break;
+              
+              const currentLength = view.state.doc.length;
+              const insertAt = Math.min(startPos + accumulatedText.length, currentLength);
+              
+              requestAnimationFrame(() => {
+                if (!this.isStreaming || !view.state) return;
+                
+                view.dispatch({
+                  changes: {
+                    from: insertAt,
+                    insert: chunk
+                  },
+                  scrollIntoView: true
+                });
+              });
+              
+              accumulatedText += chunk;
+            }
+          };
+          
+          processStream().catch(error => {
+            console.error('Error processing stream:', error);
           });
-        });
-      }
+        }
+      }).catch((error: unknown) => {
+        console.error('Error getting response:', error);
+        this.handleError(view, line, error);
+      });
 
     } catch (error) {
-      console.error('Error getting AI response:', error);
-      
-      requestAnimationFrame(() => {
-        view.dispatch({
-          changes: {
-            from: line.to,
-            insert: `\nError: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
-          }
-        });
-      });
-      
-    } finally {
-      if (this.currentStreamId) {
-        contextManager.stopResponse(this.currentStreamId);
-      }
-      this.isStreaming = false;
-      this.currentStreamId = null;
-      this.hideStopButton();
+      this.handleError(view, line, error);
     }
+  }
+
+  private handleError(view: EditorView, line: any, error: any) {
+    console.error('Error in handleAIRequest:', error);
+    
+    requestAnimationFrame(() => {
+      view.dispatch({
+        changes: {
+          from: line.to,
+          insert: `\nError: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+        }
+      });
+    });
+    
+    if (this.currentStreamId) {
+      contextManager.stopResponse(this.currentStreamId);
+    }
+    this.isStreaming = false;
+    this.currentStreamId = null;
+    this.hideStopButton();
   }
 
   handleTestResponse(view: EditorView, line: any) {
@@ -169,7 +199,7 @@ class AIPluginView {
     return Decoration.set(decorations);
   }
 
-  private stopStream() {
+   stopStream() {
     this.isStreaming = false;  // Set this first
     
     if (this.currentStreamId) {

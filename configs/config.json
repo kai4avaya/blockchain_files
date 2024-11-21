@@ -91,5 +91,6 @@
         }
       }
     }
-  }
+  },
+  "providerOrder": [ "GROQ", "GEMINI","CEREBRAS"]
 }
