@@ -18,8 +18,11 @@ class ContextManager {
   }
 
   async getNextProvider() {
+    console.log('Current providers:', this.providerOrder);
+    console.log('Current index:', this.currentProviderIndex);
     this.currentProviderIndex = (this.currentProviderIndex + 1) % this.providerOrder.length;
     const nextProvider = this.providerOrder[this.currentProviderIndex];
+    console.log('Next provider:', nextProvider);
     return nextProvider;
   }
 
@@ -85,12 +88,15 @@ class ContextManager {
           ...options,
           minResults: 3
         });
+        console.log('Vector search results:', results);
 
         updateStatus('Processing search results...');
         const contextString = this.formatContextForPrompt(results);
+        console.log('Formatted context:', contextString);
         
         updateStatus('Creating AI prompt...');
         const systemPrompt = this.createSystemPrompt(contextString);
+        console.log('Final system prompt:', systemPrompt);
 
         updateStatus('Generating AI response...');
         const modelId = await this.getModelForProvider(currentProvider);
@@ -137,35 +143,28 @@ class ContextManager {
   }
 
    formatContextForPrompt(results) {
+    console.log('Raw results to format:', results);
     const formatted = results.map(result => ({
       content: result.object.text,
       fileId: result.fileId,
       fileName: result.object.fileName,
-      isCode: result.object.fileType?.toLowerCase().includes('js') || 
-              result.object.fileType?.toLowerCase().includes('ts') ||
-              result.object.fileName?.match(/\.(js|ts|jsx|tsx|json|py|rb|java|cpp|cs)$/i),
       fileType: result.object.fileType || 'text',
       similarity: result.similarity
     }));
+    console.log('Formatted results:', formatted);
     return formatted;
   }
 
    createSystemPrompt(context) {
     const { base, context_prefix, instructions } = prompts.contextual_response.system;
     
-    const contextSection = context.map(doc => {
-      const sourceComment = `[//]: # (source:${doc.fileId} - ${doc.fileName})`;
-      if (doc.isCode) {
-        return `${sourceComment}
-\`\`\`${doc.fileType}:${doc.fileName}
+    const contextSection = context.map(doc => 
+      `[//]: # (source:${doc.fileId} - ${doc.fileName})
+\`\`\`${doc.fileType}
 ${doc.content}
-\`\`\``;
-      } else {
-        return `${sourceComment}
-${doc.content}`;
-      }
-    }).join('\n\n');
+\`\`\``).join('\n\n');
     
+    console.log('Context section:', contextSection);
     
     const finalPrompt = `${base}
 
@@ -175,6 +174,7 @@ ${contextSection}
 Instructions:
 ${instructions.map((instruction, i) => `${i + 1}. ${instruction}`).join('\n')}`;
 
+    console.log('Final system prompt:', finalPrompt);
     return finalPrompt;
   }
 

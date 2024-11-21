@@ -50,12 +50,10 @@ class AIPluginView {
   }
 
   private showStopButton() {
-    console.log('Showing stop button');
     this.stopButton.classList.add('visible');
   }
 
   private hideStopButton() {
-    console.log('Hiding stop button');
     this.stopButton.classList.remove('visible');
   }
 
@@ -88,10 +86,10 @@ class AIPluginView {
       this.showStopButton();
       const prompt = line.text.slice(0, -2);
       
-      // First ensure we're at a valid position
-      const docLength = view.state.doc.length;
-      const insertPos = Math.min(line.to + 1, docLength);
+      // Remember initial insertion point
+      const startPos = Math.min(line.to + 1, view.state.doc.length);
       
+      // Add initial newline
       view.dispatch({
         changes: {
           from: line.to,
@@ -99,61 +97,43 @@ class AIPluginView {
         }
       });
       
-      const startPos = insertPos;
+      const response = await contextManager.getContextualResponse(prompt);
+      let fullText = '';
       
-      // Don't await the entire response, just get the Promise
-      const responsePromise = contextManager.getContextualResponse(prompt);
-      
-      responsePromise.then((response: { 
-        streamId: string;
-        [Symbol.asyncIterator](): AsyncIterator<string>;
-      }) => {
-        if (!response) {
-          throw new Error('No response from AI');
-        }
+      // Stream response for immediate feedback
+      for await (const chunk of response) {
+        if (!this.isStreaming) break;
+        fullText += chunk;
         
-        this.currentStreamId = response.streamId;
-        
-        if (response[Symbol.asyncIterator]) {
-          let accumulatedText = '';
-          
-          const processStream = async () => {
-            for await (const chunk of response) {
-              if (!this.isStreaming) break;
-              
-              // Ensure view is still valid
-              if (!view.state) break;
-              
-              const currentLength = view.state.doc.length;
-              const insertAt = Math.min(startPos + accumulatedText.length, currentLength);
-              
-              requestAnimationFrame(() => {
-                if (!this.isStreaming || !view.state) return;
-                
-                view.dispatch({
-                  changes: {
-                    from: insertAt,
-                    insert: chunk
-                  },
-                  scrollIntoView: true
-                });
-              });
-              console.log('Accumulated text ASK AIIIIIIIIIIIIIIIIIIIIIIIIIII:', accumulatedText);
-              accumulatedText += chunk;
-            }
-          };
-          
-          processStream().catch(error => {
-            console.error('Error processing stream:', error);
-          });
-        }
-      }).catch((error: unknown) => {
-        console.error('Error getting response:', error);
-        this.handleError(view, line, error);
-      });
+        // Show streaming updates
+        view.dispatch({
+          changes: {
+            from: startPos,
+            to: startPos + fullText.length - chunk.length,
+            insert: fullText
+          },
+          scrollIntoView: true
+        });
+      }
 
-    } catch (error) {
+      // Final formatting pass - replace entire response
+      if (this.isStreaming && fullText) {
+        view.dispatch({
+          changes: {
+            from: startPos,
+            to: startPos + fullText.length,
+            insert: fullText
+          },
+          scrollIntoView: true
+        });
+      }
+
+    } catch (error: unknown) {
+      console.error('Error getting response:', error);
       this.handleError(view, line, error);
+    } finally {
+      this.isStreaming = false;
+      this.hideStopButton();
     }
   }
 

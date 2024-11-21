@@ -88,15 +88,11 @@ let DB_DEFAULTS = {
       ...options,
     };
 
-    this.#objectStore = "vectors";
+    this.#objectStore = storeName || DB_DEFAULTS.objectStore;
     this.#vectorPath = vectorPath || DB_DEFAULTS.vectorPath;
     this.#hashIndexStore = `${this.#objectStore}${DB_DEFAULTS.hashIndexSuffix}`;
 
-    console.log('VectorDB initialized with stores:', {
-      vectorStore: this.#objectStore,
-      hashIndexStore: this.#hashIndexStore
-    });
-
+    // this.#hashIndexStore = `${this.#hashIndexStorePrefix}${localStorage.getItem('myPeerId')}`; // Use peer ID to differentiate
     this.#lsh = new LSH(
       dimensions || DB_DEFAULTS.dimensions,
       numPlanes || DB_DEFAULTS.numPlanes
@@ -328,21 +324,31 @@ async insert(object) {
       const hashes = this.#lsh.hashVector(queryVector);
       console.log('Generated hashes:', hashes);
       
+      let processedBuckets = 0;
+      
+      const hasFileMetadata = typeof window.fileMetadata !== 'undefined';
+      const activeFileIds = hasFileMetadata ? Array.from(window.fileMetadata.keys()) : [];
+      console.log('Active file IDs:', activeFileIds);
+      
       for (let hash of hashes) {
         const hashBucket = await indexDBOverlay.getItem(this.#hashIndexStore, hash);
         console.log('Hash bucket for', hash, ':', hashBucket);
         
         if (!hashBucket || !hashBucket.vectorIds) continue;
         
-        // For each vectorId in the bucket, retrieve the actual vector
-        for (let vectorId of hashBucket.vectorIds) {
+        processedBuckets++;
+  
+        // Skip file filtering if window.fileMetadata is undefined
+        const activeVectorIds = hasFileMetadata
+          ? hashBucket.vectorIds.filter(vectorId => 
+              activeFileIds.includes(hashBucket.fileIds[vectorId])
+            )
+          : hashBucket.vectorIds;
+  
+        for (let vectorId of activeVectorIds) {
           if (!collectedVectors.has(vectorId)) {
             collectedVectors.add(vectorId);
-            
-            // Get the actual vector document
             const vector = await indexDBOverlay.getItem(this.#objectStore, vectorId);
-            console.log('Retrieved vector:', vector); // Add this log
-            
             if (vector) {
               const similarity = cosineSimilarity(queryVector, vector[this.#vectorPath]);
               resultObjects.push({
@@ -351,26 +357,15 @@ async insert(object) {
                 similarity,
                 object: vector
               });
-              
-              console.log('Added result object:', {
-                vectorId,
-                fileId: vector.fileId,
-                similarity,
-                object: vector
-              }); // Add this log
             }
           }
         }
-        
+  
         if (resultObjects.length >= limit) break;
       }
-
-      // Sort by similarity
-      resultObjects.sort((a, b) => b.similarity - a.similarity);
-      
-      console.log('Final sorted result objects:', resultObjects);
+  
+      console.log('Final result objects:', resultObjects);
       return resultObjects.slice(0, limit);
-      
     } catch (error) {
       console.error("Error during query operation:", error);
       throw error;

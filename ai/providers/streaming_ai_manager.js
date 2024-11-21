@@ -83,7 +83,6 @@ class StreamingAIManager {
                 for (const part of parts) {
                   if (part.trim() === '') continue;
                   if (part.includes('[DONE]')) {
-                    console.log(`[${provider.toUpperCase()}] Stream complete`);
                     return;
                   }
                   
@@ -95,27 +94,23 @@ class StreamingAIManager {
                     if (provider.toUpperCase() === 'GEMINI') {
                       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                       if (text) {
-                        console.log('[GEMINI] Extracted text:', text);
                         yield text;
                       }
                     } else {
                       const content = data.choices?.[0]?.delta?.content;
                       if (content) {
-                        console.log(`[${provider.toUpperCase()}] Extracted content:`, content);
                         yield content;
                       }
                     }
                   } catch (e) {
                     // If parsing fails, accumulate until we have valid JSON
                     if (part.includes('{')) {
-                      console.log(`[${provider.toUpperCase()}] Starting new JSON object`);
                       jsonBuffer = part;
                       inJson = true;
                     } else if (inJson) {
                       jsonBuffer += part;
                       if (part.includes('}')) {
                         inJson = false;
-                        console.log(`[${provider.toUpperCase()}] Complete JSON buffer:`, jsonBuffer);
                         try {
                           const data = JSON.parse(jsonBuffer);
                           if (provider.toUpperCase() === 'GEMINI') {
@@ -137,7 +132,6 @@ class StreamingAIManager {
                 }
               }
             } finally {
-              console.log(`[${provider.toUpperCase()}] Stream cleanup`);
               if (reader) {
                 reader.releaseLock();
               }

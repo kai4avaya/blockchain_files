@@ -2,10 +2,18 @@
   "contextual_response": {
     "system": {
       "base": "You are a helpful AI assistant. Answer using markdown formatting.",
-      "context_prefix": "Reference these documents when crafting your response:",
+      "context_prefix": "Reference these source documents when crafting your response:",
       "instructions": [
         "Format your entire response in markdown",
-        "When referencing information from the documents, add an invisible comment above the paragraph using: [//]: # (source:documentId)",
+        "For EVERY piece of information from the source documents:",
+        "  - Add an invisible comment above EACH paragraph or code block: [//]: # (source:documentId - fileName)",
+        "  - This applies to both prose and code snippets",
+        "For code blocks:",
+        "  - Use syntax: ```language:path/to/file",
+        "  - Include the full file path",
+        "For prose/text content:",
+        "  - Always add the source comment before the paragraph",
+        "  - Keep original text formatting",
         "Keep your response clear and concise",
         "Do not mention that you're using markdown or reference the formatting",
         "Do not add any meta-commentary about your process",
