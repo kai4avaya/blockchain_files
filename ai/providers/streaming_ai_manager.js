@@ -64,80 +64,72 @@ class StreamingAIManager {
           streamId,
           async* [Symbol.asyncIterator]() {
             try {
-              let buffer = '';
-              let jsonBuffer = '';
-              let inJson = false;
-              
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+                let buffer = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                const chunk = new TextDecoder().decode(value);
-                // console.log(`[${provider.toU/pperCase()}] Raw chunk:`, chunk);
-                buffer += chunk;
+                    const chunk = new TextDecoder().decode(value);
+                    buffer += chunk;
 
-                // Split by data: prefix
-                const parts = buffer.split('data: ');
-                buffer = parts.pop() || ''; // Keep the last part in buffer
-
-                for (const part of parts) {
-                  if (part.trim() === '') continue;
-                  if (part.includes('[DONE]')) {
-                    return;
-                  }
-                  
-                  try {
-                    // Try to parse as complete JSON
-                    const data = JSON.parse(part);
-                    // console.log(`[${provider.toUpperCase()}] Parsed data:`, data);
-                    
+                    // Handle different response formats
                     if (provider.toUpperCase() === 'GEMINI') {
-                      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                      if (text) {
-                        yield text;
-                      }
-                    } else {
-                      const content = data.choices?.[0]?.delta?.content;
-                      if (content) {
-                        yield content;
-                      }
-                    }
-                  } catch (e) {
-                    // If parsing fails, accumulate until we have valid JSON
-                    if (part.includes('{')) {
-                      jsonBuffer = part;
-                      inJson = true;
-                    } else if (inJson) {
-                      jsonBuffer += part;
-                      if (part.includes('}')) {
-                        inJson = false;
                         try {
-                          const data = JSON.parse(jsonBuffer);
-                          if (provider.toUpperCase() === 'GEMINI') {
+                            const data = JSON.parse(buffer);
+                            // Check for error response
+                            if (data.error) {
+                                throw new Error(data.error.message || 'Gemini API error');
+                            }
+                            
+                            // Extract text from Gemini response structure
                             const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                            if (text) yield text;
-                          } else {
-                            const content = data.choices?.[0]?.delta?.content;
-                            if (content) yield content;
-                          }
+                            if (text) {
+                                // Simulate streaming for better UX
+                                const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+                                for (const sentence of sentences) {
+                                    // Split long sentences into smaller chunks
+                                    const words = sentence.trim().split(' ');
+                                    const chunkSize = 5; // Adjust for smoother streaming
+                                    
+                                    for (let i = 0; i < words.length; i += chunkSize) {
+                                        const chunk = words.slice(i, i + chunkSize).join(' ');
+                                        yield chunk + (i + chunkSize >= words.length ? ' ' : '');
+                                        // Small delay between chunks
+                                        await new Promise(resolve => setTimeout(resolve, 30));
+                                    }
+                                }
+                                break; // Exit after processing complete response
+                            }
                         } catch (e) {
-                          if (!jsonBuffer.includes('{') || !jsonBuffer.includes('}')) {
-                            console.warn(`[${provider.toUpperCase()}] Error parsing complete JSON:`, e);
-                          }
+                            if (done) {
+                                console.warn('Failed to parse Gemini response:', e);
+                                break;
+                            }
+                            // Continue accumulating if not complete JSON
+                            continue;
                         }
-                        jsonBuffer = '';
-                      }
+                    } else {
+                        // Original streaming logic for other providers
+                        const parts = buffer.split('data: ');
+                        buffer = parts.pop() || '';
+
+                        for (const part of parts) {
+                            if (part.trim() === '' || part.includes('[DONE]')) continue;
+                            
+                            try {
+                                const data = JSON.parse(part);
+                                const content = data.choices?.[0]?.delta?.content;
+                                if (content) yield content;
+                            } catch (e) {
+                                console.warn('Error parsing chunk:', e);
+                            }
+                        }
                     }
-                  }
                 }
-              }
             } finally {
-              if (reader) {
-                reader.releaseLock();
-              }
-              if (this.activeStreams?.has(streamId)) {
-                this.activeStreams.delete(streamId);
-              }
+                reader?.releaseLock();
+                this.activeStreams?.delete(streamId);
             }
           }
         };

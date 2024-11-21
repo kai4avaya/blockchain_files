@@ -86,10 +86,9 @@ class AIPluginView {
       this.showStopButton();
       const prompt = line.text.slice(0, -2);
       
-      // Remember initial insertion point
       const startPos = Math.min(line.to + 1, view.state.doc.length);
+      let currentLength = 0;
       
-      // Add initial newline
       view.dispatch({
         changes: {
           from: line.to,
@@ -100,35 +99,72 @@ class AIPluginView {
       const response = await contextManager.getContextualResponse(prompt);
       let fullText = '';
       
-      // Stream response for immediate feedback
       for await (const chunk of response) {
         if (!this.isStreaming) break;
-        fullText += chunk;
         
-        // Show streaming updates
-        view.dispatch({
-          changes: {
-            from: startPos,
-            to: startPos + fullText.length - chunk.length,
-            insert: fullText
-          },
-          scrollIntoView: true
-        });
+        try {
+          // Debug logging
+          console.log('Raw chunk:', chunk);
+          
+          let content = '';
+          if (typeof chunk === 'string') {
+            if (chunk.startsWith('data: ')) {
+              try {
+                const jsonStr = chunk.slice(5).trim(); // Remove 'data: ' and trim
+                console.log('Parsing JSON:', jsonStr);
+                const parsedChunk = JSON.parse(jsonStr);
+                content = parsedChunk?.choices?.[0]?.delta?.content || '';
+              } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+              }
+            } else {
+              // Try parsing the whole chunk as JSON
+              try {
+                const parsedChunk = JSON.parse(chunk);
+                content = parsedChunk?.choices?.[0]?.delta?.content || '';
+              } catch (parseError) {
+                // If not JSON, use the chunk as-is
+                content = chunk;
+              }
+            }
+          } else if (chunk?.choices?.[0]?.delta?.content) {
+            content = chunk.choices[0].delta.content;
+          }
+          
+          console.log('Parsed content:', content);
+          
+          if (content) {
+            fullText += content;
+            
+            const docLength = view.state.doc.length;
+            const updateFrom = Math.min(startPos, docLength);
+            const updateTo = Math.min(startPos + currentLength, docLength);
+            
+            console.log('Updating editor:', {
+              content,
+              fullText,
+              updateFrom,
+              updateTo,
+              currentLength
+            });
+            
+            view.dispatch({
+              changes: {
+                from: updateFrom,
+                to: updateTo,
+                insert: fullText
+              },
+              scrollIntoView: true
+            });
+            
+            currentLength = fullText.length;
+          }
+        } catch (e) {
+          console.error('Error processing chunk:', e);
+        }
       }
 
-      // Final formatting pass - replace entire response
-      if (this.isStreaming && fullText) {
-        view.dispatch({
-          changes: {
-            from: startPos,
-            to: startPos + fullText.length,
-            insert: fullText
-          },
-          scrollIntoView: true
-        });
-      }
-
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Error getting response:', error);
       this.handleError(view, line, error);
     } finally {
@@ -140,17 +176,26 @@ class AIPluginView {
   private handleError(view: EditorView, line: any, error: any) {
     console.error('Error in handleAIRequest:', error);
     
+    const errorMessage = error instanceof Error ? 
+        error.message : 
+        'Unknown error occurred';
+    
     requestAnimationFrame(() => {
-      view.dispatch({
-        changes: {
-          from: line.to,
-          insert: `\nError: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+        try {
+            const docLength = view.state.doc.length;
+            view.dispatch({
+                changes: {
+                    from: docLength,
+                    insert: `\nError: ${errorMessage}`
+                }
+            });
+        } catch (e) {
+            console.error('Failed to show error message:', e);
         }
-      });
     });
     
     if (this.currentStreamId) {
-      contextManager.stopResponse(this.currentStreamId);
+        contextManager.stopResponse(this.currentStreamId);
     }
     this.isStreaming = false;
     this.currentStreamId = null;

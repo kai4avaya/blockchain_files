@@ -8,6 +8,8 @@ import prompts from '../../configs/prompts.json';
 import { updateStatus } from '../../ui/components/process.js';
 import toast from '../../ui/components/toast-alert';
 
+const tokenReducerWorker = new Worker(new URL('../../workers/token_reducer_worker.js', import.meta.url), { type: 'module' });
+
 class ContextManager {
   constructor() {
     this.vectorDB = new VectorDB();
@@ -45,10 +47,10 @@ class ContextManager {
       
       const health = await response.json();
       switch(provider) {
-        case 'OPEN': return health.environment.hasOpenRouterKey;
-        case 'GEMINI': return health.environment.hasGeminiKey;
-        case 'GROQ': return health.environment.hasGroqKey;
-        case 'CEREBRAS': return health.environment.hasCerebrasKey;
+        case 'OPEN': return health.environment.OPENROUTER_KEY;
+        case 'GEMINI': return health.environment.GEMINI_KEY;
+        case 'GROQ': return health.environment.GROQ_KEY;
+        case 'CEREBRAS': return health.environment.CEREBRAS_KEY;
         default: return false;
       }
     } catch {
@@ -58,13 +60,23 @@ class ContextManager {
 
   async getContextualResponse(userPrompt, options = { limit: 5 }) {
     let attempts = 0;
+    let healthCheckFailures = 0;
     const maxAttempts = this.providerOrder.length;
+    const maxHealthCheckFailures = 10;
 
     while (attempts < maxAttempts) {
       const currentProvider = this.providerOrder[this.currentProviderIndex];
       
       if (!await this.checkProviderHealth(currentProvider)) {
         console.warn(`Provider ${currentProvider} is not available`);
+        healthCheckFailures++;
+        
+        if (healthCheckFailures >= maxHealthCheckFailures) {
+          updateStatus('Health check failures exceeded limit');
+          toast.show('Unable to connect to AI providers after multiple attempts', 'error');
+          throw new Error('Maximum health check failures reached');
+        }
+
         await this.getNextProvider();
         attempts++;
         continue;
@@ -86,13 +98,54 @@ class ContextManager {
           minResults: 3
         });
 
-        updateStatus('Processing search results...');
-        const contextString = this.formatContextForPrompt(results);
-        
-        updateStatus('Creating AI prompt...');
-        const systemPrompt = this.createSystemPrompt(contextString);
+        if (!results || !Array.isArray(results) || results.length === 0) {
+          throw new Error('No relevant context found');
+        }
 
-        updateStatus('Generating AI response...');
+        // Format results before token reduction
+        const formattedResults = results.map(result => ({
+          content: result.object?.text || '',
+          fileId: result.fileId || 'unknown',
+          fileName: result.object?.fileName || 'unknown',
+          isCode: result.object?.fileType?.toLowerCase().includes('js') || 
+                  result.object?.fileType?.toLowerCase().includes('ts') ||
+                  result.object?.fileName?.match(/\.(js|ts|jsx|tsx|json|py|rb|java|cpp|cs)$/i),
+          fileType: result.object?.fileType || 'text',
+          similarity: result.similarity
+        })).filter(doc => doc.content && doc.content.length > 0);
+
+        if (formattedResults.length === 0) {
+          throw new Error('No valid content in search results');
+        }
+
+        // Force token reduction before creating prompt
+        updateStatus('Processing and reducing context...');
+        const reducedContext = await new Promise((resolve, reject) => {
+          tokenReducerWorker.onmessage = (e) => {
+            if (e.data.success) {
+              if (e.data.reduction) {
+                toast.show(`Reduced context to ${e.data.reduction.finalTokens} tokens`, 'info');
+              }
+              resolve(e.data.documents);
+            } else {
+              reject(new Error(e.data.error));
+            }
+          };
+
+          tokenReducerWorker.postMessage({
+            documents: formattedResults,
+            maxTokens: Math.floor(this.config.apiConfig.max_input_tokens * 0.75) // Leave room for prompt
+          });
+        });
+
+        if (!reducedContext || !Array.isArray(reducedContext) || reducedContext.length === 0) {
+          throw new Error('Token reduction failed to produce valid context');
+        }
+
+        updateStatus('Creating AI prompt...');
+        const systemPrompt = this.createSystemPrompt(reducedContext);
+
+        updateStatus('Generating AI response...', true);
         const modelId = await this.getModelForProvider(currentProvider);
         
         let hasInitialResponse = false;
@@ -136,36 +189,108 @@ class ContextManager {
     throw new Error('All providers failed to respond');
   }
 
-   formatContextForPrompt(results) {
+  async formatContextForPrompt(results) {
+    if (!Array.isArray(results)) {
+        console.warn('Expected results to be an array, got:', typeof results);
+        toast.show('Invalid search results format', 'warning');
+        return [];
+    }
+
     const formatted = results.map(result => ({
-      content: result.object.text,
-      fileId: result.fileId,
-      fileName: result.object.fileName,
-      isCode: result.object.fileType?.toLowerCase().includes('js') || 
-              result.object.fileType?.toLowerCase().includes('ts') ||
-              result.object.fileName?.match(/\.(js|ts|jsx|tsx|json|py|rb|java|cpp|cs)$/i),
-      fileType: result.object.fileType || 'text',
-      similarity: result.similarity
+        content: result.object.text,
+        fileId: result.fileId,
+        fileName: result.object.fileName,
+        isCode: result.object.fileType?.toLowerCase().includes('js') || 
+                result.object.fileType?.toLowerCase().includes('ts') ||
+                result.object.fileName?.match(/\.(js|ts|jsx|tsx|json|py|rb|java|cpp|cs)$/i),
+        fileType: result.object.fileType || 'text',
+        similarity: result.similarity
     }));
+
+    // Calculate rough token estimate
+    const estimatedTokens = formatted.reduce((sum, doc) => 
+        sum + (doc.content?.length || 0) / 4, 0);
+
+    // Only attempt reduction if we're likely over the limit
+    if (estimatedTokens > this.config.apiConfig.max_input_tokens) {
+        updateStatus('Reducing context size to fit token limit...');
+        try {
+            const reducedDocs = await new Promise((resolve, reject) => {
+                tokenReducerWorker.onmessage = (e) => {
+                    if (e.data.success) {
+                        const docs = Array.isArray(e.data.documents) ? e.data.documents : [];
+                        if (docs.length < formatted.length) {
+                            toast.show(`Reduced context from ${formatted.length} to ${docs.length} documents`, 'info');
+                        }
+                        resolve(docs);
+                    } else {
+                        reject(new Error(e.data.error));
+                    }
+                };
+
+                tokenReducerWorker.postMessage({
+                    documents: formatted,
+                    maxTokens: this.config.apiConfig.max_input_tokens
+                });
+            });
+
+            updateStatus('Context reduction complete');
+            return reducedDocs;
+
+        } catch (error) {
+            console.warn('Token reduction failed:', error);
+            toast.show('Token reduction failed, using truncated context', 'warning');
+            updateStatus('Using truncated context...');
+            
+            // Simple truncation as fallback
+            return formatted.map(doc => ({
+                ...doc,
+                content: doc.content.slice(0, Math.floor(this.config.apiConfig.max_input_tokens / formatted.length * 4))
+            }));
+        }
+    }
+
     return formatted;
   }
 
-   createSystemPrompt(context) {
-    const { base, context_prefix, instructions } = prompts.contextual_response.system;
+  createSystemPrompt(context) {
+    const { base, context_prefix, instructions, no_context_response } = prompts.contextual_response.system;
     
-    const contextSection = context.map(doc => {
-      const sourceComment = `[//]: # (source:${doc.fileId} - ${doc.fileName})`;
-      if (doc.isCode) {
-        return `${sourceComment}
-\`\`\`${doc.fileType}:${doc.fileName}
-${doc.content}
+    // Ensure context is an array and has content
+    const contextArray = Array.isArray(context) ? context : [];
+    
+    // If no context is available, return prompt that will trigger the no-context response
+    if (contextArray.length === 0) {
+        return `${base}
+
+${context_prefix}
+
+No relevant source documents found.
+
+Instructions:
+${instructions.map((instruction, i) => `${i + 1}. ${instruction}`).join('\n')}
+
+Note: When no source documents are provided, respond with:
+${no_context_response}`;
+    }
+    
+    const contextSection = contextArray.map(doc => {
+        if (!doc || typeof doc !== 'object') {
+            console.warn('Invalid document in context:', doc);
+            return '';
+        }
+
+        const sourceComment = `[//]: # (source:${doc.fileId || 'unknown'} - ${doc.fileName || 'unknown'})`;
+        if (doc.isCode) {
+            return `${sourceComment}
+\`\`\`${doc.fileType || 'text'}:${doc.fileName || 'unknown'}
+${doc.content || ''}
 \`\`\``;
-      } else {
-        return `${sourceComment}
-${doc.content}`;
-      }
-    }).join('\n\n');
-    
+        } else {
+            return `${sourceComment}
+${doc.content || ''}`;
+        }
+    }).filter(Boolean).join('\n\n');
     
     const finalPrompt = `${base}
 
