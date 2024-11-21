@@ -138,7 +138,7 @@ class AIPluginView {
                   scrollIntoView: true
                 });
               });
-              
+              console.log('Accumulated text ASK AIIIIIIIIIIIIIIIIIIIIIIIIIII:', accumulatedText);
               accumulatedText += chunk;
             }
           };
