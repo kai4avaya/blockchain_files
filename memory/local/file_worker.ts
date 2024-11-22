@@ -19,6 +19,13 @@ interface StoreConfig {
   vectorConfig?: VectorConfig;
 }
 
+interface IndexDBOverlay {
+  getAllTables(): Promise<string[]>;
+  getAll(tableName: string): Promise<any>;
+  saveData(tableName: string, data: any): Promise<void>;
+  // ... other methods ...
+}
+
 class IndexDBWorkerOverlay {
   private worker: Worker;
   private db: IDBDatabase | null = null;

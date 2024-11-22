@@ -3,7 +3,8 @@
 import { Peer, DataConnection } from "peerjs";
 import MousePositionManager from "../memory/collaboration/mouse_colab";
 import { TabManager } from "../ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
-import leaderCoordinator from './elections';
+// import leaderCoordinator from './elections';
+import { messageBroker, type P2PMessage } from './message_broker';
 
 interface SceneState {
   getSerializableState: () => any;
@@ -203,7 +204,17 @@ class P2PSync {
 
 
   connectToSpecificPeer(peerId: string): void {
-    this.safeConnectToSpecificPeer(peerId);
+    if (!this.peer || peerId === this.peer.id) return;
+    
+    const conn = this.peer.connect(peerId);
+    conn.on("open", () => {
+      this.handleConnection(conn);
+      // Fix message type
+      messageBroker.publish('peer_connected', {
+        type: 'peer_connected',
+        data: { peerId }
+      }, peerId);
+    });
   }
 
   isConnected(): boolean {
@@ -224,141 +235,28 @@ class P2PSync {
 
   private handleConnection(conn: DataConnection): void {
     this.connections.set(conn.peer, conn);
-    updateStatus(`Connected to peer: ${conn.peer}`);
-    this.saveKnownPeer(conn.peer);
-  
-    // Call leader coordinator to handle the connection and election
-    leaderCoordinator.connectToPeer(conn.peer);
-  
-    const checkConnection = setInterval(() => {
-      if (!conn.open) {
-        clearInterval(checkConnection);
-        this.connections.delete(conn.peer);
-        this.scheduleReconnect(conn.peer);
-      }
-    }, 5000);
-  
-    this.peerConnectHandlers.forEach((handler) => handler(conn.peer));
-  
-    // Update pill status when connection is established
-    this.updatePeerPillStatus(conn.peer, true);
-  
-    // Send current state immediately after connection
-    this.sendCurrentState(conn);
-    conn.send({ type: "known_peers", data: Array.from(this.knownPeers) });
-  
-    leaderCoordinator.triggerInitialDbSync(conn);
-  
-
+    
+    // Fix message type
+    messageBroker.publish('peer_connected', {
+      type: 'peer_connected',
+      data: { peerId: conn.peer }
+    }, conn.peer);
+    
     conn.on("data", (rawData: unknown) => {
-      const data = rawData as { type: string; docId?: string; data?: any };
-      this.customMessageHandlers.forEach((handler) => handler(data, conn.peer));
-      switch (data.type) {
-        case "request_current_state":
-          this.sendCurrentState(conn);
-          const docId = data?.docId;
-          if (docId) {
-            const docState = this.tabManager?.getDocState(docId);
-            if (docState) {
-              conn.send({
-                type: "full_state",
-                docId: docId,
-                data: docState,
-              });
-            }
-          }
-          break;
-        case "full_state":
-          this.sceneState?.syncWithPeer(data.data);
-          if (data.docId && data.data) {
-            this.tabManager?.handleFullState([
-              {
-                docId: data.docId,
-                state: data.data,
-              },
-            ]);
-          }
-          break;
-          case "request_all_states":
-            if (this.tabManager) {
-              const allDocsState = this.tabManager.getAllDocsState();
-              conn.send({
-                type: 'full_state_all',
-                data: allDocsState,
-              });
-            }
-            break;
-
-          case "full_state_all":
-            if (this.tabManager) {
-              this.tabManager.handleFullState(data.data);
-            }
-            break;
-          case "db_sync": {
-              // Forward to DBSyncManager for version check and processing
-              console.log("i am db sync", data.data);
-              
-              this.customMessageHandlers.forEach(handler => handler(data, conn.peer));
-              break;
-          }
-
-          case "connected_peers":
-            case "db_sync_initial":
-            case "leader_announcement":
-            case "request_leader_election":
-              // Delegate leader-specific messages to P2PLeaderCoordinator
-              leaderCoordinator.handleIncomingData(data);
-              break;
-
-        case "update":
-          this.sceneState?.syncWithPeer(data.data);
-          break;
-        case "mouse_position":
-          if (this.mouseOverlay) {
-            this.mouseOverlay.updateMousePosition(
-              conn.peer,
-              data.data.x,
-              data.data.y
-            );
-          }
-          break;
-        case "known_peers":
-          this.handleKnownPeers(data.data);
-          break;
-        case "yjs_sync":
-        case "yjs_sync_request":
-        case "yjs_awareness":
-          this.customMessageHandlers.forEach((handler) =>
-            handler(data, conn.peer)
-          );
-          break;
-        case "yjs_update":
-          this.customMessageHandlers.forEach((handler) =>
-            handler(data, conn.peer)
-          );
-          break;
-
-        case "create_tab":
-        case "close_tab":
-        case "rename_tab":
-          this.customMessageHandlers.forEach((handler) =>
-            handler(data, conn.peer)
-          );
-          break;
-        default:
-          console.warn(
-            `Received unknown data type: ${data.type} from peer: ${conn.peer}`
-          );
+      const data = rawData as P2PMessage;
+      if (data && data.type) {
+        messageBroker.publish(data.type, data, conn.peer);
       }
     });
 
-
     conn.on("close", () => {
-      clearInterval(checkConnection);
       this.connections.delete(conn.peer);
-      updateStatus(`Disconnected from peer: ${conn.peer}`);
+      // Fix message type
+      messageBroker.publish('peer_disconnected', {
+        type: 'peer_disconnected',
+        data: { peerId: conn.peer }
+      }, conn.peer);
       
-      // Only attempt reconnect if peer is still known
       if (this.knownPeers.has(conn.peer)) {
         this.scheduleReconnect(conn.peer);
       }
@@ -367,16 +265,7 @@ class P2PSync {
       if (this.mouseOverlay) {
         this.mouseOverlay.removePeerCursor(conn.peer);
       }
-      this.updatePeerPillStatus(conn.peer, false);
     });
-
-    conn.on("error", (err) => {
-      console.error(`Connection error with peer ${conn.peer}:`, err);
-      updateStatus(`Connection error with peer ${conn.peer}: ${err.message}`);
-      this.scheduleReconnect(conn.peer);
-    });
-
-    this.updateConnectionStatus();
   }
 
   private cleanupStalePeers(): void {
@@ -542,7 +431,7 @@ class P2PSync {
     this.customMessageHandlers.push(handler);
   }
 
-  onPeerConnect(handler: PeerConnectHandler): void {
+  public onPeerConnect(handler: PeerConnectHandler): void {
     this.peerConnectHandlers.add(handler);
   }
 
@@ -630,7 +519,7 @@ class P2PSync {
       }
     }
   }
-
+  
   private disconnectPeer(peerId: string): void {
     const conn = this.connections.get(peerId);
     if (conn) {
@@ -652,6 +541,10 @@ class P2PSync {
       this.handlePeerInputChange(peerIdInput.value);
     }
     this.isConnectButtonPress = false;
+  }
+
+  public getConnectedPeers(): string[] {
+    return Array.from(this.connections.keys());
   }
 }
 let isInitialized = false;

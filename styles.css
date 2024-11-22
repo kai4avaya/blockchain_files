@@ -1707,3 +1707,67 @@ display: none;
 .toast-info .toast-icon {
   color: #2196f3;
 }
+
+#connection-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#peer-pills-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 0;
+  margin-top: 8px;
+}
+
+.peer-pill {
+  display: inline-flex;
+  align-items: center;
+  background: #4b5563;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 16px;
+  font-size: 0.875rem;
+  gap: 4px;
+  max-width: fit-content;
+}
+
+.peer-status {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+  font-size: 0;
+  text-indent: -9999px;
+  overflow: hidden;
+}
+
+.connected-icon {
+  color: #22c55e;
+  font-size: 12px;
+  display: none; /* Hide by default */
+}
+
+.disconnect-btn {
+  cursor: pointer;
+  opacity: 0.7;
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

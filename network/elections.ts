@@ -202,45 +202,41 @@ class P2PLeaderCoordinator {
   }) {
     const { tableName, data } = syncData;
 
+    let targetTableName = tableName;
+
     console.log("handleDatabaseSync called with tableName:", tableName);
 
-    // Special handling for vectors_hashIndex tables
-    if (tableName.includes("vectors_hashIndex")) {
-        // Always use in-memory store for vector hash indices
-        const targetTableName = tableName;
-        in_memory_store.createTableIfNotExists(targetTableName);
-        in_memory_store.saveData(targetTableName, data);
-        return; // Exit early for vector hash indices
+    // Ensure the table exists before saving data
+    if (!(await indexDBOverlay.checkIfTableExists(tableName))) {
+      // await indexDBOverlay.createTableIfNotExists(tableName);
+      in_memory_store.createTableIfNotExists(tableName);
+      in_memory_store.saveData(tableName, data);
+
+      return; // we break out since this will cause indexdb error
     }
 
-    // For all other tables, proceed with normal IndexDB handling
-    try {
-        // Ensure the table exists before saving data
-        if (!(await indexDBOverlay.checkIfTableExists(tableName))) {
-            console.warn(`Table ${tableName} does not exist in IndexDB, skipping sync`);
-            return;
-        }
+    for (const item of data) {
+      const existingItems = await indexDBOverlay.getAll(targetTableName);
 
-        for (const item of data) {
-            const existingItems = await indexDBOverlay.getAll(tableName);
-            let itemExists = existingItems.some(
-                (existingItem) => existingItem.id === item.id
-            );
-            if (!itemExists) {
-                existingItems.some((existingItem) => existingItem.key === item.key);
-            }
+      let itemExists = existingItems.some(
+        (existingItem) => existingItem.id === item.id
+      );
+      if (!itemExists)
+        existingItems.some((existingItem) => existingItem.key === item.key);
 
-            if (!itemExists) {
-                item.isFromPeer = true;
-                await indexDBOverlay.saveData(tableName, item, item.id || item.key);
-            }
-        }
-        
-        // Trigger scene reconstruction after database sync
-        this.triggerSceneReconstruction();
-    } catch (error) {
-        console.error(`Error handling database sync for ${tableName}:`, error);
+      if (!itemExists) {
+        // Temporarily suppress broadcasting to avoid boomerang effects
+        item.isFromPeer = true;
+        await indexDBOverlay.saveData(
+          targetTableName,
+          item,
+          item.id || item.key
+        );
+      }
     }
+    // Trigger scene reconstruction after database sync
+    this.triggerSceneReconstruction();
+    // if(tableName === "graph") this.triggerSceneReconstruction()
   }
 
   private triggerSceneReconstruction() {

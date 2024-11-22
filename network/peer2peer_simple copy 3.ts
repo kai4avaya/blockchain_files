@@ -3,7 +3,8 @@
 import { Peer, DataConnection } from "peerjs";
 import MousePositionManager from "../memory/collaboration/mouse_colab";
 import { TabManager } from "../ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
-import leaderCoordinator from './elections';
+import { messageBroker } from './message_broker';
+import indexDBOverlay from "../memory/local/file_worker";
 
 interface SceneState {
   getSerializableState: () => any;
@@ -50,7 +51,8 @@ class P2PSync {
   private mousePositionManager: MousePositionManager | null = null;
   private mouseOverlay: MouseOverlayCanvas | null = null;
 
-  private customMessageHandlers: Array<(message: any, peerId: string) => void> = [];
+  private customMessageHandlers: Array<(message: any, peerId: string) => void> =
+    [];
 
   private peerConnectHandlers: Set<PeerConnectHandler> = new Set();
 
@@ -73,10 +75,12 @@ class P2PSync {
     this.peer = new Peer(peerId);
 
     // Add localStorage listener for userIdInput
-    const userIdInput = document.getElementById("userIdInput") as HTMLInputElement;
+    const userIdInput = document.getElementById(
+      "userIdInput"
+    ) as HTMLInputElement;
     if (userIdInput) {
       userIdInput.value = peerId;
-      userIdInput.addEventListener('input', (e) => {
+      userIdInput.addEventListener("input", (e) => {
         const newUserId = (e.target as HTMLInputElement).value;
         localStorage.setItem("myPeerId", newUserId);
         localStorage.setItem("login_block", newUserId);
@@ -84,21 +88,24 @@ class P2PSync {
     }
 
     // Add peer input handler
-    const peerIdInput = document.getElementById("peerIdInput") as HTMLInputElement;
+    const peerIdInput = document.getElementById(
+      "peerIdInput"
+    ) as HTMLInputElement;
     if (peerIdInput) {
-      peerIdInput.addEventListener('input', (e) => {
+      peerIdInput.addEventListener("input", (e) => {
         const input = (e.target as HTMLInputElement).value;
         this.handlePeerInputChange(input);
       });
     }
 
-    this.peer.on("open", (id) => {
+    this.peer.on("open", async (id) => {
       localStorage.setItem("myPeerId", id);
       updateStatus(`Initialized with peer ID: ${id}`);
       this.updateUserIdInput(id);
 
-      // Wrap the connection attempts in a safe connect method
-      this.knownPeers.forEach((peerId) => this.safeConnectToSpecificPeer(peerId));
+      // Load and connect to saved peers
+      await this.loadAndConnectSavedPeers();
+
       this.startHeartbeat();
     });
 
@@ -126,6 +133,11 @@ class P2PSync {
       console.error("PeerJS error:", error);
       updateStatus(`PeerJS error: ${error.type}`);
     });
+
+    // Set broadcast handler in message broker
+    messageBroker.setBroadcastHandler((message) => {
+      this.broadcastCustomMessage(message);
+    });
   }
   setMouseOverlay(overlay: MouseOverlayCanvas): void {
     this.mouseOverlay = overlay;
@@ -143,10 +155,10 @@ class P2PSync {
     }
 
     try {
-      const conn = this.peer.connect(peerId, { 
+      const conn = this.peer.connect(peerId, {
         reliable: true,
         // Add a shorter connection timeout
-        metadata: { timeout: 5000 } 
+        metadata: { timeout: 5000 },
       });
 
       // Set a connection timeout
@@ -201,7 +213,6 @@ class P2PSync {
     this.sceneState = sceneState;
   }
 
-
   connectToSpecificPeer(peerId: string): void {
     this.safeConnectToSpecificPeer(peerId);
   }
@@ -218,18 +229,14 @@ class P2PSync {
     }
   }
 
- 
-
-  
-
   private handleConnection(conn: DataConnection): void {
     this.connections.set(conn.peer, conn);
     updateStatus(`Connected to peer: ${conn.peer}`);
     this.saveKnownPeer(conn.peer);
-  
+
     // Call leader coordinator to handle the connection and election
-    leaderCoordinator.connectToPeer(conn.peer);
-  
+    // leaderCoordinator.connectToPeer(conn.peer);
+
     const checkConnection = setInterval(() => {
       if (!conn.open) {
         clearInterval(checkConnection);
@@ -237,18 +244,17 @@ class P2PSync {
         this.scheduleReconnect(conn.peer);
       }
     }, 5000);
-  
+
     this.peerConnectHandlers.forEach((handler) => handler(conn.peer));
-  
+
     // Update pill status when connection is established
     this.updatePeerPillStatus(conn.peer, true);
-  
+
     // Send current state immediately after connection
     this.sendCurrentState(conn);
     conn.send({ type: "known_peers", data: Array.from(this.knownPeers) });
-  
-    leaderCoordinator.triggerInitialDbSync(conn);
-  
+
+    // leaderCoordinator.triggerInitialDbSync(conn);
 
     conn.on("data", (rawData: unknown) => {
       const data = rawData as { type: string; docId?: string; data?: any };
@@ -279,36 +285,38 @@ class P2PSync {
             ]);
           }
           break;
-          case "request_all_states":
-            if (this.tabManager) {
-              const allDocsState = this.tabManager.getAllDocsState();
-              conn.send({
-                type: 'full_state_all',
-                data: allDocsState,
-              });
-            }
-            break;
-
-          case "full_state_all":
-            if (this.tabManager) {
-              this.tabManager.handleFullState(data.data);
-            }
-            break;
-          case "db_sync": {
-              // Forward to DBSyncManager for version check and processing
-              console.log("i am db sync", data.data);
-              
-              this.customMessageHandlers.forEach(handler => handler(data, conn.peer));
-              break;
+        case "request_all_states":
+          if (this.tabManager) {
+            const allDocsState = this.tabManager.getAllDocsState();
+            conn.send({
+              type: "full_state_all",
+              data: allDocsState,
+            });
           }
+          break;
 
-          case "connected_peers":
-            case "db_sync_initial":
-            case "leader_announcement":
-            case "request_leader_election":
-              // Delegate leader-specific messages to P2PLeaderCoordinator
-              leaderCoordinator.handleIncomingData(data);
-              break;
+        case "full_state_all":
+          if (this.tabManager) {
+            this.tabManager.handleFullState(data.data);
+          }
+          break;
+        case "db_sync": {
+          // Forward to DBSyncManager for version check and processing
+          console.log("i am db sync", data.data);
+
+          this.customMessageHandlers.forEach((handler) =>
+            handler(data, conn.peer)
+          );
+          break;
+        }
+
+        case "connected_peers":
+        case "db_sync_initial":
+        case "leader_announcement":
+        case "request_leader_election":
+          // Delegate leader-specific messages to P2PLeaderCoordinator
+          // leaderCoordinator.handleIncomingData(data);
+          break;
 
         case "update":
           this.sceneState?.syncWithPeer(data.data);
@@ -352,17 +360,16 @@ class P2PSync {
       }
     });
 
-
     conn.on("close", () => {
       clearInterval(checkConnection);
       this.connections.delete(conn.peer);
       updateStatus(`Disconnected from peer: ${conn.peer}`);
-      
+
       // Only attempt reconnect if peer is still known
       if (this.knownPeers.has(conn.peer)) {
         this.scheduleReconnect(conn.peer);
       }
-      
+
       this.updateConnectionStatus();
       if (this.mouseOverlay) {
         this.mouseOverlay.removePeerCursor(conn.peer);
@@ -380,7 +387,7 @@ class P2PSync {
   }
 
   private cleanupStalePeers(): void {
-    this.knownPeers.forEach(peerId => {
+    this.knownPeers.forEach((peerId) => {
       const conn = this.connections.get(peerId);
       if (!conn || !conn.open) {
         const reconnectTimer = this.reconnectTimers.get(peerId);
@@ -406,10 +413,12 @@ class P2PSync {
 
   private sendCurrentState(conn: DataConnection): void {
     if (!this.tabManager) {
-      console.warn("TabManager is not set in P2PSync. Cannot send document states.");
+      console.warn(
+        "TabManager is not set in P2PSync. Cannot send document states."
+      );
       return;
     }
-    
+
     const docsState = this.tabManager.getAllDocsState();
     conn.send({ type: "full_state_all", data: docsState });
   }
@@ -435,16 +444,19 @@ class P2PSync {
           this.safeConnectToSpecificPeer(peerId);
         }
       }, this.reconnectInterval);
-      
+
       this.reconnectTimers.set(peerId, timer);
     }
   }
 
-   // Add a method to safely remove a known peer
-   private removeKnownPeer(peerId: string): void {
+  // Add a method to safely remove a known peer
+  private removeKnownPeer(peerId: string): void {
     this.knownPeers.delete(peerId);
     this.clearReconnectTimer(peerId);
-    localStorage.setItem("knownPeers", JSON.stringify(Array.from(this.knownPeers)));
+    localStorage.setItem(
+      "knownPeers",
+      JSON.stringify(Array.from(this.knownPeers))
+    );
   }
 
   private startHeartbeat(): void {
@@ -454,9 +466,10 @@ class P2PSync {
           conn.send({ type: "heartbeat" });
         }
       });
-      
+
       // Cleanup stale peers every few heartbeats
-      if (Math.random() < 0.2) { // 20% chance each heartbeat
+      if (Math.random() < 0.2) {
+        // 20% chance each heartbeat
         this.cleanupStalePeers();
       }
     }, this.heartbeatInterval) as unknown as number;
@@ -538,7 +551,9 @@ class P2PSync {
     }
   }
 
-  public setCustomMessageHandler(handler: (message: any, peerId: string) => void): void {
+  public setCustomMessageHandler(
+    handler: (message: any, peerId: string) => void
+  ): void {
     this.customMessageHandlers.push(handler);
   }
 
@@ -553,7 +568,7 @@ class P2PSync {
     }
   }
 
-  broadcastCustomMessage(message: any): void {
+  public broadcastCustomMessage(message: CustomMessage): void {
     this.connections.forEach((conn) => {
       if (conn.open) {
         conn.send(message);
@@ -562,71 +577,151 @@ class P2PSync {
   }
 
   private handlePeerInputChange(input: string): void {
-    if (!input.endsWith(',') && !this.isConnectButtonPress) return;
+    // Only process if input ends with comma or if this was triggered by connect button
+    if (!input.endsWith(",") && !this.isConnectButtonPress) return;
 
-    const peers = input.split(',').map(p => p.trim()).filter(p => p);
-    const pillContainer = document.getElementById('peer-pills-container');
-    
-    if (!pillContainer) return;
-    
+    const peers = input
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p);
+    const statusDiv = document.getElementById("status");
+
+    if (!statusDiv) return;
+
     // Remove trailing comma from input
-    const peerIdInput = document.getElementById('peerIdInput') as HTMLInputElement;
-    if (peerIdInput && input.endsWith(',')) {
-      peerIdInput.value = peers.join(', ') + ', ';
+    const peerIdInput = document.getElementById(
+      "peerIdInput"
+    ) as HTMLInputElement;
+    if (peerIdInput && input.endsWith(",")) {
+      peerIdInput.value = peers.join(", ") + ", "; // Keep the trailing comma
     }
-    
+
     // Create pills for new peers only
-    peers.forEach(peerId => {
+    peers.forEach((peerId) => {
       if (!peerId) return;
       // Check if pill already exists
-      if (!pillContainer.querySelector(`.peer-pill[data-peer-id="${peerId}"]`)) {
-        this.createPeerPill(peerId, pillContainer);
+      if (!statusDiv.querySelector(`.peer-pill[data-peer-id="${peerId}"]`)) {
+        this.createPeerPill(peerId, statusDiv);
       }
     });
   }
 
   private createPeerPill(peerId: string, container: HTMLElement): void {
-    const pill = document.createElement('div');
-    pill.className = 'peer-pill';
-    pill.setAttribute('data-peer-id', peerId);
+    const pill = document.createElement("div");
+    pill.className = "peer-pill";
+    pill.setAttribute("data-peer-id", peerId);
     pill.innerHTML = `
       <span class="peer-name">${peerId}</span>
       <span class="peer-status">
-        <span class="spinner"></span>
-        <span class="connected-icon" style="display: none;">✓</span>
+        <svg class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <svg class="connected-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+        </svg>
       </span>
       <span class="disconnect-btn">×</span>
     `;
 
+    // Add styles
+    const style = document.createElement("style");
+    style.textContent = `
+      .peer-pill {
+        display: inline-flex;
+        align-items: center;
+        background: #4b5563;  /* Changed to a gray color */
+        color: white;
+        padding: 0.15rem 0.5rem;  /* Made smaller */
+        border-radius: 9999px;
+        margin: 0.25rem;
+        font-size: 0.75rem;  /* Made font smaller */
+        height: 1.5rem;      /* Fixed height */
+      }
+      .peer-status {
+        display: inline-flex;
+        margin: 0 0.25rem;
+      }
+      .spinner {
+        animation: spin 1s linear infinite;
+        width: 0.875rem;
+        height: 0.875rem;
+      }
+      .connected-icon {
+        width: 0.875rem;
+        height: 0.875rem;
+        color: #22c55e;
+      }
+      .hidden {
+        display: none;
+      }
+      .disconnect-btn {
+        cursor: pointer;
+        padding: 0 0.25rem;
+        opacity: 0.7;
+        font-size: 1rem;
+        line-height: 1;
+      }
+      .disconnect-btn:hover {
+        opacity: 1;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
+
     // Add disconnect handler
-    const disconnectBtn = pill.querySelector('.disconnect-btn');
-    disconnectBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
+    const disconnectBtn = pill.querySelector(".disconnect-btn");
+    disconnectBtn?.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent event bubbling
       this.disconnectPeer(peerId);
       pill.remove();
+      // Update peerIdInput to remove this peer but keep the format
+      const peerIdInput = document.getElementById(
+        "peerIdInput"
+      ) as HTMLInputElement;
+      if (peerIdInput) {
+        const peers = peerIdInput.value.split(",").map((p) => p.trim());
+        const filteredPeers = peers.filter((p) => p !== peerId);
+        peerIdInput.value =
+          filteredPeers.length > 0 ? filteredPeers.join(", ") + ", " : "";
+      }
     });
 
     container.appendChild(pill);
     this.safeConnectToSpecificPeer(peerId);
   }
 
-  private updatePeerPillStatus(peerId: string, connected: boolean): void {
-    const pillContainer = document.getElementById('peer-pills-container');
-    if (!pillContainer) return;
+  public sendToPeer(peerId: string, message: CustomMessage): void {
+    const conn = this.connections.get(peerId);
+    if (conn?.open) {
+      conn.send(message);
+    } else {
+      console.warn(
+        `Cannot send message to peer ${peerId}: Connection not open`
+      );
+    }
+  }
 
-    const pill = pillContainer.querySelector(`[data-peer-id="${peerId}"]`);
+  private updatePeerPillStatus(peerId: string, connected: boolean): void {
+    const statusDiv = document.getElementById("status");
+    if (!statusDiv) return;
+
+    const pill = statusDiv.querySelector(`[data-peer-id="${peerId}"]`);
     if (!pill) return;
 
-    const spinner = pill.querySelector('.spinner') as HTMLElement;
-    const connectedIcon = pill.querySelector('.connected-icon') as HTMLElement;
+    const spinner = pill.querySelector(".spinner");
+    const connectedIcon = pill.querySelector(".connected-icon");
 
     if (spinner && connectedIcon) {
       if (connected) {
-        spinner.style.display = 'none';
-        connectedIcon.style.display = 'inline-block';
+        spinner.classList.add("hidden");
+        connectedIcon.classList.remove("hidden");
       } else {
-        spinner.style.display = 'inline-block';
-        connectedIcon.style.display = 'none';
+        spinner.classList.remove("hidden");
+        connectedIcon.classList.add("hidden");
       }
     }
   }
@@ -637,7 +732,10 @@ class P2PSync {
       conn.close();
       this.connections.delete(peerId);
       this.knownPeers.delete(peerId);
-      localStorage.setItem("knownPeers", JSON.stringify(Array.from(this.knownPeers)));
+      localStorage.setItem(
+        "knownPeers",
+        JSON.stringify(Array.from(this.knownPeers))
+      );
     }
   }
 
@@ -647,11 +745,100 @@ class P2PSync {
   // Add this method to handle connect button clicks
   public handleConnectButtonClick(): void {
     this.isConnectButtonPress = true;
-    const peerIdInput = document.getElementById('peerIdInput') as HTMLInputElement;
+    const peerIdInput = document.getElementById(
+      "peerIdInput"
+    ) as HTMLInputElement;
     if (peerIdInput) {
       this.handlePeerInputChange(peerIdInput.value);
     }
     this.isConnectButtonPress = false;
+  }
+
+  // Add method to register for peer connections
+  public onPeerConnected(callback: (peerId: string) => void): void {
+    this.peerConnectHandlers.add(callback);
+  }
+
+  // Add method to get current connections
+  public getConnectedPeers(): string[] {
+    return Array.from(this.connections.keys());
+  }
+
+  // Add method to check if peer is connected
+  public isPeerConnected(peerId: string): boolean {
+    return this.connections.has(peerId) && this.connections.get(peerId)?.open === true;
+  }
+
+  // Add method to request connection to peer
+  public requestPeerConnection(peerId: string): void {
+    if (!this.peer || peerId === this.peer.id) return;
+    this.safeConnectToSpecificPeer(peerId);
+  }
+
+  private async updatePeerUI(peerId: string, isConnected: boolean = true): Promise<void> {
+    const container = document.getElementById('connected-peers-container');
+    if (!container) return;
+
+    // Remove existing pill if any
+    const existingPill = document.getElementById(`peer-${peerId}`);
+    if (existingPill && !isConnected) {
+      existingPill.remove();
+      return;
+    }
+
+    if (!isConnected) return;
+
+    // Create new pill if doesn't exist
+    if (!existingPill) {
+      const pill = document.createElement('div');
+      pill.id = `peer-${peerId}`;
+      pill.className = 'peer-pill';
+      pill.innerHTML = `
+        <span class="peer-id">${peerId}</span>
+        <span class="disconnect-btn" title="Disconnect">×</span>
+      `;
+      
+      // Add disconnect handler
+      pill.querySelector('.disconnect-btn')?.addEventListener('click', () => {
+        this.disconnectFromPeer(peerId);
+      });
+
+      container.appendChild(pill);
+    }
+  }
+  private async savePeerToDb(peerId: string, status: 'connected' | 'disconnected'): Promise<void> {
+    try {
+      await indexDBOverlay.saveData('peers', {
+        peerId,
+        status,
+        lastAttempt: Date.now()
+      }, peerId);
+    } catch (error) {
+      console.error('Error saving peer to database:', error);
+    }
+  }
+
+  private async loadAndConnectSavedPeers(): Promise<void> {
+    try {
+      const peers = await indexDBOverlay.getAll('peers');
+      for (const peer of peers) {
+        if (peer.status === 'connected') {
+          this.safeConnectToSpecificPeer(peer.peerId);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved peers:', error);
+    }
+  }
+
+  public async disconnectFromPeer(peerId: string): Promise<void> {
+    const conn = this.connections.get(peerId);
+    if (conn) {
+      conn.close();
+      this.connections.delete(peerId);
+      this.updatePeerUI(peerId, false);
+      await this.savePeerToDb(peerId, 'disconnected');
+    }
   }
 }
 let isInitialized = false;
@@ -666,14 +853,12 @@ const connectButton = document.getElementById(
 ) as HTMLButtonElement;
 const statusDiv = document.getElementById("status") as HTMLDivElement;
 
-
-
 function updateStatus(message: string): void {
-  const statusDiv = document.getElementById('status');
-  
+  const statusDiv = document.getElementById("status");
+
   if (statusDiv) {
     // Clear existing content
-    statusDiv.innerHTML = '';
+    statusDiv.innerHTML = "";
 
     // Set the new status message
     statusDiv.textContent = message;
@@ -685,9 +870,9 @@ function updateStatus(message: string): void {
       const stringToCopy = match[1];
 
       // Create a copy icon (no button wrapper)
-      const copyIcon = document.createElement('span');
-      copyIcon.style.cursor = 'pointer'; // Set cursor to indicate it's clickable
-      copyIcon.style.marginLeft = '10px'; // Optional spacing
+      const copyIcon = document.createElement("span");
+      copyIcon.style.cursor = "pointer"; // Set cursor to indicate it's clickable
+      copyIcon.style.marginLeft = "10px"; // Optional spacing
       copyIcon.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 1em; height: 1em; vertical-align: middle;">
           <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
@@ -695,7 +880,7 @@ function updateStatus(message: string): void {
       `;
 
       // Add click event to copy stringToCopy to clipboard
-      copyIcon.addEventListener('click', () => {
+      copyIcon.addEventListener("click", () => {
         navigator.clipboard.writeText(stringToCopy).then(() => {
           // Change icon to a checkmark on success
           copyIcon.innerHTML = `
@@ -783,3 +968,4 @@ document.addEventListener("visibilitychange", () => {
 });
 
 export { p2pSync };
+
