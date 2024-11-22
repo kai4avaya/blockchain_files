@@ -84,15 +84,48 @@ interface InMemoryData {
     }
   
     private loadFromLocalStorage(): void {
-      const storedData = localStorage.getItem('inMemoryStore');
-      if (storedData) {
-        this.inMemoryStore = JSON.parse(storedData);
-        console.log("In-memory store loaded from localStorage:", this.inMemoryStore);
+      try {
+        const storedData = localStorage.getItem('inMemoryStore');
+        if (storedData) {
+          // Parse the stored data
+          const parsedData = JSON.parse(storedData);
+          
+          // Ensure we're getting a plain object, not a nested array
+          if (Array.isArray(parsedData)) {
+            // Handle existing malformed data
+            const fixedData: Record<string, InMemoryData[]> = {};
+            parsedData.forEach(item => {
+              if (Array.isArray(item)) {
+                // If we find an array within array, flatten it
+                item.forEach(record => {
+                  const tableName = `vectors_hashIndex_${record.lastEditedBy}`;
+                  if (!fixedData[tableName]) {
+                    fixedData[tableName] = [];
+                  }
+                  fixedData[tableName].push(record);
+                });
+              }
+            });
+            this.inMemoryStore = fixedData;
+          } else {
+            // Data is already in correct format
+            this.inMemoryStore = parsedData;
+          }
+        }
+        console.log("In-memory store loaded:", this.inMemoryStore);
+      } catch (error) {
+        console.error("Error loading from localStorage:", error);
+        this.inMemoryStore = {};
       }
     }
   
     private saveToLocalStorage(): void {
-      localStorage.setItem('inMemoryStore', JSON.stringify(this.inMemoryStore));
+      try {
+        // Save as a plain object with table names as keys
+        localStorage.setItem('inMemoryStore', JSON.stringify(this.inMemoryStore));
+      } catch (error) {
+        console.error("Error saving to localStorage:", error);
+      }
     }
   
     async getAll(tableName: string): Promise<InMemoryData[]> {
@@ -110,7 +143,10 @@ interface InMemoryData {
       }
   
       // Check if the item already exists
-      const existingIndex = this.inMemoryStore[tableName].findIndex(item => item.id === key || item.key === key);
+      const existingIndex = this.inMemoryStore[tableName].findIndex(
+        item => (key ? (item.id === key || item.key === key) : (item.id === data.id || item.key === data.key))
+      );
+  
       if (existingIndex !== -1) {
         const existingItem = this.inMemoryStore[tableName][existingIndex];
   

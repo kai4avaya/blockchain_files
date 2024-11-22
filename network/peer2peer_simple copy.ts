@@ -4,6 +4,7 @@ import { Peer, DataConnection } from "peerjs";
 import MousePositionManager from "../memory/collaboration/mouse_colab";
 import { TabManager } from "../ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
 import leaderCoordinator from './elections';
+import dbSyncManager from './sync_db';
 
 interface SceneState {
   getSerializableState: () => any;
@@ -28,6 +29,13 @@ interface CustomMessage {
   type: string;
   data: any;
 }
+
+// Add new interface for peer status
+interface PeerStatus {
+  connected: boolean;
+  connecting: boolean;
+}
+
 class P2PSync {
   private static instance: P2PSync | null = null;
   private tabManager: TabManager | null = null;
@@ -47,6 +55,8 @@ class P2PSync {
 
   private peerConnectHandlers: Set<PeerConnectHandler> = new Set();
 
+  private peerStatuses: Map<string, PeerStatus> = new Map();
+
   private constructor() {}
 
   static getInstance(): P2PSync {
@@ -60,10 +70,28 @@ class P2PSync {
     // this.sceneState = sceneState;
     this.loadKnownPeers();
 
-    const storedPeerId = localStorage.getItem("myPeerId");
- 
-    const peerId = storedPeerId || `${userId}-${Date.now()}`;
+    const peerId = localStorage.getItem("myPeerId") || userId;
     this.peer = new Peer(peerId);
+
+    // Add localStorage listener for userIdInput
+    const userIdInput = document.getElementById("userIdInput") as HTMLInputElement;
+    if (userIdInput) {
+      userIdInput.value = peerId;
+      userIdInput.addEventListener('input', (e) => {
+        const newUserId = (e.target as HTMLInputElement).value;
+        localStorage.setItem("myPeerId", newUserId);
+        localStorage.setItem("login_block", newUserId);
+      });
+    }
+
+    // Add peer input handler
+    const peerIdInput = document.getElementById("peerIdInput") as HTMLInputElement;
+    if (peerIdInput) {
+      peerIdInput.addEventListener('input', (e) => {
+        const input = (e.target as HTMLInputElement).value;
+        this.handlePeerInputChange(input);
+      });
+    }
 
     this.peer.on("open", (id) => {
       localStorage.setItem("myPeerId", id);
@@ -73,6 +101,9 @@ class P2PSync {
       // Wrap the connection attempts in a safe connect method
       this.knownPeers.forEach((peerId) => this.safeConnectToSpecificPeer(peerId));
       this.startHeartbeat();
+
+      // Start database sync manager
+      dbSyncManager.startSync();
     });
 
     this.peer.on("connection", (conn) => {
@@ -199,10 +230,10 @@ class P2PSync {
     this.connections.set(conn.peer, conn);
     updateStatus(`Connected to peer: ${conn.peer}`);
     this.saveKnownPeer(conn.peer);
-
-     // Call leader coordinator to handle the connection and election
-     leaderCoordinator.connectToPeer(conn.peer);
-
+  
+    // Call leader coordinator to handle the connection and election
+    leaderCoordinator.connectToPeer(conn.peer);
+  
     const checkConnection = setInterval(() => {
       if (!conn.open) {
         clearInterval(checkConnection);
@@ -210,17 +241,24 @@ class P2PSync {
         this.scheduleReconnect(conn.peer);
       }
     }, 5000);
-
+  
     this.peerConnectHandlers.forEach((handler) => handler(conn.peer));
-
+  
+    // Update pill status when connection is established
+    this.updatePeerPillStatus(conn.peer, true);
+  
     // Send current state immediately after connection
     this.sendCurrentState(conn);
     conn.send({ type: "known_peers", data: Array.from(this.knownPeers) });
-
+  
     leaderCoordinator.triggerInitialDbSync(conn);
+  
+
+    // Add immediate sync initiation
+    dbSyncManager.initiateSync(conn.peer);
 
     conn.on("data", (rawData: unknown) => {
-      const data = rawData as { type: string; docId?: string; data?: any };
+      const data = rawData as { type: string; docId?: string; data?: any, timestamp?: any };
       this.customMessageHandlers.forEach((handler) => handler(data, conn.peer));
       switch (data.type) {
         case "request_current_state":
@@ -265,8 +303,6 @@ class P2PSync {
             break;
           case "db_sync": {
               // Forward to DBSyncManager for version check and processing
-              console.log("i am db sync", data.data);
-              
               this.customMessageHandlers.forEach(handler => handler(data, conn.peer));
               break;
           }
@@ -314,6 +350,28 @@ class P2PSync {
             handler(data, conn.peer)
           );
           break;
+          case "db_sync_check":
+            console.log("Handling db sync check", data, "data.data", data.data);
+            if (typeof data.data === 'object' && data.data !== null) {
+                // Pass the object directly since it's already in the correct format
+                dbSyncManager.handleSyncCheck(
+                    data.data as Record<string, number>,  // Already a plain object
+                    conn.peer,
+                    data.timestamp
+                );
+            } else {
+                console.error("Invalid db_sync_check data format:", data.data);
+            }
+            break;
+          
+        case "db_sync_request":
+          dbSyncManager.handleSyncRequest(data.data);
+          break;
+          
+        case "db_sync_response":
+          dbSyncManager.handleSyncResponse(data.data, data.timestamp);
+          break;
+          
         default:
           console.warn(
             `Received unknown data type: ${data.type} from peer: ${conn.peer}`
@@ -336,6 +394,7 @@ class P2PSync {
       if (this.mouseOverlay) {
         this.mouseOverlay.removePeerCursor(conn.peer);
       }
+      this.updatePeerPillStatus(conn.peer, false);
     });
 
     conn.on("error", (err) => {
@@ -528,6 +587,99 @@ class P2PSync {
       }
     });
   }
+
+  private handlePeerInputChange(input: string): void {
+    if (!input.endsWith(',') && !this.isConnectButtonPress) return;
+
+    const peers = input.split(',').map(p => p.trim()).filter(p => p);
+    const pillContainer = document.getElementById('peer-pills-container');
+    
+    if (!pillContainer) return;
+    
+    // Remove trailing comma from input
+    const peerIdInput = document.getElementById('peerIdInput') as HTMLInputElement;
+    if (peerIdInput && input.endsWith(',')) {
+      peerIdInput.value = peers.join(', ') + ', ';
+    }
+    
+    // Create pills for new peers only
+    peers.forEach(peerId => {
+      if (!peerId) return;
+      // Check if pill already exists
+      if (!pillContainer.querySelector(`.peer-pill[data-peer-id="${peerId}"]`)) {
+        this.createPeerPill(peerId, pillContainer);
+      }
+    });
+  }
+
+  private createPeerPill(peerId: string, container: HTMLElement): void {
+    const pill = document.createElement('div');
+    pill.className = 'peer-pill';
+    pill.setAttribute('data-peer-id', peerId);
+    pill.innerHTML = `
+      <span class="peer-name">${peerId}</span>
+      <span class="peer-status">
+        <span class="spinner"></span>
+        <span class="connected-icon" style="display: none;">✓</span>
+      </span>
+      <span class="disconnect-btn">×</span>
+    `;
+
+    // Add disconnect handler
+    const disconnectBtn = pill.querySelector('.disconnect-btn');
+    disconnectBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.disconnectPeer(peerId);
+      pill.remove();
+    });
+
+    container.appendChild(pill);
+    this.safeConnectToSpecificPeer(peerId);
+  }
+
+  private updatePeerPillStatus(peerId: string, connected: boolean): void {
+    const pillContainer = document.getElementById('peer-pills-container');
+    if (!pillContainer) return;
+
+    const pill = pillContainer.querySelector(`[data-peer-id="${peerId}"]`);
+    if (!pill) return;
+
+    const spinner = pill.querySelector('.spinner') as HTMLElement;
+    const connectedIcon = pill.querySelector('.connected-icon') as HTMLElement;
+
+    if (spinner && connectedIcon) {
+      if (connected) {
+        spinner.style.display = 'none';
+        connectedIcon.style.display = 'inline-block';
+      } else {
+        spinner.style.display = 'inline-block';
+        connectedIcon.style.display = 'none';
+      }
+    }
+  }
+
+  private disconnectPeer(peerId: string): void {
+    const conn = this.connections.get(peerId);
+    if (conn) {
+      conn.close();
+      this.connections.delete(peerId);
+      this.knownPeers.delete(peerId);
+      localStorage.setItem("knownPeers", JSON.stringify(Array.from(this.knownPeers)));
+    }
+  }
+
+  // Add this property to track connect button clicks
+  private isConnectButtonPress: boolean = false;
+
+  // Add this method to handle connect button clicks
+  public handleConnectButtonClick(): void {
+    this.isConnectButtonPress = true;
+    const peerIdInput = document.getElementById('peerIdInput') as HTMLInputElement;
+    if (peerIdInput) {
+      this.handlePeerInputChange(peerIdInput.value);
+    }
+    this.isConnectButtonPress = false;
+  }
 }
 let isInitialized = false;
 
@@ -624,6 +776,7 @@ userIdInput?.addEventListener("change", initializeP2PSync);
 
 // Connect to peer when button is clicked
 connectButton?.addEventListener("click", () => {
+  p2pSync.handleConnectButtonClick();
   const peerId = peerIdInput?.value.trim();
   if (peerId) {
     p2pSync.connectToSpecificPeer(peerId);
