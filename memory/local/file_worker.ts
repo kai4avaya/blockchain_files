@@ -681,6 +681,91 @@ class IndexDBWorkerOverlay {
     await this.ensureDBOpen();
     return this.sendToWorkerWithRetry("getItem", { storeName, key });
   }
+
+  // Add this helper function
+  private async cleanupVectorData(fileId: string): Promise<void> {
+    try {
+      // Clean up vectors table
+      const vectorsData = await this.getAll('vectors');
+      for (const vector of vectorsData) {
+        if (vector.fileId === fileId) {
+          await this.sendToWorkerWithRetry("deleteItem", {
+            storeName: 'vectors',
+            key: vector.id
+          });
+        }
+      }
+
+      // Clean up vector hash indices
+      const hashIndexTables = await this.getTablesWithPrefix('vectors_hashIndex');
+      for (const tableName of hashIndexTables) {
+        const hashData = await this.getAll(tableName);
+        for (const item of hashData) {
+          if (item.fileIds) {
+            if (typeof item.fileIds === 'object') {
+              // If only one fileId and it matches, delete entire row
+              if (Object.keys(item.fileIds).length === 1 && item.fileIds[fileId]) {
+                await this.sendToWorkerWithRetry("deleteItem", {
+                  storeName: tableName,
+                  key: item.id || item.key
+                });
+              } 
+              // If multiple fileIds, remove just the matching one
+              else if (item.fileIds[fileId]) {
+                const updatedFileIds = { ...item.fileIds };
+                delete updatedFileIds[fileId];
+                await this.saveData(tableName, {
+                  ...item,
+                  fileIds: updatedFileIds
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error cleaning up vector data:', error);
+    }
+  }
+
+  // Update the markDeletedAcrossTables function
+  async markDeletedAcrossTables(fileId: string): Promise<void> {
+    try {
+      // Clean up vector-related data first
+      await this.cleanupVectorData(fileId);
+
+      // Get all regular tables from config
+      const tables = Object.keys(config.dbStores);
+      
+      for (const tableName of tables) {
+        // Skip vector tables as they're handled separately
+        if (tableName === 'vectors' || tableName.includes('vectors_hashIndex')) {
+          continue;
+        }
+
+        try {
+          const item = await this.getItem(tableName, fileId);
+          if (item) {
+            const updatedItem = {
+              ...item,
+              isDeleted: true,
+              version: (item.version || 0) + 1,
+              globalTimestamp: Date.now(),
+              versionNonce: Math.random(),
+              lastEditedBy: localStorage.getItem('login_block') || 'no_login'
+            };
+            
+            await this.saveData(tableName, updatedItem);
+          }
+        } catch (error) {
+          console.warn(`Error updating deleted status in table ${tableName}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Error marking deleted across tables:', error);
+      throw error;
+    }
+  }
 }
 
 const indexDBOverlay = new IndexDBWorkerOverlay();

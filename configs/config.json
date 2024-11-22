@@ -36,7 +36,7 @@
   },
   "apiConfig": {
     "endpoints": {
-      "development": " http://localhost:8787",
+      "development": "http://localhost:36837",
       "production": "https://lumi.kak2594.workers.dev/"
     },
     "timeout" : 20000,

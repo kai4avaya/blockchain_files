@@ -410,13 +410,50 @@ class SceneState {
       console.error("Error saving state to IndexedDB:", error);
     }
   }
+
+  markObjectAsDeleted(objectId: string): void {
+    console.log(`Attempting to mark object as deleted: ${objectId}`);
+    
+    const object = this.objects.get(objectId);
+    if (object) {
+      console.log('Found object in scene state:', object);
+      
+      const updatedObject = {
+        ...object,
+        isDeleted: true,
+        version: (object.version || 0) + 1,
+        versionNonce: generateVersionNonce(),
+        globalTimestamp: Date.now(),
+        lastEditedBy: localStorage.getItem('login_block') || 'no_login'
+      };
+      
+      // Update in memory
+      this.objects.set(objectId, updatedObject);
+      this.updatedObjects.add(objectId);
+      
+      // Save to graph table
+      this.saveData(this.STORAGE_KEY, updatedObject)
+        .then(() => {
+          console.log(`Successfully marked object ${objectId} as deleted in graph table`);
+          // Trigger scene reconstruction
+          this.reconstructScene();
+          // Broadcast update
+          this.broadcastUpdate([updatedObject]);
+        })
+        .catch(error => {
+          console.error(`Error saving deleted state for object ${objectId}:`, error);
+        });
+    } else {
+      console.warn(`Object ${objectId} not found in scene state`);
+    }
+  }
 }
 
 export const sceneState = SceneState.getInstance();
 sceneState.setupP2PSync();
 
 export function saveObjectChanges(
-  objectData,
+  objectData: ObjectState,
   options?: { deferReconstruct?: boolean; fromPeer?: boolean }
 ) {
   // console.log("saveObjectChanges", objectData);

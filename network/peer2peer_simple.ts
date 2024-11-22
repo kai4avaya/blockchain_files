@@ -125,8 +125,14 @@ class P2PSync {
     });
 
     this.peer.on("error", (error) => {
-      console.error("PeerJS error:", error);
-      updateStatus(`PeerJS error: ${error.type}`);
+      // Only log connection errors if they're not related to peer unavailability
+      if (!error.type.includes("Could not connect to peer")) {
+        console.error("PeerJS error:", error);
+        updateStatus(`PeerJS error: ${error.type}`);
+      } else {
+        // Optionally log to debug level if needed
+        console.debug("Peer unavailable:", error.type);
+      }
     });
 
     // Add the peer database change handler to custom message handlers
@@ -160,9 +166,12 @@ class P2PSync {
         // Silently handle connection errors
         conn.on("error", () => {
             this.connections.delete(peerId);
+            // Optionally log to debug level
+            console.debug('Connection attempt failed for peer:', peerId);
         });
 
     } catch (error) {
+        // Silently handle any connection errors
         console.debug('Connection attempt failed:', error);
     }
   }

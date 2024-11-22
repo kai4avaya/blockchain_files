@@ -674,6 +674,18 @@ function removeExistingLabel(filename) {
   }
 }
 
+// Add this export function near the other exports
+export function removeLabel(fileId) {
+  const label = labelMap.get(fileId);
+  if (label) {
+    // Remove from scene
+    scene.remove(label);
+    // Remove from our map
+    labelMap.delete(fileId);
+    markNeedsRender();
+  }
+}
+
 
 export function createSphere(convertedData) {
   const color =
@@ -2018,5 +2030,5 @@ function cleanupResources() {
   materialCache.clear();
   geometryCache.clear();
 }
-
 window.addEventListener("beforeunload", cleanupResources);
+

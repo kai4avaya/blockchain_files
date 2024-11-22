@@ -96,6 +96,8 @@ const FILE_ICONS = {
 };
 
 function getFileIcon(filename) {
+  if (!filename) return FILE_ICONS.default;
+  
   const extension = filename.split('.').pop().toLowerCase();
   return FILE_ICONS[extension] || FILE_ICONS.default;
 }
@@ -678,9 +680,10 @@ function getElementPath(element) {
   export function updateFileTreeUI() {
     const fileSystem = getFileSystem();
     const snapshot = fileSystem.getSnapshot();
+    
+    if (!snapshot || !fileTree) return;
+    
     fileTree.innerHTML = "";
-
-  
     const dirMap = new Map(snapshot.directories.map((dir) => [dir.id, dir]));
     const rootDir = createFolderElement("Root");
     fileTree.appendChild(rootDir);
@@ -847,5 +850,25 @@ window.addEventListener('bloomStateChanged', (event) => {
 
 
 window.addEventListener('updateFileTree', () => {
+  refreshFileTree();
+});
+
+// Add this with the other event listeners
+window.addEventListener('fileDeleted', (event) => {
+  const { fileId } = event.detail;
+  
+  // Remove the file element from the tree
+  const fileElement = document.querySelector(`li input[data-file-id="${fileId}"]`)?.closest('li');
+  if (fileElement) {
+    fileElement.remove();
+  }
+  
+  // Update any parent folder checkboxes if needed
+  const parentFolder = fileElement?.closest('.folder');
+  if (parentFolder) {
+    updateParentCheckbox(parentFolder);
+  }
+  
+  // Refresh the file tree UI
   refreshFileTree();
 });

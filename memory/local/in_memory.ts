@@ -181,6 +181,13 @@ interface InMemoryData {
       this.inMemoryStore[tableName] = this.inMemoryStore[tableName].filter(item => item.id !== key && item.key !== key);
       this.saveToLocalStorage();
     }
+  
+    async deleteFromAllTables(fileId: string): Promise<void> {
+      for (const tableName of Object.keys(this.inMemoryStore)) {
+        await this.deleteData(tableName, fileId);
+      }
+      this.saveToLocalStorage();
+    }
   }
   
   const inMemoryStore = new InMemory();
