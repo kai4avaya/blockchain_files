@@ -37,7 +37,7 @@
   "vector_docs_query_limit":5,
   "apiConfig": {
     "endpoints": {
-      "development": "http://localhost:36837",
+      "development": "http://localhost:8787",
       "production": "https://lumi.kak2594.workers.dev/"
     },
     "timeout" : 20000,

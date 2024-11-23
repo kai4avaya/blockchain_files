@@ -60,38 +60,56 @@ class ContextManager {
   }
 
   async getContextualResponse(userPrompt, options = { limit: config.vector_docs_query_limit }) {
-    const customEndpoint = localStorage.getItem('aiProvider');
-    const customApiKey = localStorage.getItem('apiKey');
+    const useCustomProvider = localStorage.getItem('useCustomProvider') === 'true';
     
-    if (customEndpoint && customApiKey) {
-      try {
-        updateStatus('Using custom API endpoint...');
+    if (useCustomProvider) {
+        // Get the active provider from localStorage
+        const providers = JSON.parse(localStorage.getItem('apiProviders') || '[]');
+        const activeProvider = providers.find(p => p.isActive);
         
-        const [queryEmbedding] = await embeddingWorker.generateEmbeddings([userPrompt], 'query');
-        const results = await this.vectorDB.query(queryEmbedding, { ...options, minResults: 3 });
-        
-        if (!results?.length) throw new Error('No relevant context found');
-        
-        const reducedContext = await this.formatContextForPrompt(results);
-        const systemPrompt = this.createSystemPrompt(reducedContext);
-        
-        updateStatus('Generating AI response...', true);
-        
-        return await directStreamingService.streamCompletion(
-          customEndpoint,
-          customApiKey,
-          [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          options
-        );
-      } catch (error) {
-        console.error('Custom API failed:', error);
-        toast.show('Custom API failed, falling back to default providers', 'warning');
-      }
+        if (!activeProvider) {
+            toast.show('No active AI provider selected', 'error');
+            throw new Error('No active AI provider selected');
+        }
+
+        try {
+            updateStatus('Using custom API endpoint...');
+            
+            const [queryEmbedding] = await embeddingWorker.generateEmbeddings([userPrompt], 'query');
+            const results = await this.vectorDB.query(queryEmbedding, { ...options, minResults: 3 });
+            
+            if (!results?.length) {
+              
+              toast.show('No relevant context found', 'warning');
+              // throw new Error('No relevant context found');}
+            }
+            
+            const reducedContext = await this.formatContextForPrompt(results);
+            const systemPrompt = this.createSystemPrompt(reducedContext);
+            
+            updateStatus('Generating AI response...', true);
+            
+            return await directStreamingService.streamCompletion(
+                activeProvider.url,
+                activeProvider.apiKey,
+                [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                options
+            );
+        } catch (error) {
+            console.error('Custom API failed:', error);
+            toast.show('Custom API failed: ' + error.message, 'error');
+            throw error;
+        }
     }
     
+    // Use default Lumi B provider logic
+    return this.useLumiBProvider(userPrompt, options);
+  }
+
+  async useLumiBProvider(userPrompt, options) {
     let attempts = 0;
     let healthCheckFailures = 0;
     const maxAttempts = this.providerOrder.length;
@@ -126,13 +144,14 @@ class ContextManager {
         );
 
         updateStatus('Searching vector database...');
-        const results = await this.vectorDB.query(queryEmbedding, {
+        let results = await this.vectorDB.query(queryEmbedding, {
           ...options,
           minResults: 3
         });
 
         if (!results || !Array.isArray(results) || results.length === 0) {
-          throw new Error('No relevant context found');
+          toast.show('No relevant files found in context. Consider adding more files to get more contextual responses.', 'warning');
+          results = [];
         }
 
         // Format results before token reduction
@@ -148,7 +167,41 @@ class ContextManager {
         })).filter(doc => doc.content && doc.content.length > 0);
 
         if (formattedResults.length === 0) {
-          throw new Error('No valid content in search results');
+          toast.show('Proceeding without context. Add relevant files to get more specific responses.', 'info');
+          updateStatus('Generating AI response without context...');
+          
+          const systemPrompt = this.createSystemPrompt([]);  // Pass empty context
+
+          updateStatus('Generating AI response...', true);
+          const modelId = await this.getModelForProvider(currentProvider);
+          
+          let hasInitialResponse = false;
+          const timeoutId = setTimeout(() => {
+            if (!hasInitialResponse) {
+              this.aiManager.stopAllStreams();
+              throw new Error(`No response after ${this.config.apiConfig.timeout/1000}s from ${currentProvider}`);
+            }
+          }, this.config.apiConfig.timeout);
+
+          try {
+            const response = await this.aiManager.streamCompletion(
+              modelId,
+              [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              options
+            );
+
+            hasInitialResponse = true;
+            clearTimeout(timeoutId);
+            updateStatus('Done');
+            return response;
+
+          } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+          }
         }
 
         // Force token reduction before creating prompt
