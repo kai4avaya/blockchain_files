@@ -19,10 +19,6 @@ import config from './configs/config.json';
 import { dbSyncManager } from "./memory/collaboration/dbState_sync"; // need this so it activates!
 import { setupDatabaseModal } from './ui/components/database_modal/modalHandler.js';
 import in_memory_store from './memory/local/in_memory'; // Adjust the import path as necessary
-// import settingsHandler from './ui/components/se/ttings_modal_handler.js';
-import {settingsPills} from './ui/components/settings_pills.js';
-import { eventBus } from './ui/eventBus.js';
-
 
 let tabManager = null;
 const userId = "kai";
@@ -36,19 +32,6 @@ async function main() {
   setupDatabaseModal(); 
   initializeDatabases();
   in_memory_store.loadFromLocalStorage();
-  
-  // settingsPills.setupEventListeners();
-  console.log("Initializing main function");
-
-  // Initialize SettingsPills
-  console.log("Initializing SettingsPills");
-  settingsPills.setupEventListeners();
-
-  // Other initialization code...
-  // ...
-
-  console.log("Main function initialized");
-
   
   try {
     await setupMarkdownEditor();
@@ -87,6 +70,7 @@ async function main() {
 
   addEventListeners(canvas);
 }
+
 const handleQuickClick = throttle(async (event) => {
   const selectedObject = getObjectUnderPointer(event, "sphere");
   if (selectedObject) {
@@ -308,39 +292,3 @@ async function setupMarkdownEditor() {
     }
   });
 }
-
-// async function initializeSettings() {
-//   try {
-//     // Wait for DOM to be ready
-//     if (document.readyState === 'loading') {
-//       await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
-//     }
-
-//     // Initialize settings handler
-//     // if (!window.settingsHandler) {
-//     //   window.settingsHandler = settingsHandler;
-//     // }
-
-//     // Add event listener for settings updates
-//     window.addEventListener('settingsUpdated', (event) => {
-//       console.log('Settings updated:', event.detail);
-//     });
-
-//     // Add event listener for settings cleared
-//     window.addEventListener('settingsCleared', () => {
-//       console.log('Settings cleared');
-//     });
-
-//     const settings = settingsHandler.getSettings();
-//     console.log('Current settings:', {
-//       hasProvider: !!settings.provider,
-//       hasKey: !!settings.apiKey,
-//       hasModel: !!settings.model
-//     });
-
-//   } catch (error) {
-//     console.error('Error initializing settings:', error);
-//     throw error;
-//   }
-// }
-

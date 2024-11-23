@@ -320,3 +320,102 @@
 .url-button:hover {
   background: #374151;
 }
+
+/* Add these new styles */
+.settings-pills-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.settings-pill {
+  display: inline-flex;
+  align-items: center;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 4px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.settings-pill.active {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.settings-pill:hover {
+  background: #e5e7eb;
+}
+
+.pill-text {
+  margin-right: 8px;
+}
+
+.pill-status {
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+.pill-status svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+.pill-status.valid svg {
+  color: #10b981;
+}
+
+.pill-status.invalid svg {
+  color: #ef4444;
+}
+
+.pill-status.pending svg {
+  color: #6b7280;
+  animation: spin-settings 1s linear infinite;
+}
+
+.pill-remove {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 18px;
+  padding: 0 4px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.pill-remove:hover {
+  opacity: 1;
+}
+
+.pill-details {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  min-width: 200px;
+}
+
+.settings-pill.expanded .pill-details {
+  display: block;
+}
+
+@keyframes spin-settings {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

@@ -173,7 +173,7 @@
 
 
     <!-- Settings Modal -->
-    <div id="settingsModal" class="modal" style="display: none; pointer-events: all !important;">
+    <!-- <div id="settingsModal" class="modal" style="display: none; pointer-events: all !important;">
       <input type="text" class="settings-input" id="aiProviderInput" placeholder="Enter your AI provider">
       <select class="modal-select" id="aiModelSelect">
         <option value="">Select AI Model</option>
@@ -184,8 +184,39 @@
       </select>
       <input type="text" class="settings-input" id="apiKeyInput" placeholder="Enter your API key">
       <button id="saveSettingsButton">Save Settings</button>
-    </div>
+    </div> -->
 
+      <!-- <div class="settings-header">
+        <label for="aiModelSelect">AI Model</label>
+        <select class="modal-select" id="aiModelSelect">
+          <option value="">Select AI Model</option>
+          <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+          <option value="gpt-4">GPT-4</option>
+          <option value="claude-2">Claude 2</option>
+          <option value="palm">PaLM</option>
+        </select>
+      </div>
+      <input type="text" class="settings-input" id="aiProviderInput" placeholder="Enter your AI provider">
+      <input type="text" class="settings-input" id="apiKeyInput" placeholder="Enter your API key">
+      <div class="settings-buttons">
+        <button id="saveSettingsButton" class="settings-save-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Save Settings
+        </button>
+        <button id="clearSettingsButton" class="settings-clear-btn" style="display: none;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+          Clear Settings
+        </button>
+      </div>
+      <div class="settings-status" id="settingsStatus"></div>
+    `; -->
     <div id="popup"></div>
     <div id="overlay" class="overlay" style="display: none;"></div>
 
@@ -511,12 +542,10 @@ function showSettingsModal() {
       <label for="aiModelSelect">AI Model</label>
       <select class="modal-select" id="aiModelSelect">
         <option value="">Select AI Model</option>
-        <option value="gpt-3.5-turbo">
+        <option value="Lumi B">
           <span>GPT-3.5 Turbo</span>
         </option>
-        <option value="gpt-4">GPT-4</option>
-        <option value="claude-2">Claude 2</option>
-        <option value="palm">PaLM</option>
+      
       </select>
     </div>
     <input type="text" class="settings-input" id="aiProviderInput" placeholder="Enter your AI provider">
@@ -529,6 +558,8 @@ function showSettingsModal() {
       </svg>
       Save Settings
     </button>
+    <div class="settings-pills-container"></div>
+    <div class="settings-status"> </div>
   `;
 
   settingsModalContainer.offsetHeight;
@@ -551,16 +582,50 @@ function hideSettingsModal() {
 }
 
 function saveSettings() {
-  const aiProvider = document.getElementById('aiProviderInput').value;
-  const aiModel = document.getElementById('aiModelSelect').value;
-  const apiKey = document.getElementById('apiKeyInput').value;
+  // const provider = document.getElementById('aiProviderInput').value;
+  // const model = document.getElementById('aiModelSelect').value;
+  // const apiKey = document.getElementById('apiKeyInput').value;
 
+  console.log("NERDDDDD")
   // Save settings to localStorage or your preferred storage
-  localStorage.setItem('aiProvider', aiProvider);
-  localStorage.setItem('aiModel', aiModel);
-  localStorage.setItem('apiKey', apiKey);
+  // localStorage.setItem('aiProvider', provider);
+  //       localStorage.setItem('apiKey', apiKey);
+  //       localStorage.setItem('aiModel', model);
 
-  hideSettingsModal();
+        const url = document.getElementById('aiProviderInput').value.trim();
+        const apiKey = document.getElementById('apiKeyInput').value.trim();
+
+        // if (url && apiKey) {
+        //   console.log('Dispatching addProvider event');
+        //   window.dispatchEvent(new CustomEvent('addProvider', { detail: { url, apiKey } }));
+        // }
+
+        console.log("ai provider", url)
+        console.log("api key", apiKey)
+
+        if (url && apiKey) {
+      console.log('Dispatching addProvider event');
+      window.eventBus.dispatchEvent(new CustomEvent('addProvider', { 
+        detail: { url, apiKey } 
+      }));
+    } else {
+      console.warn('URL or API key is missing');
+    }
+        
+        console.log('Settings saved successfully');
+        // hideSettingsModal();
+        
+        // Dispatch event for other parts of the application
+        // window.dispatchEvent(new CustomEvent('settingsUpdated', {
+        //   detail: { provider, model }
+        // }));
+
+
+        // if (url && apiKey) {
+        //   window.dispatchEvent(new CustomEvent('addProvider', { detail: { url: provider, apiKey } }));
+        // }
+
+  // hideSettingsModal();
 }
 
 // Add click handler for settings icon

@@ -34,6 +34,7 @@
     "vectors_hashIndex": {
     }
   },
+  "vector_docs_query_limit":5,
   "apiConfig": {
     "endpoints": {
       "development": "http://localhost:36837",

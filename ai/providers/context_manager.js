@@ -7,6 +7,7 @@ import config from '../../configs/config.json';
 import prompts from '../../configs/prompts.json';
 import { updateStatus } from '../../ui/components/process.js';
 import toast from '../../ui/components/toast-alert';
+import directStreamingService from './direct_streaming_service.js';
 
 const tokenReducerWorker = new Worker(new URL('../../workers/token_reducer_worker.js', import.meta.url), { type: 'module' });
 
@@ -58,7 +59,39 @@ class ContextManager {
     }
   }
 
-  async getContextualResponse(userPrompt, options = { limit: 5 }) {
+  async getContextualResponse(userPrompt, options = { limit: config.vector_docs_query_limit }) {
+    const customEndpoint = localStorage.getItem('aiProvider');
+    const customApiKey = localStorage.getItem('apiKey');
+    
+    if (customEndpoint && customApiKey) {
+      try {
+        updateStatus('Using custom API endpoint...');
+        
+        const [queryEmbedding] = await embeddingWorker.generateEmbeddings([userPrompt], 'query');
+        const results = await this.vectorDB.query(queryEmbedding, { ...options, minResults: 3 });
+        
+        if (!results?.length) throw new Error('No relevant context found');
+        
+        const reducedContext = await this.formatContextForPrompt(results);
+        const systemPrompt = this.createSystemPrompt(reducedContext);
+        
+        updateStatus('Generating AI response...', true);
+        
+        return await directStreamingService.streamCompletion(
+          customEndpoint,
+          customApiKey,
+          [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          options
+        );
+      } catch (error) {
+        console.error('Custom API failed:', error);
+        toast.show('Custom API failed, falling back to default providers', 'warning');
+      }
+    }
+    
     let attempts = 0;
     let healthCheckFailures = 0;
     const maxAttempts = this.providerOrder.length;
