@@ -68,7 +68,7 @@
         </svg>
         <span class="tooltip">Home</span>
       </div>
-      <div class="sidebar-icon">
+      <div class="sidebar-icon" id="search-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"></circle>
@@ -157,8 +157,10 @@
         style="pointer-events: all !important;">
       <input type="text" class="p2p_peer_input" id="peerIdInput" placeholder="Enter peer ID to connect"
         style="pointer-events: all !important;">
-      <button id="connectButton" style="pointer-events: all !important;">
-        Connect
+      <button id="connectButton" style="pointer-events: all !important;  align-items: center;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+      </svg> Connect
         <span class="tooltip">Click to connect to the peer</span>
       </button>
       <!-- <div id="connected-peers-container"></div>
@@ -322,6 +324,7 @@ fileTreeBtn.addEventListener('click', (e) => {
       hidePeerModal();
       hideHomeModal();
       hideSettingsModal();
+      hideSearchModal();
       
       // Hide databases modal with animation
       const databasesModal = document.getElementById('databasesModal');
@@ -725,53 +728,198 @@ document.addEventListener('click', (e) => {
   }
 });
 </script>
-  <script>
-// Get required elements
-const resizeHandle = chatSlideout.querySelector('.resize-handle');
-let isResizing = false;
-let startWidth;
-let startX;
 
-// Handle resize start
-resizeHandle.addEventListener('mousedown', (e) => {
-    if (!chatSlideout.classList.contains('active')) return;
-    
-    isResizing = true;
-    startX = e.pageX;
-    startWidth = chatSlideout.offsetWidth;
-    
-    resizeHandle.classList.add('dragging');
-    
-    // Add temporary document listeners only while dragging
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleUp);
-    
-    e.stopPropagation();
-});
+<script>
+  // Add search modal functionality
+  const searchBtn = document.getElementById('search-btn');
+  const searchModalContainer = document.createElement('div');
+  searchModalContainer.classList.add('modal');
+  searchModalContainer.style.display = 'none';
+  document.body.appendChild(searchModalContainer);
 
-// Handle dragging
-function handleMove(e) {
-    if (!isResizing) return;
+  function showSearchModal() {
+    closeAllModals(); // Close all other modals first
     
-    const width = startWidth - (e.pageX - startX);
-    if (width >= 200 && width <= 800) {
-        chatSlideout.style.width = `${width}px`;
+    const iconRect = searchBtn.getBoundingClientRect();
+    searchModalContainer.style.top = `${iconRect.top - 15}px`;
+    searchModalContainer.style.display = 'flex';
+    
+    // Search modal content
+    searchModalContainer.innerHTML = `
+      <div class="search-header">
+        <input type="text" 
+               class="search-input" 
+               id="searchInput" 
+               placeholder="Search your scene..."
+               autocomplete="off">
+        <div class="search-filters">
+          <select class="search-select" id="searchTypeSelect">
+            <option value="all">All</option>
+            <option value="nodes">Nodes</option>
+            <option value="text">Text</option>
+            <option value="files">Files</option>
+          </select>
+        </div>
+      </div>
+      <div class="search-results" id="searchResults">
+        <!-- Results will be populated here -->
+      </div>
+      <div class="search-status"></div>
+    `;
+
+    searchModalContainer.offsetHeight;
+    requestAnimationFrame(() => {
+      searchModalContainer.classList.add('active');
+    });
+
+    const arrowOffset = iconRect.height / 2;
+    searchModalContainer.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
+    activeIcon = searchBtn;
+
+    // Add search input handler
+    const searchInput = searchModalContainer.querySelector('#searchInput');
+    searchInput.addEventListener('input', handleSearch);
+    
+    // Add search type change handler
+    const searchTypeSelect = searchModalContainer.querySelector('#searchTypeSelect');
+    searchTypeSelect.addEventListener('change', handleSearch);
+  }
+
+  function hideSearchModal() {
+    searchModalContainer.style.display = 'none';
+    searchModalContainer.classList.remove('active');
+    activeIcon = null;
+  }
+
+  function handleSearch() {
+    const searchInput = document.getElementById('searchInput');
+    const searchType = document.getElementById('searchTypeSelect').value;
+    const query = searchInput.value.trim();
+    const resultsContainer = document.getElementById('searchResults');
+
+    if (query) {
+      // Dispatch search event for other parts of the application
+      window.eventBus.dispatchEvent(new CustomEvent('search', {
+        detail: { 
+          query,
+          type: searchType
+        }
+      }));
+    } else {
+      resultsContainer.innerHTML = '';
     }
-}
+  }
 
-// Handle resize end
-function handleUp() {
-    if (!isResizing) return;
+  // Add click handler for search button
+  searchBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (searchModalContainer.style.display === 'none') {
+      closeAllModals();
+      showSearchModal();
+    } else {
+      hideSearchModal();
+    }
+
+    // Close other modals/slideouts
+    hidePeerModal();
+    hideHomeModal();
+    hideSettingsModal();
+    leftSlideout.classList.remove('active');
+    chatSlideout.classList.remove('active');
+  });
+
+  // Update document click handler to include search modal
+  document.addEventListener('click', (e) => {
+    if (!modal.contains(e.target) && 
+        !homeModal.contains(e.target) && 
+        !settingsModalContainer.contains(e.target) && 
+        !searchModalContainer.contains(e.target) && 
+        !e.target.closest('.sidebar-icon')) {
+      hidePeerModal();
+      hideHomeModal();
+      hideSettingsModal();
+      hideSearchModal();
+    }
+  });
+
+  // Update closeAllModals function
+  function closeAllModals(flags={}) {
+    // Hide all slideouts
+    if(!flags.leftSlideout) {
+      leftSlideout.classList.remove('active');
+    }
     
-    isResizing = false;
-    resizeHandle.classList.remove('dragging');
+    // Hide all standard modals
+    hidePeerModal();
+    hideHomeModal();
+    hideSettingsModal();
+    hideSearchModal();
     
-    // Remove temporary document listeners
-    document.removeEventListener('mousemove', handleMove);
-    document.removeEventListener('mouseup', handleUp);
-}
-  </script>
-  <script type="module" src="/main.js"></script>
+    // Hide databases modal with animation
+    const databasesModal = document.getElementById('databasesModal');
+    if (databasesModal) {
+      databasesModal.classList.remove('show');
+      const overlay = document.getElementById('overlay');
+      overlay.classList.remove('show');
+      
+      setTimeout(() => {
+        databasesModal.style.display = 'none';
+        overlay.style.display = 'none';
+      }, 300);
+    }
+  }
+</script>
+
+<script>
+  // Get required elements
+  const resizeHandle = chatSlideout.querySelector('.resize-handle');
+  let isResizing = false;
+  let startWidth;
+  let startX;
+
+  // Handle resize start
+  resizeHandle.addEventListener('mousedown', (e) => {
+      if (!chatSlideout.classList.contains('active')) return;
+      
+      isResizing = true;
+      startX = e.pageX;
+      startWidth = chatSlideout.offsetWidth;
+      
+      resizeHandle.classList.add('dragging');
+      
+      // Add temporary document listeners only while dragging
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleUp);
+      
+      e.stopPropagation();
+  });
+
+  // Handle dragging
+  function handleMove(e) {
+      if (!isResizing) return;
+      
+      const width = startWidth - (e.pageX - startX);
+      if (width >= 200 && width <= 800) {
+          chatSlideout.style.width = `${width}px`;
+      }
+  }
+
+  // Handle resize end
+  function handleUp() {
+      if (!isResizing) return;
+      
+      isResizing = false;
+      resizeHandle.classList.remove('dragging');
+      
+      // Remove temporary document listeners
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+  }
+</script>
+
+<script type="module" src="/main.js"></script>
 
 </body>
 

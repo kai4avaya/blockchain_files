@@ -1791,7 +1791,7 @@ display: none;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px;
+  padding: 4px 8px;
   margin: 4px;
   background-color: #f3f4f6;
   border-radius: 16px;
@@ -1816,7 +1816,7 @@ display: none;
 .settings-pill .pill-details {
   display: none;
   width: 100%;
-  padding-top: 8px;
+  /* padding-top: 8px; */
   margin-top: 8px;
   border-top: 1px solid #e5e7eb;
 }
@@ -1899,3 +1899,69 @@ input:checked + .slider:before {
     border: 2px solid #2196F3;
     box-shadow: 0 0 8px rgba(33, 150, 243, 0.4);
 }
+
+.pill-text {
+padding-left: 4px;
+}
+
+.search-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.search-input {
+  width: 90%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--background-color);
+  color: var(--text-color);
+}
+
+.search-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.search-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--background-color);
+  color: var(--text-color);
+  font-size: 12px;
+}
+
+.search-results {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+.search-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* Add these button styles */
+.modal button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;  /* Space between icon and text */
+  width: 100%; /* Add this if you want the button to take full width */
+}
+
+.small-icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  /* Remove margin-right since we're using gap */
+}
+
+/* If you want to target specifically the connect button */

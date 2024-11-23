@@ -68,7 +68,7 @@
         </svg>
         <span class="tooltip">Home</span>
       </div>
-      <div class="sidebar-icon">
+      <div class="sidebar-icon" id="search-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"></circle>
@@ -186,7 +186,7 @@
       <button id="saveSettingsButton">Save Settings</button>
     </div> -->
 
-      <div class="settings-header">
+      <!-- <div class="settings-header">
         <label for="aiModelSelect">AI Model</label>
         <select class="modal-select" id="aiModelSelect">
           <option value="">Select AI Model</option>
@@ -216,7 +216,7 @@
         </button>
       </div>
       <div class="settings-status" id="settingsStatus"></div>
-    `;
+    `; -->
     <div id="popup"></div>
     <div id="overlay" class="overlay" style="display: none;"></div>
 
@@ -536,31 +536,51 @@ function showSettingsModal() {
   settingsModalContainer.style.top = `${iconRect.top - 15}px`;
   settingsModalContainer.style.display = 'flex';
   
+  const useCustomProvider = localStorage.getItem('useCustomProvider') === 'true';
   // Updated settings modal content with better design
   settingsModalContainer.innerHTML = `
-    <div class="settings-header">
-      <label for="aiModelSelect">AI Model</label>
-      <select class="modal-select" id="aiModelSelect">
-        <option value="">Select AI Model</option>
-        <option value="gpt-3.5-turbo">
-          <span>GPT-3.5 Turbo</span>
-        </option>
-        <option value="gpt-4">GPT-4</option>
-        <option value="claude-2">Claude 2</option>
-        <option value="palm">PaLM</option>
-      </select>
-    </div>
-    <input type="text" class="settings-input" id="aiProviderInput" placeholder="Enter your AI provider">
-    <input type="text" class="settings-input" id="apiKeyInput" placeholder="Enter your API key">
-    <button id="saveSettingsButton" class="settings-save-btn">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-        <polyline points="17 21 17 13 7 13 7 21"/>
-        <polyline points="7 3 7 8 15 8"/>
-      </svg>
-      Save Settings
-    </button>
+       <div class="settings-header">
+            <div class="model-switch-container">
+                <label class="switch">
+                    <input type="checkbox" id="providerToggle" ${useCustomProvider ? 'checked' : ''}>
+                    <span class="slider round"></span>
+                </label>
+                <span class="switch-label">Use Custom AI Provider</span>
+            </div>
+            <select class="modal-select" id="aiModelSelect" ${useCustomProvider ? 'disabled' : ''}>
+                <option value="Lumi B">Lumi B</option>
+            </select>
+        </div>
+        <input type="text" class="settings-input" id="aiProviderInput" 
+            placeholder="Enter your AI provider" ${!useCustomProvider ? 'disabled' : ''}>
+        <input type="text" class="settings-input" id="apiKeyInput" 
+            placeholder="Enter your API key" ${!useCustomProvider ? 'disabled' : ''}>
+        <button id="saveSettingsButton" class="settings-save-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Save Settings
+        </button>
+        <div class="settings-pills-container"></div>
+        <div class="settings-status"></div>
   `;
+
+  const toggle = settingsModalContainer.querySelector('#providerToggle');
+    const inputs = settingsModalContainer.querySelectorAll('.settings-input');
+    const modelSelect = settingsModalContainer.querySelector('#aiModelSelect');
+
+    toggle.addEventListener('change', (e) => {
+        const useCustom = e.target.checked;
+        inputs.forEach(input => input.disabled = !useCustom);
+        modelSelect.disabled = useCustom;
+        localStorage.setItem('useCustomProvider', useCustom);
+    });
+
+      // Trigger pill rendering
+      window.eventBus.dispatchEvent(new CustomEvent('renderExistingPills'));
+
 
   settingsModalContainer.offsetHeight;
   requestAnimationFrame(() => {
@@ -581,19 +601,99 @@ function hideSettingsModal() {
   activeIcon = null;
 }
 
+// function saveSettings() {
+//   // const provider = document.getElementById('aiProviderInput').value;
+//   // const model = document.getElementById('aiModelSelect').value;
+//   // const apiKey = document.getElementById('apiKeyInput').value;
+
+//   console.log("NERDDDDD")
+//   // Save settings to localStorage or your preferred storage
+//   // localStorage.setItem('aiProvider', provider);
+//   //       localStorage.setItem('apiKey', apiKey);
+//   //       localStorage.setItem('aiModel', model);
+
+//         const url = document.getElementById('aiProviderInput').value.trim();
+//         const apiKey = document.getElementById('apiKeyInput').value.trim();
+
+//         // if (url && apiKey) {
+//         //   console.log('Dispatching addProvider event');
+//         //   window.dispatchEvent(new CustomEvent('addProvider', { detail: { url, apiKey } }));
+//         // }
+
+//         console.log("ai provider", url)
+//         console.log("api key", apiKey)
+
+//         if (url && apiKey) {
+//       console.log('Dispatching addProvider event');
+//       window.eventBus.dispatchEvent(new CustomEvent('addProvider', { 
+//         detail: { url, apiKey } 
+//       }));
+//     } else {
+//       console.warn('URL or API key is missing');
+//     }
+        
+//         console.log('Settings saved successfully');
+//         // hideSettingsModal();
+        
+//         // Dispatch event for other parts of the application
+//         // window.dispatchEvent(new CustomEvent('settingsUpdated', {
+//         //   detail: { provider, model }
+//         // }));
+
+
+//         // if (url && apiKey) {
+//         //   window.dispatchEvent(new CustomEvent('addProvider', { detail: { url: provider, apiKey } }));
+//         // }
+
+//   // hideSettingsModal();
+// }
 function saveSettings() {
-  const aiProvider = document.getElementById('aiProviderInput').value;
-  const aiModel = document.getElementById('aiModelSelect').value;
-  const apiKey = document.getElementById('apiKeyInput').value;
+    const url = document.getElementById('aiProviderInput').value.trim();
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
 
-  // Save settings to localStorage or your preferred storage
-  localStorage.setItem('aiProvider', aiProvider);
-  localStorage.setItem('aiModel', aiModel);
-  localStorage.setItem('apiKey', apiKey);
+    if (url && apiKey) {
+        console.log('Dispatching addProvider event');
+        
+        // Check for existing provider
+        const existingProviders = JSON.parse(localStorage.getItem('apiProviders') || '[]');
+        const isDuplicate = existingProviders.some(p => 
+            p.url.toLowerCase() === url.toLowerCase()
+        );
 
-  hideSettingsModal();
+        if (isDuplicate) {
+            // Show update message
+            const statusDiv = settingsModalContainer.querySelector('.settings-status');
+            if (statusDiv) {
+                statusDiv.textContent = 'Updating existing provider...';
+                statusDiv.style.color = '#2196F3';
+                setTimeout(() => {
+                    statusDiv.textContent = '';
+                }, 2000);
+            }
+        }
+
+        window.eventBus.dispatchEvent(new CustomEvent('addProvider', { 
+            detail: { url, apiKey } 
+        }));
+        
+        // Clear inputs after successful save
+        document.getElementById('aiProviderInput').value = '';
+        document.getElementById('apiKeyInput').value = '';
+        
+      
+    } else {
+        console.warn('URL or API key is missing');
+        // Show error message
+        const statusDiv = settingsModalContainer.querySelector('.settings-status');
+        if (statusDiv) {
+            statusDiv.textContent = 'Please enter both URL and API key';
+            statusDiv.style.color = '#f44336';
+            setTimeout(() => {
+                statusDiv.textContent = '';
+            }, 2000);
+        }
+    }
 }
-
 // Add click handler for settings icon
 settingsIcon.addEventListener('click', (e) => {
   e.stopPropagation();
