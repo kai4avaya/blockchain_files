@@ -42,9 +42,9 @@ class P2PSync {
   private tabManager: TabManager | null = null;
 
   private peer: Peer | null = null;
-  private connections: Map<string, DataConnection> = new Map();
+  public connections: Map<string, DataConnection> = new Map();
   private sceneState: SceneState | null = null;
-  private knownPeers: Set<string> = new Set();
+  public knownPeers: Set<string> = new Set();
   private heartbeatInterval: number = 5000; // Heartbeat every 5 seconds
   private heartbeatTimer: number | null = null;
   private reconnectInterval: number = 10000;
@@ -858,11 +858,22 @@ function updateStatus(message: string): void {
     // Clear existing content
     statusDiv.innerHTML = '';
 
+    console.log("in the updateStatus messag in a bottle function", message);
+
+    // Don't show peer-unavailable errors, show connection status instead
+    if (message.includes("PeerJS error")) {
+     const connectedPeers = p2pSync.connections.size;
+     const totalPossiblePeers = p2pSync.knownPeers.size;
+     message = `Peer Connections: ${connectedPeers}/${totalPossiblePeers} peers connected`;
+   }
+
     // Set the new status message
     statusDiv.textContent = message;
 
     // Check if the message contains ": " and extract text after it
     const match = message.match(/: (.+)/);
+
+   
 
     if (match && match[1]) {
       const stringToCopy = match[1];

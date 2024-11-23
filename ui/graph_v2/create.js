@@ -675,14 +675,58 @@ function removeExistingLabel(filename) {
 }
 
 // Add this export function near the other exports
-export function removeLabel(fileId) {
-  const label = labelMap.get(fileId);
-  if (label) {
-    // Remove from scene
-    scene.remove(label);
-    // Remove from our map
-    labelMap.delete(fileId);
-    markNeedsRender();
+export function removeLabel(objectId, filename = '') {
+  console.log('Attempting to remove label:', { objectId, filename });
+  let labelRemoved = false;
+
+  // Function to check if a label matches our search criteria
+  const isMatchingLabel = (labelElement) => {
+    if (!labelElement || !labelElement.element) return false;
+    
+    // Check by ID
+    if (labelElement.element.dataset.objectId === objectId) return true;
+    
+    // If we have a filename, check the text content
+    if (filename && labelElement.element.textContent.includes(filename)) {
+      console.log('Found label by filename match:', filename);
+      return true;
+    }
+    
+    return false;
+  };
+
+  // Search both scenes for labels
+  [scene, nonBloomScene].forEach(currentScene => {
+    currentScene.traverse((object) => {
+      // Look for CSS2DObjects (labels) in children
+      object.children.forEach(child => {
+        if (child instanceof CSS2DObject) {
+          if (isMatchingLabel(child)) {
+            console.log('Found and removing label:', child);
+            child.removeFromParent();
+            child.element.remove();
+            labelRemoved = true;
+          }
+        }
+      });
+    });
+  });
+
+  // Also search for any orphaned label elements in the DOM
+  const allLabels = document.querySelectorAll('.label');
+  allLabels.forEach(label => {
+    if (label.dataset.objectId === objectId || 
+        (filename && label.textContent.includes(filename))) {
+      console.log('Found and removing orphaned label element');
+      label.remove();
+      labelRemoved = true;
+    }
+  });
+
+  if (!labelRemoved) {
+    console.warn('No label found to remove for:', { objectId, filename });
+  } else {
+    console.log('Label removal completed successfully');
   }
 }
 
@@ -1721,6 +1765,10 @@ function removeObject(object) {
       if (solidCube.material) solidCube.material.dispose();
       if (solidCube.geometry) solidCube.geometry.dispose();
     }
+  }
+
+  if (object.userData && object.userData.filename) {
+    removeLabel(object.userData.id, object.userData.filename);
   }
 
   // Dispose of materials and geometries

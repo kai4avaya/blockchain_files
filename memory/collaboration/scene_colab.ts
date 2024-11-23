@@ -29,6 +29,11 @@ interface ObjectState {
   };
 }
 
+interface DeleteOptions {
+  filename?: string;
+  forceReconstruct?: boolean;
+}
+
 class SceneState {
   private static instance: SceneState | null = null;
   private objects: Map<string, ObjectState>;
@@ -411,17 +416,35 @@ class SceneState {
     }
   }
 
-  markObjectAsDeleted(objectId: string): void {
-    console.log(`Attempting to mark object as deleted: ${objectId}`);
+  markObjectAsDeleted(objectId: string, options: DeleteOptions = {}): void {
+    console.log(`Attempting to mark object as deleted:`, { id: objectId, filename: options.filename });
     
-    const object = this.objects.get(objectId);
-    if (object) {
-      console.log('Found object in scene state:', object);
+    // Debug log before deletion
+    this.debugLogSceneState('Before Deletion');
+    
+    let objectToDelete = this.objects.get(objectId);
+    
+    // If not found by ID and filename is provided, try to find by filename
+    if (!objectToDelete && options.filename) {
+      console.log(`Object not found by ID, searching by filename: ${options.filename}`);
+      const foundByFilename = Array.from(this.objects.values()).find(
+        obj => obj.userData?.filename === options.filename
+      );
+      
+      if (foundByFilename) {
+        console.log(`Found object by filename:`, foundByFilename);
+        objectToDelete = foundByFilename;
+        objectId = foundByFilename.uuid; // Get the correct ID for graph table
+      }
+    }
+
+    if (objectToDelete) {
+      console.log('Found object to delete:', objectToDelete);
       
       const updatedObject = {
-        ...object,
+        ...objectToDelete,
         isDeleted: true,
-        version: (object.version || 0) + 1,
+        version: (objectToDelete.version || 0) + 1,
         versionNonce: generateVersionNonce(),
         globalTimestamp: Date.now(),
         lastEditedBy: localStorage.getItem('login_block') || 'no_login'
@@ -431,21 +454,92 @@ class SceneState {
       this.objects.set(objectId, updatedObject);
       this.updatedObjects.add(objectId);
       
-      // Save to graph table
-      this.saveData(this.STORAGE_KEY, updatedObject)
-        .then(() => {
-          console.log(`Successfully marked object ${objectId} as deleted in graph table`);
-          // Trigger scene reconstruction
-          this.reconstructScene();
-          // Broadcast update
-          this.broadcastUpdate([updatedObject]);
-        })
-        .catch(error => {
-          console.error(`Error saving deleted state for object ${objectId}:`, error);
-        });
+      // Update the graph table using indexDBOverlay
+      indexDBOverlay.saveData('graph', {
+        ...updatedObject,
+        id: objectId // Ensure we're using the correct ID for the graph table
+      }).then(() => {
+        console.log(`Successfully marked object ${objectId} as deleted in graph table`);
+        
+        // Debug log after deletion and save
+        this.debugLogSceneState('After Deletion and Save');
+        
+        // Always reconstruct scene after graph update
+        console.log('Initiating scene reconstruction');
+        this.reconstructScene();
+        
+        // Broadcast update
+        this.broadcastUpdate([updatedObject]);
+      }).catch(error => {
+        console.error(`Error saving deleted state for object ${objectId} in graph table:`, error);
+        this.debugLogSceneState('After Deletion Error');
+      });
     } else {
-      console.warn(`Object ${objectId} not found in scene state`);
+      console.warn(`Object not found by either ID or filename:`, { id: objectId, filename: options.filename });
+      this.debugLogSceneState('Object Not Found');
     }
+  }
+
+  // Add this debug utility function
+  debugLogSceneState(context: string = ''): void {
+    console.group(`Scene State Debug ${context ? `(${context})` : ''}`);
+    console.log('Total objects:', this.objects.size);
+    console.log('Updated objects:', this.updatedObjects.size);
+    console.log('Saved objects:', this.savedObjects.size);
+    
+    console.group('All Objects:');
+    
+    // Track objects without IDs
+    const objectsWithoutId = new Set<string>();
+    
+    this.objects.forEach((obj, key) => {
+      const filename = obj.userData?.filename;
+      const id = obj.uuid || obj.id;
+      
+      if (!id && filename) {
+        objectsWithoutId.add(filename);
+      }
+      
+      console.log(`Object ${key}:`, {
+        id: id || 'NO_ID',
+        filename: filename || 'NO_FILENAME',
+        isDeleted: obj.isDeleted,
+        type: obj.type,
+        version: obj.version,
+        lastEditedBy: obj.lastEditedBy,
+        globalTimestamp: obj.globalTimestamp
+      });
+    });
+    
+    // Log any objects found by filename but missing IDs
+    if (objectsWithoutId.size > 0) {
+      console.warn('Objects missing IDs:', Array.from(objectsWithoutId));
+    }
+    
+    // Search for specific filename if provided in context
+    if (context.includes('filename:')) {
+      const searchFilename = context.split('filename:')[1].trim();
+      console.group(`Searching for filename: "${searchFilename}"`);
+      const foundObjects = Array.from(this.objects.values())
+        .filter(obj => obj.userData?.filename === searchFilename);
+      
+      if (foundObjects.length > 0) {
+        console.log('Found objects with matching filename:', foundObjects);
+      } else {
+        console.warn('No objects found with filename:', searchFilename);
+      }
+      console.groupEnd();
+    }
+    
+    console.groupEnd();
+    
+    console.group('Scene Information:');
+    console.log('Scene Version:', this.sceneVersion);
+    console.log('Connected to P2P:', this.p2pSync.isConnected());
+    console.log('Total Scenes:', this.scenes.length);
+    console.groupEnd();
+    
+    console.groupEnd();
   }
 }
 

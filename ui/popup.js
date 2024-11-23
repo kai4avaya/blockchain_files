@@ -486,35 +486,44 @@ overlay.classList.add('show');
       deleteButton.addEventListener('click', async () => {
         if (confirm('Are you sure you want to delete this file?')) {
           try {
-            console.log('Starting deletion process for file:', metadata.id);
+            console.log('Starting deletion process for file:', {
+              id: metadata.id,
+              filename: metadata.name || metadata.filename
+            });
             
             // 1. Mark as deleted in scene state first (this updates the graph table)
             const { sceneState } = await import('../memory/collaboration/scene_colab.ts');
-            await sceneState.markObjectAsDeleted(metadata.id);
-            console.log('Marked as deleted in scene state');
+            
+            // Debug log scene state before deletion
+            sceneState.debugLogSceneState('Before Deletion');
+            
+            // Try to delete by both ID and filename
+            await sceneState.markObjectAsDeleted(metadata.id, {
+              filename: metadata.name || metadata.filename,
+              forceReconstruct: true
+            });
+            
+            // Debug log scene state after deletion
+            sceneState.debugLogSceneState('After Deletion');
 
-            // 2. Delete from all database tables
+            // Continue with rest of deletion process
             await indexDBOverlay.markDeletedAcrossTables(metadata.id);
             console.log('Marked as deleted across all tables');
             
-            // 3. Clean up in-memory storage
             const inMemoryStore = await import('../memory/local/in_memory.ts');
             await inMemoryStore.default.deleteFromAllTables(metadata.id);
             console.log('Cleaned up in-memory storage');
 
-            // 4. Remove visual elements
             const { removeLabel } = await import('../ui/graph_v2/create.js');
-            await removeLabel(metadata.id);
-            console.log('Removed label from 3D scene');
+            await removeLabel(metadata.id, metadata.name || metadata.filename);
+            console.log('Removed label');
 
-            // 5. Update file tree UI
             const event = new CustomEvent('fileDeleted', {
               detail: { fileId: metadata.id }
             });
             window.dispatchEvent(event);
             console.log('File tree UI updated');
 
-            // 6. Close popup
             closePopup();
             console.log('Deletion process completed successfully');
           } catch (error) {
