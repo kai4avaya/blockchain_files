@@ -198,6 +198,27 @@ function addEventListeners(canvas) {
     handleQuickClick(event);
   });
 
+  // Add document-level listeners for popup closing
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      const popup = document.getElementById('popup');
+      const overlay = document.getElementById('overlay');
+      if (popup && popup.style.display === 'block') {
+        popup.style.display = 'none';
+        if (overlay) overlay.style.display = 'none';
+      }
+    }
+  });
+
+  document.addEventListener('mousedown', (event) => {
+    const popup = document.getElementById('popup');
+    const overlay = document.getElementById('overlay');
+    if (popup && popup.style.display === 'block' && !popup.contains(event.target)) {
+      popup.style.display = 'none';
+      if (overlay) overlay.style.display = 'none';
+    }
+  });
+
   const throttledPointerMove = throttle((event) => {
     if (p2pSync.isConnected()) {
       const rect = canvas.getBoundingClientRect();
