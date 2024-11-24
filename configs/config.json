@@ -8,6 +8,12 @@
   "excludedSyncTables": ["graph", "tabs", "docs"],
   "dbName": "fileGraphDB",
   "dbStores": {
+    "text_stats": {
+      "keyPath": "fileId",
+      "indexes": [
+        { "name": "lastUpdated", "keyPath": "lastUpdated" }
+      ]
+    },
     "directories": { "keyPath": "id" },
     "files": { "keyPath": "id" },
     "graph": { "keyPath": "uuid" },

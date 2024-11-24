@@ -2,6 +2,7 @@
 import { generateUniqueId } from "../utils/utils";
 import { getFileSystem } from "./collaboration/file_colab";
 import { orchestrateTextProcessing } from "../ai/text_orchestration.js";
+import { textStats } from './text_stats.js';
 
 let compressionWorker;
 let workerIdleTimeout;
@@ -137,12 +138,26 @@ async function readFileContent(file) {
 
 
 async function processFile(fileEntry, id) {
-
   return new Promise((resolve, reject) => {
     fileEntry.file(async (file) => {
       try {
         const fileSystem = getFileSystem();
         const content = await readFileContent(file);
+        
+        // Process text files for stats
+        if (file.type === 'text/plain' || 
+            file.type === 'text/markdown' || 
+            file.type === "application/pdf" ||
+            file.type === 'text/javascript') {
+          
+          console.log('Processing text stats for:', file.name); // Debug log
+          
+          // Process text stats and wait for it to complete
+          const stats =  textStats.processTextStats(content, id);
+           textStats.saveTextStats(id, stats);
+        }
+
+        // Continue with other processing...
         const compressedContent = await compressData(content);
         
         // First save to IndexedDB
@@ -155,15 +170,21 @@ async function processFile(fileEntry, id) {
           version: 1,
           versionNonce: Math.floor(Math.random() * 1000000),
           isDeleted: false,
-          content: compressedContent, // Save the actual content
+          content: compressedContent,
         };
-
-
 
         await fileSystem.addOrUpdateItem(fileMetadata, "file");
         
-        // Then process content for vectorization
+        // Process content for vectorization
         await orchestrateTextProcessing(content, file, id);
+        
+        // Process text statistics in background for text files
+        if (file.type === 'text/plain' || file.type === 'text/markdown' || file.type === 'text/javascript') {
+          // Don't await this - let it process in background
+          textStats.processTextStats(content, id)
+            .then(stats => textStats.saveTextStats(id, stats))
+            .catch(error => console.warn('Text stats processing error:', error));
+        }
         
         addFileToTree(fileMetadata);
         resolve();

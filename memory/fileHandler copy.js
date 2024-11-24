@@ -96,6 +96,8 @@ const FILE_ICONS = {
 };
 
 function getFileIcon(filename) {
+  if (!filename) return FILE_ICONS.default;
+  
   const extension = filename.split('.').pop().toLowerCase();
   return FILE_ICONS[extension] || FILE_ICONS.default;
 }
@@ -678,11 +680,15 @@ function getElementPath(element) {
   export function updateFileTreeUI() {
     const fileSystem = getFileSystem();
     const snapshot = fileSystem.getSnapshot();
+    
+    if (!snapshot || !fileTree) return;
+    
     fileTree.innerHTML = "";
-  
     const dirMap = new Map(snapshot.directories.map((dir) => [dir.id, dir]));
     const rootDir = createFolderElement("Root");
     fileTree.appendChild(rootDir);
+  // Track which files have been processed in directories
+  const processedFiles = new Set();
 
      snapshot.directories.forEach((dir) => {
       if (dir.id !== "0") {
@@ -694,6 +700,9 @@ function getElementPath(element) {
         dir.fileIds.forEach((fileId) => {
           const file = snapshot.files.find((f) => f.id === fileId);
           if (file) {
+               // Add file to processed set
+          processedFiles.add(file.id);
+          
             const fileElement = document.createElement("li");
             const iconClass = getFileIcon(file.name);
             
@@ -749,6 +758,7 @@ function getElementPath(element) {
     });
   
     snapshot.files.forEach((file) => {
+      if (!processedFiles.has(file.id)) {
       const fileElement = document.createElement("li");
       const iconClass = getFileIcon(file.name);
       
@@ -807,6 +817,7 @@ function getElementPath(element) {
       fileElement.appendChild(contentWrapper);
       
       rootDir.querySelector("ul").appendChild(fileElement);
+    }
     });
     // Process directories
    
@@ -830,7 +841,6 @@ export function refreshFileTree() {
 window.addEventListener('bloomStateChanged', (event) => {
   const { fileId, isSelected } = event.detail;
 
-  console.log("checkboxes! bloomStateChanged", fileId, isSelected)
   
   const checkbox = document.querySelector(`input[type="checkbox"][data-file-id="${fileId}"]`);
   if (checkbox) {
@@ -840,5 +850,25 @@ window.addEventListener('bloomStateChanged', (event) => {
 
 
 window.addEventListener('updateFileTree', () => {
+  refreshFileTree();
+});
+
+// Add this with the other event listeners
+window.addEventListener('fileDeleted', (event) => {
+  const { fileId } = event.detail;
+  
+  // Remove the file element from the tree
+  const fileElement = document.querySelector(`li input[data-file-id="${fileId}"]`)?.closest('li');
+  if (fileElement) {
+    fileElement.remove();
+  }
+  
+  // Update any parent folder checkboxes if needed
+  const parentFolder = fileElement?.closest('.folder');
+  if (parentFolder) {
+    updateParentCheckbox(parentFolder);
+  }
+  
+  // Refresh the file tree UI
   refreshFileTree();
 });
