@@ -5,7 +5,6 @@ import { retrieveFile } from '../memory/fileHandler.js'; // Adjust the import pa
 import indexDBOverlay from '../memory/local/file_worker'; // Adjust the path as necessary
 import config from '../configs/config.json';
 // import { removeLabel } from '../ui/graph_v2/create.js';
-import { createTextStatsCharts } from './text_stats_charts.js';
 
 // Add this function near the top of the file
 function adjustPopupPosition(popup, x, y) {
@@ -41,31 +40,6 @@ function adjustPopupPosition(popup, x, y) {
   }
   
   return { x: adjustedX, y: adjustedY };
-}
-
-// Add this helper function at the top of the file
-function createKeywordsHtml(keywords, maxInitial = 10) {
-  if (!keywords || !keywords.length) {
-    return '<span class="tag" style="background-color=#FFC0CB">No keywords available.</span>';
-  }
-
-  const initialKeywords = keywords.slice(0, maxInitial);
-  const remainingKeywords = keywords.slice(maxInitial);
-  
-  let html = initialKeywords.map(k => `<span class="tag">${k}</span>`).join(' ');
-  
-  if (remainingKeywords.length > 0) {
-    html += `
-      <button class="show-more-keywords" onclick="event.stopPropagation();">
-        +${remainingKeywords.length} more
-      </button>
-      <span class="remaining-keywords" style="display: none;">
-        ${remainingKeywords.map(k => `<span class="tag">${k}</span>`).join(' ')}
-      </span>
-    `;
-  }
-  
-  return html;
 }
 
 // Function to Show Popup with Overlay
@@ -429,23 +403,14 @@ overlay.classList.add('show');
         <p><strong>Last Modified:</strong> ${new Date(fileData.lastModified).toLocaleString()}</p>
         <p><strong>Summary:</strong> <pre class="content-pre">${summary || 'No summary available.'}</pre></p>
         <div id="tagsContainer" style="margin-bottom: 10px;">
-          <strong>Keywords:</strong> 
-          <div class="keywords-wrapper">
-            ${createKeywordsHtml(keywords)}
-          </div>
+          <strong>Keywords:</strong> ${keywords ? keywords.map(k => `<span class="tag">${k}</span>`).join(' ') : '</span class="tag" style="background-color=#FFC0CB">No keywords available.</span>'}
         </div>
         <button id="downloadButton" class="download-button">
           ${getFileTypeIcon(fileData.type)}
           <span class="download-label">Download File</span>
         </button>
-        <div class="charts-container">
-          <canvas id="readabilityChart" width="400" height="200"></canvas>
-          <canvas id="paragraphLengthChart" width="400" height="200"></canvas>
-          <div class="charts-row">
-            <canvas id="sentenceTypesChart" width="200" height="200"></canvas>
-            <canvas id="wordStatsChart" width="200" height="200"></canvas>
-          </div>
-        </div>
+        <canvas id="fileChangeChart" width="400" height="200"></canvas>
+        <canvas id="edgesChart" width="400" height="200"></canvas>
       </div>
     `;
 
@@ -471,14 +436,55 @@ overlay.classList.add('show');
       });
     }
 
-    // Create the charts if text stats are available
-    const charts = await createTextStatsCharts(metadata.id);
-    if (charts) {
-      new Chart(document.getElementById('readabilityChart').getContext('2d'), charts.readabilityChart);
-      new Chart(document.getElementById('paragraphLengthChart').getContext('2d'), charts.paragraphLengthChart);
-      new Chart(document.getElementById('sentenceTypesChart').getContext('2d'), charts.sentenceTypesChart);
-      new Chart(document.getElementById('wordStatsChart').getContext('2d'), charts.wordStatsRadarChart);
-    }
+    // Mock data for the file change over time graph
+    const fileChangeData = {
+      labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
+      datasets: [{
+        label: 'File Size Over Time',
+        data: [500, 1000, 750, 1200, 1100, 1300, 900],
+        fill: false,
+        borderColor: 'rgb(75, 192, 192)',
+        tension: 0.1
+      }]
+    };
+
+    // Create the file change over time graph
+    const fileChangeCtx = document.getElementById('fileChangeChart').getContext('2d');
+    new Chart(fileChangeCtx, {
+      type: 'line',
+      data: fileChangeData,
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+
+    // Mock data for the edges connecting to this node graph
+    const edgesData = {
+      labels: ['Node A', 'Node B', 'Node C', 'Node D'],
+      datasets: [{
+        label: 'Connections',
+        data: [2, 3, 5, 1],
+        backgroundColor: 'rgb(255, 99, 132)',
+      }]
+    };
+
+    // Create the edges connecting to this node graph
+    const edgesCtx = document.getElementById('edgesChart').getContext('2d');
+    new Chart(edgesCtx, {
+      type: 'bar',
+      data: edgesData,
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
 
     // Add CSS for the delete button
     const style = document.createElement('style');
@@ -560,24 +566,6 @@ overlay.classList.add('show');
             console.error('Error in deletion process:', error);
             alert('Error deleting file. Please try again.');
           }
-        }
-      });
-    }
-
-    // Add event listener for the show more button after creating the popup content
-    const showMoreBtn = popupContent.querySelector('.show-more-keywords');
-    if (showMoreBtn) {
-      showMoreBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const remainingKeywords = popupContent.querySelector('.remaining-keywords');
-        const btn = e.target;
-        
-        if (remainingKeywords.style.display === 'none') {
-          remainingKeywords.style.display = 'inline';
-          btn.textContent = 'Show less';
-        } else {
-          remainingKeywords.style.display = 'none';
-          btn.textContent = `+${(keywords.length - 10)} more`;
         }
       });
     }
