@@ -6,6 +6,42 @@ import indexDBOverlay from '../memory/local/file_worker'; // Adjust the path as 
 import config from '../configs/config.json';
 // import { removeLabel } from '../ui/graph_v2/create.js';
 
+// Add this function near the top of the file
+function adjustPopupPosition(popup, x, y) {
+  const viewport = {
+    width: window.innerWidth,
+    height: window.innerHeight
+  };
+  
+  const popupRect = popup.getBoundingClientRect();
+  
+  // Initialize adjusted coordinates
+  let adjustedX = x;
+  let adjustedY = y;
+  
+  // Check right edge
+  if (x + popupRect.width > viewport.width) {
+    adjustedX = viewport.width - popupRect.width - 20; // 20px padding
+  }
+  
+  // Check bottom edge
+  if (y + popupRect.height > viewport.height) {
+    adjustedY = viewport.height - popupRect.height - 20; // 20px padding
+  }
+  
+  // Check left edge
+  if (adjustedX < 0) {
+    adjustedX = 20; // 20px padding
+  }
+  
+  // Check top edge
+  if (adjustedY < 0) {
+    adjustedY = 20; // 20px padding
+  }
+  
+  return { x: adjustedX, y: adjustedY };
+}
+
 // Function to Show Popup with Overlay
 export async function showPopup(metadata, x, y) {
   console.log("metadata", metadata);
@@ -538,6 +574,13 @@ overlay.classList.add('show');
     console.error('Error fetching file data:', error);
     // Handle error (e.g., display an error message)
   }
+
+  // Get adjusted position after popup is visible and has dimensions
+  const { x: adjustedX, y: adjustedY } = adjustPopupPosition(popup, x, y);
+  
+  // Set adjusted position
+  popup.style.left = `${adjustedX}px`;
+  popup.style.top = `${adjustedY}px`;
 }
 
 // Helper function to get the file type icon
