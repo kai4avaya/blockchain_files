@@ -79,17 +79,9 @@ function showURLInput(x, y, intersectPoint) {
   const container = document.createElement('div');
   container.className = 'url-input-container';
   
-  const inputWrapper = document.createElement('div');
-  inputWrapper.style.display = 'flex';
-  inputWrapper.style.gap = '8px';
-  
   const input = document.createElement('input');
   input.className = 'url-input';
   input.placeholder = 'Enter URL...';
-  
-  const buttonWrapper = document.createElement('div');
-  buttonWrapper.style.display = 'flex';
-  buttonWrapper.style.gap = '8px';
   
   const sendButton = document.createElement('button');
   sendButton.className = 'url-button';
@@ -99,153 +91,80 @@ function showURLInput(x, y, intersectPoint) {
   backButton.className = 'url-button';
   backButton.textContent = 'Back';
   
-  inputWrapper.appendChild(input);
-  buttonWrapper.appendChild(sendButton);
-  buttonWrapper.appendChild(backButton);
-  container.appendChild(inputWrapper);
-  container.appendChild(buttonWrapper);
+  container.appendChild(input);
+  container.appendChild(sendButton);
+  container.appendChild(backButton);
   
   contextMenu.innerHTML = '';
   contextMenu.appendChild(container);
   
   input.focus();
-
-  let isFetching = false;
-  let abortController = new AbortController();
-  
-  function formatURL(url) {
-    console.log('Formatting URL:', url);
-    // Remove leading/trailing whitespace
-    url = url.trim();
-    
-    // Add protocol if missing
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://' + url;
-    }
-    
-    // Add www if needed (only if it's not already there and not a subdomain)
-    const urlObj = new URL(url);
-    if (!urlObj.hostname.includes('.') || urlObj.hostname.split('.').length === 2) {
-      if (!urlObj.hostname.startsWith('www.')) {
-        urlObj.hostname = 'www.' + urlObj.hostname;
-        url = urlObj.toString();
-      }
-    }
-    
-    console.log('Formatted URL:', url);
-    return url;
-  }
   
   sendButton.onclick = async () => {
-    console.log('Send button clicked');
-    if (isFetching) {
-      console.log('Already fetching, ignoring click');
-      return;
-    }
-    
     const url = input.value;
-    if (!url) {
-      console.log('No URL provided');
-      return;
-    }
-    
-    const originalText = sendButton.textContent;
-    console.log('Starting fetch process');
+    if (!url) return;
     
     try {
-      isFetching = true;
-      
-      // Show spinner
-      sendButton.innerHTML = '<div class="button-spinner"></div>';
-      sendButton.disabled = true;
-      
-      const formattedUrl = formatURL(url);
       const endpoint = NODE_ENV === 'development' ? LOCAL_SCRAPER_ENDPOINT : SCRAPER_ENDPOINT;
-      
-      // Fix URL construction by adding a separator
-      const fetchUrl = `${endpoint}${endpoint.includes('?') ? '&' : '?'}url=${encodeURIComponent(formattedUrl)}`;
-      console.log('Fetching from:', fetchUrl);
-      
-      const response = await fetch(fetchUrl, {
-        signal: abortController.signal
-      });
-      
-      console.log('Received response:', response.status);
+      const response = await fetch(`${endpoint}${encodeURIComponent(url)}`);
       const text = await response.text();
-      console.log('Received text length:', text.length);
       
-      // Create synthetic event only if we haven't aborted
-      if (!abortController.signal.aborted) {
-        const file = new File(
-          [text],
-          `${formattedUrl.split('/').pop() || 'webpage'}.md`,
-          { 
-            type: 'text/markdown',
-            lastModified: Date.now()
+      // Create a File object from the scraped content
+      const file = new File(
+        [text],
+        `${url.split('/').pop() || 'webpage'}.md`,
+        { 
+          type: 'text/markdown',
+          lastModified: Date.now()
+        }
+      );
+
+      // Create a DataTransfer object
+      const dt = new DataTransfer();
+      dt.items.add(file);
+
+      // Create synthetic event similar to tab drop
+      const syntheticEvent = {
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        clientX: x,
+        clientY: y,
+        dataTransfer: {
+          files: dt.files,
+          items: [{
+            getAsFile: () => file,
+            kind: 'file',
+            type: file.type
+          }],
+          getData: () => '',
+          types: ['Files']
+        },
+        source: {
+          data: {
+            id: generateUniqueId(),
+            name: url,
+            content: text,
+            type: 'url'
           }
-        );
+        },
+        intersectPoint: intersectPoint
+      };
 
-        const dt = new DataTransfer();
-        dt.items.add(file);
+      // Dispatch tabDrop event
+      const canvas = document.querySelector('canvas');
+      canvas.dispatchEvent(new CustomEvent('tabDrop', { 
+        bubbles: true,
+        cancelable: true,
+        detail: syntheticEvent
+      }));
 
-        const syntheticEvent = {
-          preventDefault: () => {},
-          stopPropagation: () => {},
-          clientX: x,
-          clientY: y,
-          dataTransfer: {
-            files: dt.files,
-            items: [{
-              getAsFile: () => file,
-              kind: 'file',
-              type: file.type
-            }],
-            getData: () => '',
-            types: ['Files']
-          },
-          source: {
-            data: {
-              id: generateUniqueId(),
-              name: url,
-              content: text,
-              type: 'url'
-            }
-          },
-          intersectPoint: intersectPoint
-        };
-
-        console.log('Dispatching tabDrop event');
-        const canvas = document.querySelector('canvas');
-        canvas.dispatchEvent(new CustomEvent('tabDrop', { 
-          bubbles: true,
-          cancelable: true,
-          detail: syntheticEvent
-        }));
-
-        hideContextMenu();
-      }
+      hideContextMenu();
     } catch (error) {
-      console.error('Fetch error:', error);
-      if (!error.name === 'AbortError') {
-        console.error('Error scraping website:', error);
-      }
-    } finally {
-      if (!abortController.signal.aborted) {
-        console.log('Cleaning up after fetch');
-        isFetching = false;
-        sendButton.innerHTML = originalText;
-        sendButton.disabled = false;
-      }
+      console.error('Error scraping website:', error);
     }
   };
   
   backButton.onclick = () => {
-    console.log('Back button clicked');
-    if (isFetching) {
-      console.log('Aborting fetch');
-      abortController.abort();
-      abortController = new AbortController();
-    }
     showContextMenu(x, y, intersectPoint);
   };
 }
@@ -389,63 +308,38 @@ style.textContent = `
   }
 
   .url-input-container {
-    padding: 12px;
-    min-width: 300px;
+    padding: 8px;
   }
 
   .url-input {
-    flex: 1;
+    width: 100%;
     padding: 8px;
+    margin-bottom: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
-    font-size: 14px;
-    min-width: 0;
   }
 
   .url-button {
-    padding: 8px 16px;
+    padding: 6px 12px;
+    margin-right: 8px;
     border: none;
     border-radius: 4px;
     background-color: #007bff;
     color: white;
     cursor: pointer;
     transition: background-color 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 60px;
-    min-height: 35px;
   }
 
-  .url-button:hover:not(:disabled) {
+  .url-button:hover {
     background-color: #0056b3;
-  }
-
-  .url-button:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
   }
 
   .url-button:last-child {
     background-color: #6c757d;
   }
 
-  .url-button:last-child:hover:not(:disabled) {
+  .url-button:last-child:hover {
     background-color: #545b62;
-  }
-
-  .button-spinner {
-    width: 16px;
-    height: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top: 2px solid #fff;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
   }
 `;
 
