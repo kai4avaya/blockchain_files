@@ -31,7 +31,7 @@ import {
 import MouseOverlayCanvas from "./MouseOverlayCanvas";
 import { Frustum, Matrix4 } from "three";
 import indexDBOverlay from '../../memory/local/file_worker';
-import { showContextMenu , contextMenu, hideContextMenu} from "./canvas_menu.js";
+// import { showContextMenu , contextMenu, hideContextMenu} from "./canvas_menu.js";
 
 
 const frustum = new Frustum();
@@ -43,7 +43,7 @@ export const BLOOM_SCENE = 1;
 const bloomLayer = new THREE.Layers();
 bloomLayer.set(BLOOM_SCENE);
 const SCALEFACTOR = 0.05;
-
+let isCubeRender = false;
 export const scene = new THREE.Scene();
 export const nonBloomScene = new THREE.Scene();
 
@@ -66,13 +66,7 @@ const nonBloomRT = new THREE.WebGLRenderTarget(
 );
 const darkMaterial = new THREE.MeshBasicMaterial({ color: "black" });
 const materials = {};
-// const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
-// const renderer = new THREE.WebGLRenderer({
-//   antialias: false,
-//   powerPreference: "high-performance",
-//   failIfMajorPerformanceCaveat: false,
-//   preserveDrawingBuffer: true,
-// });
+
 
 const renderer = new THREE.WebGLRenderer({
   antialias: false,
@@ -128,6 +122,18 @@ controls.minDistance = 0.1;
 controls.maxDistance = 1000; // Increased Max Distance
 let needsRender = false;
 let renderCount = 0;
+
+const RENDER_STATES = {
+  NONE: 0,
+  NEEDS_MATRIX_UPDATE: 1,
+  NEEDS_FULL_RENDER: 2,
+};
+
+let renderState = RENDER_STATES.NONE;
+let needsLabelUpdate = false;
+
+let timeOfDay;
+let prevTimeOfDay;
 
 // At the top of your file
 let ghostCube = null;
@@ -280,75 +286,6 @@ function createEnvironment() {
   directionalLight.position.set(1, 1, 1).normalize();
   scene.add(directionalLight);
 }
-// function setLightingBasedOnTime(scene, nonBloomScene) {
-//   const timeOfDay = getCurrentTimeOfDay();
-
-//   // Remove existing lights from both scenes
-//   [scene, nonBloomScene].forEach((scn) => {
-//     scn.traverse((object) => {
-//       if (object.isLight) {
-//         scn.remove(object);
-//       }
-//     });
-//   });
-
-//   let ambientLight, directionalLight;
-
-//   if (timeOfDay === 'day') {
-//     // Daytime lights
-//     ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-//     directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-//     directionalLight.position.set(1, 1, 1).normalize();
-//   } else {
-//     // Nighttime lights
-//     ambientLight = new THREE.AmbientLight(0x404040, 0.3);
-//     directionalLight = new THREE.DirectionalLight(0x8888ff, 0.2);
-//     directionalLight.position.set(1, 1, 1).normalize();
-//   }
-
-//   // Add lights to both scenes
-//   scene.add(ambientLight);
-//   scene.add(directionalLight);
-
-//   // Clone the lights for the nonBloomScene
-//   const ambientLightClone = ambientLight.clone();
-//   const directionalLightClone = directionalLight.clone();
-
-//   nonBloomScene.add(ambientLightClone);
-//   nonBloomScene.add(directionalLightClone);
-// }
-
-// function setBackgroundBasedOnTime(scene, nonBloomScene) {
-//   const timeOfDay = getCurrentTimeOfDay();
-//   let bgColor;
-
-//   if (timeOfDay === 'day') {
-//     bgColor = new THREE.Color(0x87CEEB); // Sky blue
-//   } else {
-//     scene.background = new THREE.Color(0x0A0A0A); // Black
-//   }
-
-//   scene.background = bgColor;
-//   nonBloomScene.background = bgColor;
-//   renderer.setClearColor(bgColor);
-// }
-
-// function setBackgroundBasedOnTime(scene, nonBloomScene) {
-//   const timeOfDay = getCurrentTimeOfDay();
-//   let bgColor;
-
-//   if (timeOfDay === 'day') {
-//     // Soft daylight gradient
-//     renderer.setClearColor(0x87CEEB, 1); // Sky blue
-//   } else {
-//     // Night gradient - deep dark blue that works well with bloom
-//     renderer.setClearColor(0x0A0A14, 1); // Deep night blue
-//   }
-
-//   // Set same background for both scenes to maintain consistency
-//   scene.background = new THREE.Color(renderer.getClearColor());
-//   nonBloomScene.background = new THREE.Color(renderer.getClearColor());
-// }
 
 function loadTerrain(file, callback) {
   const xhr = new XMLHttpRequest();
@@ -402,9 +339,10 @@ controls.addEventListener("change", () => {
   markNeedsRender();
 });
 
-export async function initializeGraph() {
+export function initializeGraph() {
   setupScene();
 }
+initializeGraph()
 
 export function randomColorGenerator() {
   // Generate bright fluorescent colors
@@ -526,6 +464,8 @@ export function createWireframeCube(convertedData) {
   nonBloomScene.add(wireframeCube);
   nonBloomScene.add(solidCube);
 
+  markNeedsRender("cubeRemoval"); // KAI DOUBLE CHECK THIS
+
   console.log(
     "CUBE CREATED! I have created wireframecube",
     wireframeCube,
@@ -637,7 +577,8 @@ function setupScene() {
   //   }
   // });
 
-  markNeedsRender();
+  // markNeedsRender();
+  markNeedsRender('cubeRemoval');
 }
 
 // Add an event listener to save camera state when the window is about to unload
@@ -810,7 +751,8 @@ export function createSphere(convertedData) {
   sphere.layers.set(ENTIRE_SCENE); // Default layer
   sphere.layers.enable(BLOOM_SCENE); // Bloom layer
 
-  markNeedsRender();
+  // markNeedsRender();
+  markNeedsRender("cubeRemoval");
 
   console.log("i am created sphere", sphere);
   return { sphere };
@@ -975,17 +917,7 @@ export function render_cull() {
 // }, 16);
 
 // Near your other global variables
-const RENDER_STATES = {
-  NONE: 0,
-  NEEDS_MATRIX_UPDATE: 1,
-  NEEDS_FULL_RENDER: 2,
-};
 
-let renderState = RENDER_STATES.NONE;
-let needsLabelUpdate = false;
-
-let timeOfDay;
-let prevTimeOfDay;
 
 function setBloomParameters(timeOfDay) {
   if (timeOfDay >= 0.8) {
@@ -1436,7 +1368,7 @@ function restoreMaterial(obj) {
 //   renderCount = 1; // Render for the next 2 frames
 //   updateMiniMap();
 // }
-let isCubeRender = false;
+// let isCubeRender = false;
 // export function markNeedsRender(type = "full") {
 //   isCubeRender = false;
 //   switch (type) {
@@ -1634,14 +1566,14 @@ export function createGhostCube(position, size, existingCube = null) {
   // **Store reference to existing cube, if any**
   ghostCube.existingCube = existingCube;
 
-  const { scene } = share3dDat();
+  // const { scene } = share3dDat();
   scene.add(ghostCube);
   markNeedsRender();
 }
 
 export function removeGhostCube() {
   if (ghostCube) {
-    const { scene } = share3dDat();
+    // const { scene } = share3dDat();
     scene.remove(ghostCube);
     ghostCube.geometry.dispose();
     ghostCube.material.dispose();

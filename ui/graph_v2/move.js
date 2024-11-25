@@ -54,7 +54,10 @@ const loginName = localStorage.getItem("login_block") || "no_login";
 
 window.fileMetadata = new Map(); // Track file metadata globally
 
-setupDragAndDrop();
+export function initiateMove() {
+  setupDragAndDrop();
+setupPointerEvents();
+}
 
 
 // this function updates the folder metadata with the current sphere IDs
@@ -1776,7 +1779,7 @@ window.addEventListener('checkboxStateChanged', (event) => {
   markNeedsRender();
 });
 
-setupPointerEvents();
+// setupPointerEvents();
 window.handleFileDrop_sphere = handleFileDrop_sphere;
 window.removeGhostCube = removeGhostCube;
 window.onPointerUp = onPointerUp;

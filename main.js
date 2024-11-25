@@ -1,12 +1,15 @@
 // import { editor } from "./quillEditor.js";
-import { showPopup } from "./ui/popup.js";
-import { getObjectUnderPointer } from "./ui/graph_v2/move";
+
+// import { sceneState } from "./memory/collaboration/scene_colab";
+// import { initializeGraph, share3dDat } from "./ui/graph_v2/create";
+import { share3dDat } from "./ui/graph_v2/create";
+import { getObjectUnderPointer, initiateMove} from "./ui/graph_v2/move";
 import {
   initializeFileSystem,
   getFileSystem,
 } from "./memory/collaboration/file_colab";
+import { showPopup } from "./ui/popup.js";
 import { sceneState } from "./memory/collaboration/scene_colab";
-import { initializeGraph, share3dDat } from "./ui/graph_v2/create";
 import { p2pSync } from "./network/peer2peer_simple"; // Import the P2PSync class
 import embeddingWorker from "./ai/embeddings.js";
 import { initiate } from "./memory/vectorDB/vectorDbGateway.js"; // Assuming your initiate function is exported
@@ -36,12 +39,12 @@ async function main() {
   setupDatabaseModal(); 
   initializeDatabases();
   in_memory_store.loadFromLocalStorage();
-  
+  initiateMove();
   // settingsPills.setupEventListeners();
-  console.log("Initializing main function");
+  // console.log("Initializing main function");
 
   // Initialize SettingsPills
-  console.log("Initializing SettingsPills");
+  // console.log("Initializing SettingsPills");
   settingsPills.setupEventListeners();
 
   // Other initialization code...
@@ -67,7 +70,7 @@ async function main() {
   updateFileTreeUI()
 
   // Initialize the graph and SceneState
-  await initializeGraph();
+  // await initializeGraph();
 
   initiate_gui_controls();
 

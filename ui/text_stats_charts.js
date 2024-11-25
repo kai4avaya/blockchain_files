@@ -16,14 +16,22 @@ const ANIMATION_CONFIG = {
 export async function createTextStatsCharts(fileId) {
   try {
     const stats = await indexDBOverlay.getItem('text_stats', fileId);
-    if (!stats) return null;
+    console.log('Retrieved stats:', stats);
+    
+    if (!stats) {
+      console.log('No stats found for fileId:', fileId);
+      return null;
+    }
 
-    return {
+    const charts = {
       readabilityChart: createReadabilityChart(stats.readabilityScores),
       paragraphLengthChart: createParagraphDistributionChart(stats.paragraphStats),
       sentenceTypesChart: createSentenceTypesChart(stats.sentenceTypes),
-      wordStatsChart: createWordStatsRadarChart(stats.wordStats)
+      wordStatsRadarChart: createWordStatsRadarChart(stats.wordStats)
     };
+
+    console.log('Created chart configs:', charts);
+    return charts;
   } catch (error) {
     console.error('Error creating text stats charts:', error);
     return null;
@@ -142,69 +150,80 @@ function createSentenceTypesChart(sentenceTypes) {
       plugins: {
         title: {
           display: true,
-          text: 'Sentence Types Distribution'
+          text: 'Sentence Types Distribution',
+          font: {
+            size: 14
+          }
         },
         legend: {
-          position: 'bottom'
+          position: 'bottom',
+          labels: {
+            font: {
+              size: 11
+            }
+          }
         }
       },
-      cutout: '60%'
+      cutout: '80%',
+      maintainAspectRatio: true,
+      aspectRatio: 1.5
     }
   };
 }
 
 function createWordStatsRadarChart(wordStats) {
-  const maxValues = {
-    total: Math.max(wordStats.total, 300),
-    unique: Math.max(wordStats.unique, 200),
-    averageLength: Math.max(wordStats.averageLength, 10)
-  };
+  console.log('Input wordStats:', wordStats);
+  
+  const data = [
+    wordStats.total || 0,
+    wordStats.unique || 0,
+    (wordStats.averageLength || 0) * 20
+  ];
+  
+  console.log('Processed data array:', data);
 
   return {
     type: 'radar',
     data: {
-      labels: ['Total Words', 'Unique Words', 'Avg Word Length'],
+      labels: ['Total Words', 'Unique Words', 'Avg Word Length (×20)'],
       datasets: [{
         label: 'Word Statistics',
-        data: [
-          (wordStats.total / maxValues.total) * 100,
-          (wordStats.unique / maxValues.unique) * 100,
-          (wordStats.averageLength / maxValues.averageLength) * 100
-        ],
-        backgroundColor: CHART_COLORS.background,
-        borderColor: CHART_COLORS.primary,
-        pointBackgroundColor: CHART_COLORS.accent,
+        data: data,
+        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        borderColor: 'rgb(54, 162, 235)',
+        borderWidth: 2,
+        pointBackgroundColor: 'rgb(54, 162, 235)',
         pointBorderColor: '#fff',
         pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: CHART_COLORS.primary
+        pointHoverBorderColor: 'rgb(54, 162, 235)',
+        pointRadius: 4
       }]
     },
     options: {
       responsive: true,
-      animation: {
-        ...ANIMATION_CONFIG,
-        animateRotate: true,
-        animateScale: true
-      },
-      plugins: {
-        title: {
-          display: true,
-          text: 'Word Statistics'
-        }
-      },
+      maintainAspectRatio: true,
       scales: {
         r: {
           beginAtZero: true,
-          max: 100,
           ticks: {
-            stepSize: 20
-          },
-          grid: {
-            color: CHART_COLORS.background
-          },
-          pointLabels: {
-            font: {
-              size: 12
+            callback: function(value) {
+              return value;
+            }
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const value = context.raw;
+              const index = context.dataIndex;
+              return index === 2 
+                ? `${context.label.replace(' (×20)', '')}: ${(value/20).toFixed(2)}`
+                : `${context.label}: ${Math.round(value)}`;
             }
           }
         }

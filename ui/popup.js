@@ -442,8 +442,9 @@ overlay.classList.add('show');
           <canvas id="readabilityChart" width="400" height="200"></canvas>
           <canvas id="paragraphLengthChart" width="400" height="200"></canvas>
           <div class="charts-row">
-            <canvas id="sentenceTypesChart" width="200" height="200"></canvas>
             <canvas id="wordStatsChart" width="200" height="200"></canvas>
+            <canvas id="sentenceTypesChart" width="200" height="200"></canvas>
+
           </div>
         </div>
       </div>
@@ -474,10 +475,16 @@ overlay.classList.add('show');
     // Create the charts if text stats are available
     const charts = await createTextStatsCharts(metadata.id);
     if (charts) {
-      new Chart(document.getElementById('readabilityChart').getContext('2d'), charts.readabilityChart);
-      new Chart(document.getElementById('paragraphLengthChart').getContext('2d'), charts.paragraphLengthChart);
-      new Chart(document.getElementById('sentenceTypesChart').getContext('2d'), charts.sentenceTypesChart);
-      new Chart(document.getElementById('wordStatsChart').getContext('2d'), charts.wordStatsRadarChart);
+      console.log('Creating charts with config:', charts); // Debug log
+      try {
+        new Chart(document.getElementById('readabilityChart').getContext('2d'), charts.readabilityChart);
+        new Chart(document.getElementById('paragraphLengthChart').getContext('2d'), charts.paragraphLengthChart);
+        new Chart(document.getElementById('sentenceTypesChart').getContext('2d'), charts.sentenceTypesChart);
+        new Chart(document.getElementById('wordStatsChart').getContext('2d'), charts.wordStatsRadarChart); // Match this name
+        console.log('Charts created successfully');
+      } catch (error) {
+        console.error('Error creating charts:', error);
+      }
     }
 
     // Add CSS for the delete button
