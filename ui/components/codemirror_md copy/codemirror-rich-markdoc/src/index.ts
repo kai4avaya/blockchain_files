@@ -3,6 +3,7 @@ import { syntaxHighlighting } from '@codemirror/language';
 import { markdown } from '@codemirror/lang-markdown';
 import { Extension } from '@codemirror/state';
 import { atMentionsExtension } from '../editor/extensions/atMentions';
+import { imageUploadExtension } from '../editor/extensions/imageUpload';
 
 import tagParser from './tagParser';
 import highlightStyle from './highlightStyle';
@@ -21,6 +22,7 @@ export default function (config: MarkdocPluginConfig): Extension {
 
   return [
     atMentionsExtension,
+    imageUploadExtension,
     ViewPlugin.fromClass(RichEditPlugin, {
       decorations: v => v.decorations,
       provide: v => [

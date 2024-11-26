@@ -40,6 +40,49 @@ const imageUploadPlugin = ViewPlugin.fromClass(class {
     
     // Add drop zone styling to editor
     view.dom.classList.add('cm-image-dropzone')
+
+    // Add drag event listeners directly to ensure they work
+    view.dom.addEventListener('dragenter', (e) => {
+      e.preventDefault()
+      view.dom.classList.add('cm-image-dropzone-active')
+    })
+
+    view.dom.addEventListener('dragover', (e) => {
+      e.preventDefault()
+      view.dom.classList.add('cm-image-dropzone-active')
+    })
+
+    view.dom.addEventListener('dragleave', (e) => {
+      e.preventDefault()
+      view.dom.classList.remove('cm-image-dropzone-active')
+    })
+
+    view.dom.addEventListener('drop', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      view.dom.classList.remove('cm-image-dropzone-active')
+
+      const files = e.dataTransfer?.files
+      if (!files || files.length === 0) return
+
+      const file = files[0]
+      if (!file.type.startsWith('image/')) return
+
+      // Use cursor position if no specific drop position
+      const pos = view.state.selection.main.head
+
+      // Create a temporary URL for the image
+      const url = URL.createObjectURL(file)
+
+      // Insert markdown image syntax at cursor position
+      view.dispatch({
+        changes: {
+          from: pos,
+          insert: `![${file.name}](${url})\n`
+        },
+        effects: insertImageEffect.of({ url, pos })
+      })
+    })
   }
 
   update(update: any) {
@@ -57,61 +100,7 @@ const imageUploadPlugin = ViewPlugin.fromClass(class {
     }
   }
 }, {
-  decorations: v => v.decorations,
-
-  // Handle drag and drop events
-  eventHandlers: {
-    dragover(e: DragEvent, view: EditorView) {
-      e.preventDefault()
-      view.dom.classList.add('cm-image-dropzone-active')
-    },
-
-    dragleave(e: DragEvent, view: EditorView) {
-      e.preventDefault()
-      view.dom.classList.remove('cm-image-dropzone-active')
-    },
-
-    async drop(e: DragEvent, view: EditorView) {
-      e.preventDefault()
-      view.dom.classList.remove('cm-image-dropzone-active')
-
-      const files = e.dataTransfer?.files
-      if (!files || files.length === 0) return
-
-      const file = files[0]
-      if (!file.type.startsWith('image/')) return
-
-      try {
-        // Get drop position from mouse coordinates
-        const pos = view.posAtCoords({ x: e.clientX, y: e.clientY })
-        if (pos === null) return
-
-        // Create a temporary URL for the image
-        const url = URL.createObjectURL(file)
-
-        // Insert markdown image syntax at cursor position
-        view.dispatch({
-          changes: {
-            from: pos,
-            insert: `![${file.name}](${url})\n`
-          },
-          effects: insertImageEffect.of({ url, pos })
-        })
-
-        // Optional: Upload file to server
-        // const formData = new FormData()
-        // formData.append('image', file)
-        // const response = await fetch('/api/upload', {
-        //   method: 'POST',
-        //   body: formData
-        // })
-        // const { url: permanentUrl } = await response.json()
-        
-      } catch (error) {
-        console.error('Error handling image drop:', error)
-      }
-    }
-  }
+  decorations: v => v.decorations
 })
 
 // Add some CSS for the dropzone
