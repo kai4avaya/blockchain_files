@@ -505,3 +505,32 @@
 .at-mention-item.selected {
   background-color: #e5e7eb;
 }
+
+.revoke-btn {
+    background: none;
+    border: none;
+    color: #6b7280;
+    font-size: 18px;
+    padding: 0 4px;
+    margin-left: 8px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.revoke-btn:hover {
+    opacity: 1;
+    background-color: #fee2e2;
+    color: #ef4444;
+}
+
+.pill.removing {
+    opacity: 0;
+    transform: scale(0.9);
+}

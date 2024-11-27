@@ -1,12 +1,10 @@
 // ui\components\database_modal\modalHandler.js
 
-import { p2pSync } from '../../../network/peer2peer_simple';
 import indexDBOverlay from '../../../memory/local/file_worker';
 // import { generateUniqueId } from '../../../utils/utils';
 import config from '../../../configs/config.json'
 import { showNotification } from '../notifications/popover.js';
 import { createAndInitializeNewDatabaseInstance } from '../../../memory/local/start_new_db';
-import toast from '../toast-alert';
 
 // Add loading spinner HTML template
 const buttonSpinnerTemplate = `
@@ -197,51 +195,14 @@ async function fetchPeersForDB(dbName) {
 }
 
 function generatePeerPills(peers) {
-    const container = document.createElement('div');
-    container.className = 'peer-pills-container';
-    container.innerHTML = peers
+    return peers
         .map((peerId) => `
             <span class="pill">
                 ${peerId}
-                <button class="revoke-btn" data-peer="${peerId}">×</button>
+                <button class="revoke-btn" data-peer="${peerId}">x</button>
             </span>
         `)
         .join('');
-    
-    setupPeerPillListeners(container);
-    return container.outerHTML;
-}
-
-function setupPeerPillListeners(container) {
-    container.addEventListener('click', async (event) => {
-        if (event.target.classList.contains('revoke-btn')) {
-            const peerId = event.target.dataset.peer;
-            const pill = event.target.closest('.pill');
-            
-            try {
-                // Remove peer using p2pSync
-                await p2pSync.disconnectPeer(peerId);
-                
-                // Mark peer as deleted in IndexDB
-                await indexDBOverlay.saveData('peers', {
-                    peerId: peerId,
-                    isDeleted: true,
-                    timestamp: Date.now()
-                });
-                
-                // Animate and remove pill
-                pill.style.opacity = '0';
-                setTimeout(() => pill.remove(), 300);
-                
-                // Show success toast
-                toast.show(`Peer ${peerId} has been removed`, 'success');
-                
-            } catch (error) {
-                console.error('Error removing peer:', error);
-                toast.show(`Failed to remove peer: ${error.message}`, 'error');
-            }
-        }
-    });
 }
 
 databasesContainer.addEventListener('click', (event) => {
