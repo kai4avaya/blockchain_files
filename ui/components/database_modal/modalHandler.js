@@ -216,41 +216,77 @@ function setupPeerPillListeners(container) {
     container.addEventListener('click', async (event) => {
         if (event.target.classList.contains('revoke-btn')) {
             const peerId = event.target.dataset.peer;
-            const pill = event.target.closest('.pill');
+            const accordionElement = event.target.closest('.accordion');
+            const dbName = accordionElement.getAttribute('data-db-name');
             
-            try {
-                // Remove peer using p2pSync
-                await p2pSync.disconnectPeer(peerId);
-                
-                // Mark peer as deleted in IndexDB
-                await indexDBOverlay.saveData('peers', {
-                    peerId: peerId,
-                    isDeleted: true,
-                    timestamp: Date.now()
-                });
-                
-                // Animate and remove pill
-                pill.style.opacity = '0';
-                setTimeout(() => pill.remove(), 300);
-                
-                // Show success toast
-                toast.show(`Peer ${peerId} has been removed`, 'success');
-                
-            } catch (error) {
-                console.error('Error removing peer:', error);
-                toast.show(`Failed to remove peer: ${error.message}`, 'error');
+            if (!dbName) {
+                toast.show('Could not determine database name', 'error');
+                return;
+            }
+
+            const confirmRevoke = confirm(`Do you want to revoke sharing with ${peerId}?`);
+            if (confirmRevoke) {
+                try {
+                    // Remove peer using p2pSync
+                    await p2pSync.disconnectPeer(peerId);
+                    
+                    // Remove from database
+                    await revokePeerSharing(dbName, peerId);
+                    
+                    // Remove the pill with animation
+                    const pill = event.target.closest('.pill');
+                    pill.classList.add('removing');
+                    
+                    setTimeout(() => {
+                        pill.remove();
+                    }, 300);
+                    
+                    toast.show(`Peer ${peerId} has been removed`, 'success');
+                    
+                } catch (error) {
+                    console.error('Error removing peer:', error);
+                    toast.show(`Failed to remove peer: ${error.message}`, 'error');
+                }
             }
         }
     });
 }
 
-databasesContainer.addEventListener('click', (event) => {
+databasesContainer.addEventListener('click', async (event) => {
     if (event.target.classList.contains('revoke-btn')) {
         const peer = event.target.dataset.peer;
-        const dbName = event.target.closest('.accordion-header span').textContent;
+        // Find the database name from the closest accordion element
+        const accordionElement = event.target.closest('.accordion');
+        const dbName = accordionElement.getAttribute('data-db-name');
+        
+        if (!dbName) {
+            toast.show('Could not determine database name', 'error');
+            return;
+        }
+
         const confirmRevoke = confirm(`Do you want to revoke sharing with ${peer}?`);
         if (confirmRevoke) {
-            revokePeerSharing(dbName, peer);
+            try {
+                // Remove peer using p2pSync
+                await p2pSync.disconnectPeer(peer);
+                
+                // Remove from database
+                await revokePeerSharing(dbName, peer);
+                
+                // Remove the pill with animation
+                const pill = event.target.closest('.pill');
+                pill.classList.add('removing');
+                
+                setTimeout(() => {
+                    pill.remove();
+                }, 300);
+                
+                toast.show(`Peer ${peer} has been removed`, 'success');
+                
+            } catch (error) {
+                console.error('Error removing peer:', error);
+                toast.show(`Failed to remove peer: ${error.message}`, 'error');
+            }
         }
     }
 });
@@ -259,10 +295,17 @@ async function revokePeerSharing(dbName, peer) {
     try {
         config.dbName = dbName;
         await indexDBOverlay.openDB();
-        await indexDBOverlay.deleteEntry('peers', peer); // Remove peer from peers store
-        loadDatabases(); // Refresh modal content
+        
+        // Use deleteItem_field instead of deleteEntry
+        // This will mark the peer as deleted rather than removing it completely
+        await indexDBOverlay.deleteItem_field('peers', peer);
+        
+        // Alternatively, if you want to completely remove the peer:
+        // await indexDBOverlay.deleteItem('peers', peer);
+        
     } catch (error) {
         console.error(`Failed to revoke peer "${peer}" for database "${dbName}":`, error);
+        throw error;
     }
 }
 

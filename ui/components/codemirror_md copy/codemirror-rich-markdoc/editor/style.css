@@ -534,3 +534,38 @@
     opacity: 0;
     transform: scale(0.9);
 }
+
+/* Add these styles for the peer pill delete animation */
+.revoke-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    transition: all 0.2s ease;
+}
+
+.revoke-btn.loading {
+    pointer-events: none;
+}
+
+.revoke-btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border: 2px solid #f3f4f6;
+    border-top: 2px solid #ef4444;
+    border-radius: 50%;
+    animation: deleteSpinner 0.8s linear infinite;
+}
+
+@keyframes deleteSpinner {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.revoke-btn.loading span {
+    opacity: 0;
+}
