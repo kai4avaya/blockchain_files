@@ -464,8 +464,6 @@ function handleFileDragOver(
   const canvas = renderer.domElement;
   const rect = canvas.getBoundingClientRect();
 
-  console.log("handleFileDragOver")
-
   // Calculate mouse position relative to the canvas
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -491,8 +489,6 @@ function handleFileDragOver(
   } else {
     removeGhostCube();
   }
-
-  console.log("solidCubeIntersect", solidCubeIntersect)
 
   if (solidCubeIntersect) {
     console.log("highlighting cube", solidCubeIntersect.object)
@@ -985,7 +981,6 @@ async function handleFileDrop_sphere(event) {
   return createdShapes;
 }
 
-
 function resetCubeColor(cube) {
   if (cube && cube.originalMaterial) {
     cube.material = cube.originalMaterial;
@@ -998,14 +993,17 @@ function setupDragAndDrop() {
   const { renderer } = share3dDat(); // Access the renderer to get the canvas
   const canvas = renderer.domElement;
 
+  // Add these data transfer effects explicitly
   canvas.addEventListener("dragenter", (event) => {
     event.preventDefault();
+    event.dataTransfer.dropEffect = "copy"; // Show copy cursor
     isFileDragging = true;
     isDragging = true;
   });
 
   canvas.addEventListener("dragover", (event) => {
     event.preventDefault();
+    event.dataTransfer.dropEffect = "copy"; // Show copy cursor
     if (isFileDragging) {
       handleFileDragOver(event);
     }
@@ -1013,7 +1011,7 @@ function setupDragAndDrop() {
 
   canvas.addEventListener("drop", (event) => {
     event.preventDefault();
-    // tabDrop(event);
+    event.stopPropagation(); // Add this to prevent event bubbling
     handleFileDrop_sphere(event);
     removeGhostCube();
     onPointerUp(event);
@@ -1021,10 +1019,22 @@ function setupDragAndDrop() {
 
   canvas.addEventListener("dragleave", (event) => {
     event.preventDefault();
+    event.stopPropagation(); // Add this to prevent event bubbling
     isFileDragging = false;
+    isDragging = false; // Reset isDragging state
     resetCubeHighlight();
     removeGhostCube();
   });
+
+  // Add this to handle cases where drag is canceled
+  canvas.addEventListener("dragend", (event) => {
+    event.preventDefault();
+    isFileDragging = false;
+    isDragging = false;
+    resetCubeHighlight();
+    removeGhostCube();
+  });
+
   canvas.addEventListener('tabDrop', dropExporter);
 }
 
@@ -1768,4 +1778,5 @@ window.addEventListener('checkboxStateChanged', (event) => {
 window.handleFileDrop_sphere = handleFileDrop_sphere;
 window.removeGhostCube = removeGhostCube;
 window.onPointerUp = onPointerUp;
+
 
