@@ -17,7 +17,6 @@ class AIPluginView {
   private currentStreamId: string | null = null;
   private stopButton!: HTMLButtonElement;
   private view: EditorView;
-  private generatingInterval: NodeJS.Timeout | null = null;
 
   constructor(view: EditorView) {
     this.view = view;
@@ -93,36 +92,11 @@ class AIPluginView {
       view.dispatch({
         changes: {
           from: line.to,
-          insert: '\nGenerating.'
-        }
-      });
-      
-      let dots = 1;
-      this.generatingInterval = setInterval(() => {
-        view.dispatch({
-          changes: {
-            from: line.to + 11, // "Generating" length is 10 + 1 for newline
-            to: line.to + 11 + dots,
-            insert: '.'.repeat((dots % 3) + 1)
-          }
-        });
-        dots = (dots % 3) + 1;
-      }, 500);
-      
-      const response = await contextManager.getContextualResponse(prompt);
-      
-      if (this.generatingInterval) {
-        clearInterval(this.generatingInterval);
-        this.generatingInterval = null;
-      }
-      view.dispatch({
-        changes: {
-          from: line.to,
-          to: line.to + 14, // Maximum length of "Generating..." + newline
           insert: '\n'
         }
       });
       
+      const response = await contextManager.getContextualResponse(prompt);
       let fullText = '';
       
       for await (const chunk of response) {
@@ -191,10 +165,6 @@ class AIPluginView {
       }
 
     } catch (error) {
-      if (this.generatingInterval) {
-        clearInterval(this.generatingInterval);
-        this.generatingInterval = null;
-      }
       console.error('Error getting response:', error);
       this.handleError(view, line, error);
     } finally {
@@ -277,17 +247,9 @@ class AIPluginView {
         });
       }
     }
-    if (this.generatingInterval) {
-      clearInterval(this.generatingInterval);
-      this.generatingInterval = null;
-    }
   }
 
   destroy() {
-    if (this.generatingInterval) {
-      clearInterval(this.generatingInterval);
-      this.generatingInterval = null;
-    }
     this.stopButton.remove();
   }
 }

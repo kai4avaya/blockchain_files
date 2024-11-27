@@ -32,7 +32,7 @@ import MouseOverlayCanvas from "./MouseOverlayCanvas";
 import { Frustum, Matrix4 } from "three";
 import indexDBOverlay from '../../memory/local/file_worker';
 // import { showContextMenu , contextMenu, hideContextMenu} from "./canvas_menu.js";
-import {createMiniMap} from './createMiniMap.js'; 
+
 
 const frustum = new Frustum();
 const projScreenMatrix = new Matrix4();
@@ -267,6 +267,85 @@ function getCachedMaterial(type, params) {
   return materialCache.get(key);
 }
 
+const updateMiniMap = createMiniMap(scene, nonBloomScene, camera, renderer);
+
+// Add this function to your code
+function addGridHelper() {
+  const size = 100;
+  const divisions = 100;
+  const gridHelper = new THREE.GridHelper(size, divisions);
+  scene.add(gridHelper);
+}
+
+function createEnvironment() {
+  // Create a large grid
+  const gridSize = 1000;
+  const gridDivisions = 100;
+  const gridHelper = new THREE.GridHelper(
+    gridSize,
+    gridDivisions,
+    0x444444,
+    0x444444
+  );
+  scene.add(gridHelper);
+
+  // Add ambient light
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+
+  // Add directional light
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  directionalLight.position.set(1, 1, 1).normalize();
+  scene.add(directionalLight);
+}
+
+function loadTerrain(file, callback) {
+  const xhr = new XMLHttpRequest();
+  xhr.responseType = "arraybuffer";
+  xhr.open("GET", file, true);
+  xhr.onload = function (evt) {
+    if (xhr.response) {
+      callback(new Uint16Array(xhr.response));
+    }
+  };
+  xhr.send(null);
+}
+
+function createEnvironmentTerrain() {
+  // Set the background to black
+  scene.background = new THREE.Color(0x000000);
+
+  loadTerrain("../../assets/besseggen.bin", function (data) {
+    const width = 199;
+    const height = 199;
+    const geometry = new THREE.PlaneGeometry(60, 60, width - 1, height - 1);
+
+    for (let i = 0, l = geometry.attributes.position.count; i < l; i++) {
+      geometry.attributes.position.setZ(i, (data[i] / 65535) * 10);
+    }
+
+    geometry.computeVertexNormals();
+
+    const material = new THREE.MeshPhongMaterial({
+      color: 0xdddddd,
+      wireframe: true,
+    });
+
+    const terrain = new THREE.Mesh(geometry, material);
+    terrain.rotation.x = -Math.PI / 2; // Rotate to lay flat
+    scene.add(terrain);
+
+    markNeedsRender();
+  });
+
+  // Add lights
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  directionalLight.position.set(1, 1, 1).normalize();
+  scene.add(directionalLight);
+}
 
 controls.addEventListener("change", () => {
   markNeedsRender();
@@ -1139,28 +1218,6 @@ export function markNeedsRender(type = "full") {
             renderState = RENDER_STATES.NEEDS_FULL_RENDER;
             // render();
             break;
-
-      case "immediate":
-        // Force immediate render cycle
-        renderer.renderLists.dispose();
-        renderer.clear();
-        renderer.info.reset();
-        scene.updateMatrixWorld(true);
-        nonBloomScene.updateMatrixWorld(true);
-        bloomComposer.render();
-        finalComposer.render();
-        
-        // Set up for next frame
-        renderState = RENDER_STATES.NEEDS_FULL_RENDER;
-        renderCount = 2; // Force two render cycles
-        
-        // Force an immediate additional render
-        requestAnimationFrame(() => {
-          controls.update();
-          bloomComposer.render();
-          finalComposer.render();
-        });
-        break;
     case "full":
     default:
       renderState = RENDER_STATES.NEEDS_FULL_RENDER;
@@ -1541,232 +1598,196 @@ function addAxesHelper() {
   scene.add(axesHelper);
 }
 
-// export function createMiniMap(scene, nonBloomScene, camera, renderer) {
-//   const mapSize = 150;
-//   const padding = 10;
-//   const borderWidth = 2;
+export function createMiniMap(scene, nonBloomScene, camera, renderer) {
+  const mapSize = 150;
+  const padding = 10;
+  const borderWidth = 2;
 
-//   // Create container div for border with higher z-index
-//   const container = document.createElement("div");
-//   container.style.position = "fixed"; // Change to fixed
-//   container.style.right = `${padding}px`;
-//   container.style.bottom = `${padding}px`;
-//   container.style.width = `${mapSize + 2 * borderWidth}px`;
-//   container.style.height = `${mapSize + 2 * borderWidth}px`;
-//   container.style.backgroundColor = "rgba(211, 211, 211, 0.5)";
-//   container.style.padding = `${borderWidth}px`;
-//   container.style.zIndex = "1000"; // Add high z-index
-//   container.style.pointerEvents = "auto"; // Ensure clicks are captured
-//   document.body.appendChild(container);
+  // Create container div for border
+  const container = document.createElement("div");
+  container.style.position = "absolute";
+  container.style.right = `${padding}px`;
+  container.style.bottom = `${padding}px`;
+  container.style.width = `${mapSize + 2 * borderWidth}px`;
+  container.style.height = `${mapSize + 2 * borderWidth}px`;
+  container.style.backgroundColor = "rgba(211, 211, 211, 0.5)";
+  container.style.padding = `${borderWidth}px`;
+  document.body.appendChild(container);
 
-//   // Add recenter button
-//   const recenterBtn = document.createElement("div");
-//   recenterBtn.innerHTML = "⌖"; // Crosshair symbol
-//   recenterBtn.style.position = "absolute";
-//   recenterBtn.style.top = "5px";
-//   recenterBtn.style.left = "5px";
-//   recenterBtn.style.width = "20px";
-//   recenterBtn.style.height = "20px";
-//   recenterBtn.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-//   recenterBtn.style.color = "white";
-//   recenterBtn.style.borderRadius = "50%";
-//   recenterBtn.style.display = "flex";
-//   recenterBtn.style.alignItems = "center";
-//   recenterBtn.style.justifyContent = "center";
-//   recenterBtn.style.cursor = "pointer";
-//   recenterBtn.style.fontSize = "14px";
-//   recenterBtn.style.zIndex = "1001";
-  
-//   recenterBtn.addEventListener("click", (e) => {
-//     e.stopPropagation(); // Prevent minimap click event
-//     // Reset camera position and controls
-//     camera.position.set(0, 0, 20);
-//     controls.target.set(0, 0, 0);
-//     camera.zoom = 1;
-//     camera.updateProjectionMatrix();
-//     controls.update();
-//     markNeedsRender();
-//   });
-  
-//   container.appendChild(recenterBtn);
+  // Create canvas element
+  const canvas = document.createElement("canvas");
+  canvas.width = mapSize;
+  canvas.height = mapSize;
+  canvas.style.display = "block";
+  canvas.style.backgroundColor = "rgba(0,0,0,0.5)";
+  container.appendChild(canvas);
 
-//   // Create canvas element with pointer events
-//   const canvas = document.createElement("canvas");
-//   canvas.width = mapSize;
-//   canvas.height = mapSize;
-//   canvas.style.display = "block";
-//   canvas.style.backgroundColor = "rgba(0,0,0,0.5)";
-//   canvas.style.pointerEvents = "auto"; // Ensure clicks are captured
-//   container.appendChild(canvas);
+  const ctx = canvas.getContext("2d");
 
-//   const ctx = canvas.getContext("2d");
+  // Add click event listener to the canvas
+  canvas.addEventListener("click", (event) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
 
-//   // Add click event listener to the canvas
-//   canvas.addEventListener("click", (event) => {
-//     const rect = canvas.getBoundingClientRect();
-//     const x = event.clientX - rect.left;
-//     const y = event.clientY - rect.top;
+    // Convert mini-map coordinates to world coordinates
+    const worldX = (x / mapSize - 0.5) * 100;
+    const worldZ = (y / mapSize - 0.5) * 100;
 
-//     // Convert mini-map coordinates to world coordinates
-//     const worldX = (x / mapSize - 0.5) * 100;
-//     const worldZ = (y / mapSize - 0.5) * 100;
+    // Set camera position
+    camera.position.x = worldX;
+    camera.position.z = worldZ;
 
-//     // Set camera position
-//     camera.position.x = worldX;
-//     camera.position.z = worldZ;
+    // Update controls target if you're using OrbitControls
+    if (controls) {
+      controls.target.set(worldX, 0, worldZ);
+      controls.update();
+    }
 
-//     // Update controls target if you're using OrbitControls
-//     if (controls) {
-//       controls.target.set(worldX, 0, worldZ);
-//       controls.update();
-//     }
+    markNeedsRender();
+  });
 
-//     markNeedsRender();
-//   });
+  function updateMiniMap() {
+    ctx.clearRect(0, 0, mapSize, mapSize);
 
-//   function updateMiniMap() {
-//     ctx.clearRect(0, 0, mapSize, mapSize);
+    const centerX = mapSize / 2;
+    const centerY = mapSize * 0.8; // Position camera dot near the bottom
 
-//     const centerX = mapSize / 2;
-//     const centerY = mapSize * 0.8; // Position camera dot near the bottom
+    // Calculate bounds of all objects
+    let minX = Infinity,
+      maxX = -Infinity,
+      minZ = Infinity,
+      maxZ = -Infinity;
+    function updateBounds(sceneToCheck) {
+      sceneToCheck.traverse((object) => {
+        if (object.isMesh) {
+          minX = Math.min(minX, object.position.x);
+          maxX = Math.max(maxX, object.position.x);
+          minZ = Math.min(minZ, object.position.z);
+          maxZ = Math.max(maxZ, object.position.z);
+        }
+      });
+    }
+    updateBounds(scene);
+    updateBounds(nonBloomScene);
 
-//     // Calculate bounds of all objects
-//     let minX = Infinity,
-//       maxX = -Infinity,
-//       minZ = Infinity,
-//       maxZ = -Infinity;
-//     function updateBounds(sceneToCheck) {
-//       sceneToCheck.traverse((object) => {
-//         if (object.isMesh) {
-//           minX = Math.min(minX, object.position.x);
-//           maxX = Math.max(maxX, object.position.x);
-//           minZ = Math.min(minZ, object.position.z);
-//           maxZ = Math.max(maxZ, object.position.z);
-//         }
-//       });
-//     }
-//     updateBounds(scene);
-//     updateBounds(nonBloomScene);
+    // Add padding
+    const padding = 50;
+    minX -= padding;
+    maxX += padding;
+    minZ -= padding;
+    maxZ += padding;
 
-//     // Add padding
-//     const padding = 50;
-//     minX -= padding;
-//     maxX += padding;
-//     minZ -= padding;
-//     maxZ += padding;
+    // Ensure the view area is square
+    const range = Math.max(maxX - minX, maxZ - minZ);
 
-//     // Ensure the view area is square
-//     const range = Math.max(maxX - minX, maxZ - minZ);
+    // Calculate scale factor to fit all objects
+    const scaleFactor = (mapSize * 0.6) / range; // 60% of map size to leave margin
 
-//     // Calculate scale factor to fit all objects
-//     const scaleFactor = (mapSize * 0.6) / range; // 60% of map size to leave margin
+    // Function to convert world coordinates to mini-map coordinates
+    function worldToMap(x, z) {
+      return {
+        x: centerX + (x - camera.position.x) * scaleFactor,
+        y: centerY - (z - camera.position.z) * scaleFactor,
+      };
+    }
 
-//     // Function to convert world coordinates to mini-map coordinates
-//     function worldToMap(x, z) {
-//       return {
-//         x: centerX + (x - camera.position.x) * scaleFactor,
-//         y: centerY - (z - camera.position.z) * scaleFactor,
-//       };
-//     }
+    // Function to draw objects from a scene
+    function drawSceneObjects(sceneToRender) {
+      sceneToRender.traverse((object) => {
+        if (object.isMesh) {
+          const { x, y } = worldToMap(object.position.x, object.position.z);
 
-//     // Function to draw objects from a scene
-//     function drawSceneObjects(sceneToRender) {
-//       sceneToRender.traverse((object) => {
-//         if (object.isMesh) {
-//           const { x, y } = worldToMap(object.position.x, object.position.z);
+          let color;
+          if (object.geometry.type === "IcosahedronGeometry") {
+            color = "red";
+          } else if (object.geometry.type === "BoxGeometry") {
+            color = object.material.color.getStyle();
+          } else {
+            return;
+          }
 
-//           let color;
-//           if (object.geometry.type === "IcosahedronGeometry") {
-//             color = "red";
-//           } else if (object.geometry.type === "BoxGeometry") {
-//             color = object.material.color.getStyle();
-//           } else {
-//             return;
-//           }
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+    }
 
-//           ctx.fillStyle = color;
-//           ctx.beginPath();
-//           ctx.arc(x, y, 3, 0, Math.PI * 2);
-//           ctx.fill();
-//         }
-//       });
-//     }
+    // Draw objects from both scenes
+    drawSceneObjects(scene);
+    drawSceneObjects(nonBloomScene);
 
-//     // Draw objects from both scenes
-//     drawSceneObjects(scene);
-//     drawSceneObjects(nonBloomScene);
+    // Calculate camera's visible range based on zoom
+    const visibleRange = 100 / camera.zoom; // Adjust this factor as needed
+    const cameraY = centerY + (visibleRange / 2) * scaleFactor;
 
-//     // Calculate camera's visible range based on zoom
-//     const visibleRange = 100 / camera.zoom; // Adjust this factor as needed
-//     const cameraY = centerY + (visibleRange / 2) * scaleFactor;
+    // Draw camera position
+    ctx.fillStyle = "yellow";
+    ctx.beginPath();
+    ctx.arc(centerX, cameraY, 5, 0, Math.PI * 2);
+    ctx.fill();
 
-//     // Draw camera position
-//     ctx.fillStyle = "yellow";
-//     ctx.beginPath();
-//     ctx.arc(centerX, cameraY, 5, 0, Math.PI * 2);
-//     ctx.fill();
+    // Calculate view frustum
+    const fov = (camera.fov * Math.PI) / 180;
+    const aspect = camera.aspect;
+    const nearDistance = 10 * scaleFactor;
+    const farDistance = visibleRange * scaleFactor;
 
-//     // Calculate view frustum
-//     const fov = (camera.fov * Math.PI) / 180;
-//     const aspect = camera.aspect;
-//     const nearDistance = 10 * scaleFactor;
-//     const farDistance = visibleRange * scaleFactor;
+    // Draw viewpoint cone
+    ctx.strokeStyle = "rgba(255, 255, 0, 0.5)";
+    ctx.fillStyle = "rgba(255, 255, 0, 0.1)";
+    ctx.beginPath();
+    ctx.moveTo(centerX, cameraY);
+    ctx.lineTo(
+      centerX + Math.tan(fov / 2) * aspect * nearDistance,
+      cameraY - nearDistance
+    );
+    ctx.lineTo(
+      centerX + Math.tan(fov / 2) * aspect * farDistance,
+      cameraY - farDistance
+    );
+    ctx.lineTo(
+      centerX - Math.tan(fov / 2) * aspect * farDistance,
+      cameraY - farDistance
+    );
+    ctx.lineTo(
+      centerX - Math.tan(fov / 2) * aspect * nearDistance,
+      cameraY - nearDistance
+    );
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
 
-//     // Draw viewpoint cone
-//     ctx.strokeStyle = "rgba(255, 255, 0, 0.5)";
-//     ctx.fillStyle = "rgba(255, 255, 0, 0.1)";
-//     ctx.beginPath();
-//     ctx.moveTo(centerX, cameraY);
-//     ctx.lineTo(
-//       centerX + Math.tan(fov / 2) * aspect * nearDistance,
-//       cameraY - nearDistance
-//     );
-//     ctx.lineTo(
-//       centerX + Math.tan(fov / 2) * aspect * farDistance,
-//       cameraY - farDistance
-//     );
-//     ctx.lineTo(
-//       centerX - Math.tan(fov / 2) * aspect * farDistance,
-//       cameraY - farDistance
-//     );
-//     ctx.lineTo(
-//       centerX - Math.tan(fov / 2) * aspect * nearDistance,
-//       cameraY - nearDistance
-//     );
-//     ctx.closePath();
-//     ctx.fill();
-//     ctx.stroke();
+    // Draw compass
+    const compassRadius = 15;
+    const compassX = mapSize - compassRadius - 5;
+    const compassY = compassRadius + 5;
 
-//     // Draw compass
-//     const compassRadius = 15;
-//     const compassX = mapSize - compassRadius - 5;
-//     const compassY = compassRadius + 5;
+    ctx.save();
+    ctx.translate(compassX, compassY);
+    ctx.rotate(-camera.rotation.y);
 
-//     ctx.save();
-//     ctx.translate(compassX, compassY);
-//     ctx.rotate(-camera.rotation.y);
+    ctx.strokeStyle = "white";
+    ctx.beginPath();
+    ctx.moveTo(0, -compassRadius);
+    ctx.lineTo(0, compassRadius);
+    ctx.moveTo(0, -compassRadius);
+    ctx.lineTo(-compassRadius / 2, 0);
+    ctx.moveTo(0, -compassRadius);
+    ctx.lineTo(compassRadius / 2, 0);
+    ctx.stroke();
 
-//     ctx.strokeStyle = "white";
-//     ctx.beginPath();
-//     ctx.moveTo(0, -compassRadius);
-//     ctx.lineTo(0, compassRadius);
-//     ctx.moveTo(0, -compassRadius);
-//     ctx.lineTo(-compassRadius / 2, 0);
-//     ctx.moveTo(0, -compassRadius);
-//     ctx.lineTo(compassRadius / 2, 0);
-//     ctx.stroke();
+    ctx.restore();
+  }
 
-//     ctx.restore();
-//   }
+  // Initial update
+  updateMiniMap();
 
-//   // Initial update
-//   updateMiniMap();
-
-//   // Return the update function
-//   return updateMiniMap;
-// }
-
-
+  // Return the update function
+  return updateMiniMap;
+}
 
 const deletedObjects = new Set();
 
@@ -1784,7 +1805,4 @@ function cleanupResources() {
   geometryCache.clear();
 }
 window.addEventListener("beforeunload", cleanupResources);
-
-const updateMiniMap = createMiniMap(camera, scene, nonBloomScene, markNeedsRender, controls);
-
 

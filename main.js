@@ -26,6 +26,7 @@ import in_memory_store from './memory/local/in_memory'; // Adjust the import pat
 import {settingsPills} from './ui/components/settings_pills.js';
 import { eventBus } from './ui/eventBus.js';
 import { ShareManager } from "./network/share_manager";
+// import {createMiniMap} from './ui/graph_v2/createMiniMap.js';
 
 
 let tabManager = null;
@@ -78,8 +79,11 @@ async function main() {
   initiate_gui_controls();
 
   const { renderer, scene, nonBloomScene, mouseOverlay } = share3dDat();
+  // const updateMiniMap = createMiniMap()
+
 
   await sceneState.initialize(scene, nonBloomScene);
+
 
   if (!renderer) {
     console.error("Renderer is not initialized.");

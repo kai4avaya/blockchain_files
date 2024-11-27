@@ -677,7 +677,7 @@ canvas {
   max-width: 300px;
   width: 90%;
   padding: 0.75rem;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   /* For Safari */
@@ -712,6 +712,9 @@ canvas {
   transition: opacity 0.3s ease-out, transform 0.3s ease-out;
   opacity: 1;
   transform: translateY(0);
+  background-color: rgba(240, 240, 240, 0.9);
+  padding: 8px 12px;
+  border-radius: 6px;
 }
 
 .status-item.fade-out {
@@ -742,16 +745,17 @@ canvas {
   margin-bottom: 0.5rem;
   opacity: 0;
   animation: fadeIn 0.5s ease-in forwards;
+  background-color: rgba(240, 240, 240, 0.9);
+  padding: 8px 12px;
+  border-radius: 6px;
 }
 
 .status-item span {
   font-family: 'Courier New', monospace;
   color: #3498db;
-  /* Keeping the blue color */
   font-size: 14px;
   margin-right: 10px;
-  text-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
-  /* Subtle glow for readability */
+  text-shadow: none;
 }
 
 @keyframes fadeIn {
@@ -1637,7 +1641,7 @@ vertical-align: middle;
   max-width: 300px;
   width: 90%;
   padding: 0.75rem;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-radius: 10px;
@@ -2059,4 +2063,45 @@ vertical-align: middle;
   background-color: #f0f0f0;
   color: #999;
   transform: none;
+}
+
+
+/* Add this to your CSS file */
+.minimap-container {
+  position: fixed !important;
+  bottom: 10px;
+  right: 10px;
+  z-index: 9999 !important; /* Very high z-index to ensure it's above everything */
+  pointer-events: auto !important;
+  user-select: none;
+  background-color: rgba(211, 211, 211, 0.5);
+  border-radius: 4px;
+}
+
+.minimap-canvas {
+  display: block;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.minimap-recenter-btn {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 20px;
+  height: 20px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  z-index: 10000;
+  border: none;
+  padding: 0;
+}
+
+.minimap-recenter-btn:hover {
+  background-color: rgba(0, 0, 0, 0.7);
 }
