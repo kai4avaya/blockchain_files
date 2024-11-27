@@ -102,6 +102,7 @@ class P2PSync {
       
       this.startHeartbeat();
       dbSyncManager.startSync();
+      this.updateButtonStates();
     });
 
     this.peer.on("connection", (conn) => {
@@ -548,6 +549,7 @@ class P2PSync {
     this.reconnectTimers.forEach((timer) => clearTimeout(timer));
     this.reconnectTimers.clear();
     this.updateConnectionStatus();
+    this.updateButtonStates();
   }
 
   getSerializableState(): any {
@@ -836,6 +838,37 @@ class P2PSync {
         this.loadAndDisplayAllPeers();
     }
   }
+
+ updateButtonStates(): void {
+    const connectButton = document.getElementById('connectButton') as HTMLButtonElement;
+    const shareLinkButton = document.getElementById('shareLinkButton') as HTMLButtonElement;
+    const shareQRButton = document.getElementById('shareQRButton') as HTMLButtonElement;
+    const currentPeerId = this.getCurrentPeerId();
+
+    if (currentPeerId) {
+      // Enable share buttons and update connect button
+      if (shareLinkButton) {
+        shareLinkButton.disabled = false;
+      }
+      if (shareQRButton) {
+        shareQRButton.disabled = false;
+      }
+      if (connectButton) {
+        connectButton.disabled = false;
+      }
+    } else {
+      // Disable all buttons
+      if (shareLinkButton) {
+        shareLinkButton.disabled = true;
+      }
+      if (shareQRButton) {
+        shareQRButton.disabled = true;
+      }
+      if (connectButton) {
+        connectButton.disabled = true;
+      }
+    }
+  }
 }
 let isInitialized = false;
 
@@ -932,6 +965,7 @@ function initializeP2PSync() {
     p2pSync.initialize(userId);
     updateStatus(`Initializing with user ID: ${userId}`);
     isInitialized = true;
+    p2pSync.updateButtonStates();
   }
 }
 

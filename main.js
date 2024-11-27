@@ -25,6 +25,7 @@ import in_memory_store from './memory/local/in_memory'; // Adjust the import pat
 // import settingsHandler from './ui/components/se/ttings_modal_handler.js';
 import {settingsPills} from './ui/components/settings_pills.js';
 import { eventBus } from './ui/eventBus.js';
+import { ShareManager } from "./network/share_manager";
 
 
 let tabManager = null;
@@ -46,6 +47,8 @@ async function main() {
   // Initialize SettingsPills
   // console.log("Initializing SettingsPills");
   settingsPills.setupEventListeners();
+  ShareManager.handleIncomingShareLink();
+  
 
   // Other initialization code...
   // ...

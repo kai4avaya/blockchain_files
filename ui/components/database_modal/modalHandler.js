@@ -41,7 +41,7 @@ async function loadDatabases() {
         dbAccordion.innerHTML = `
             <div class="accordion-header">
                 <span>${displayName}</span>
-                <button class="accordion-toggle">Toggle</button>
+                <button class="accordion-toggle">View Peers</button>
                 <button class="delete-db-button">Delete</button>
             </div>
             <div class="accordion-content">
