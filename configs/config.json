@@ -38,6 +38,9 @@
       }
     },
     "vectors_hashIndex": {
+    },
+    "images": {
+      "keyPath": "id"
     }
   },
   "vector_docs_query_limit":5,

@@ -2007,4 +2007,28 @@ vertical-align: middle;
 /* Remove margin-right since we're using gap */
 }
 
-/* If you want to target specifically the connect button */
+/* Add these styles for the share buttons */
+.modal button[id*="share"] {
+  background-color: #f5f5f5;
+  color: #666;
+  border: 1px solid #ddd;
+  padding: 6px 12px;
+  font-size: 13px;
+  min-height: 32px;
+  transition: all 0.2s ease;
+}
+
+.modal button[id*="share"]:hover:not(:disabled) {
+  background-color: #eee;
+  color: #333;
+}
+
+.modal button[id*="share"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.modal button[id*="share"] .small-icon {
+  width: 14px;
+  height: 14px;
+}

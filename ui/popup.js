@@ -83,7 +83,6 @@ export async function showPopup(metadata, x, y) {
       'js': 'application/javascript',
       'json': 'application/json',
       'pdf': 'application/pdf',
-      // Add more mappings as needed
     }[extension] || 'application/octet-stream';
   }
 
@@ -320,18 +319,6 @@ overlay.classList.add('show');
   popupContent.addEventListener('click', function(event) {
     event.stopPropagation();
   });
-
-  // Function to Close Popup
-  // function closePopup() {
-  //   popup.style.display = 'none';
-  //   overlay.style.display = 'none';
-  //   document.removeEventListener('keydown', handleKeyPress);
-  //   overlay.removeEventListener('click', handleOverlayClick);
-  //   const closeButton = document.getElementById('popupClose');
-  //   if (closeButton) {
-  //     closeButton.removeEventListener('click', closePopup);
-  //   }
-  // }
 
   function closePopup() {
     const popup = document.getElementById('popup');

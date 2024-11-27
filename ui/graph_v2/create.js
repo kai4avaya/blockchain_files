@@ -120,6 +120,18 @@ controls.minDistance = 0.1;
 
 // controls.maxDistance = 100;
 controls.maxDistance = 1000; // Increased Max Distance
+
+
+controls.enableDamping = true; // Add smooth damping effect
+// controls.dampingFactor = 0.05;
+controls.screenSpacePanning = false; // Disable 2D panning
+// controls.maxPolarAngle = Math.PI / 2; // Limit vertical rotation to prevent going below the scene
+// controls.minDistance = 5; // Minimum zoom distance
+// controls.maxDistance = 500; // Maximum zoom distance
+controls.target.set(0, 0, 0); // Set the orbit target to scene center
+controls.enableRotate = true;
+controls.rotateSpeed = 0.5;
+
 let needsRender = false;
 let renderCount = 0;
 
@@ -679,10 +691,6 @@ export function createSphere(convertedData) {
 
   const material = getCachedMaterial("basic", { color });
   const sphere = new THREE.Mesh(sphereGeometry, material);
-
-
-
-
   // Create sphere using the global geometry and updated material
   // const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
   makeObjectWritable(sphere);
@@ -742,12 +750,7 @@ export function createSphere(convertedData) {
     // Add the label to labelMap
     labelMap.set(filename, label);
 
-  // if (Math.random() < 0.25) sphere.layers.enable(BLOOM_SCENE);
-  // sphere.layers.enable(BLOOM_SCENE);
-  // sphere.layers.set(BLOOM_SCENE);
-
-  // sphere.layers.enable(0);  // Default layer
-  // sphere.layers.enable(BLOOM_SCENE);
+ 
   sphere.layers.set(ENTIRE_SCENE); // Default layer
   sphere.layers.enable(BLOOM_SCENE); // Bloom layer
 
@@ -771,11 +774,6 @@ finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bl
 
 // kai render
 export function render_cull() {
-  // Increase the frustum size by scaling the projection matrix
-  // const scaleFactor = 1.5; // Adjust this value as needed
-  // const scaledProjectionMatrix = camera.projectionMatrix.clone().scale(new THREE.Vector3(1, 1, scaleFactor));
-  // projScreenMatrix.multiplyMatrices(scaledProjectionMatrix, camera.matrixWorldInverse);
-  // frustum.setFromProjectionMatrix(projScreenMatrix);
 
   projScreenMatrix
     .copy(camera.projectionMatrix)
@@ -848,76 +846,6 @@ export function render_cull() {
   finalComposer.render();
 }
 
-// const throttledRender = throttle(() => {
-//   camera.updateMatrixWorld();
-
-//   // Render bloom pass
-//   renderer.setClearColor(0x000000, 0);
-//   bloomComposer.renderToScreen = false;
-//   scene.traverse((obj) => {
-//     if (obj.isMesh) {
-//       if (obj.layers.test(BLOOM_SCENE)) {
-//         obj.layers.enable(BLOOM_SCENE);
-//         obj.layers.disable(0);
-//       } else {
-//         obj.layers.enable(0);
-//         obj.layers.disable(BLOOM_SCENE);
-//       }
-//     }
-//   });
-//   bloomComposer.render();
-
-//   // Render scene normally
-//   renderer.setClearColor(0x000000, 1);
-//   camera.layers.set(0);
-//   renderer.setRenderTarget(null);
-//   renderer.render(scene, camera);
-
-//   // Render non-bloom scene
-//   renderer.setRenderTarget(nonBloomRT);
-//   renderer.clear();
-//   renderer.render(nonBloomScene, camera);
-
-//   // Final composite
-//   finalComposer.render();
-
-//   // Render labels
-//   labelRenderer.render(scene, camera);
-// }, 16);
-
-// const throttledRender = throttle(() => {
-//   camera.updateMatrixWorld();
-
-//   // **1. Render Bloom Pass**
-//   renderer.setClearColor(0x000000, 0);
-//   bloomComposer.renderToScreen = false;
-
-//   // **Set camera to render only BLOOM_SCENE layer**
-//   camera.layers.set(BLOOM_SCENE);
-//   bloomComposer.render();
-
-//   // **2. Render Normal Scene**
-//   renderer.setClearColor(0x000000, 1);
-
-//   // **Set camera to render only ENTIRE_SCENE layer**
-//   camera.layers.set(ENTIRE_SCENE);
-//   renderer.setRenderTarget(null);
-//   renderer.render(scene, camera);
-
-//   // **3. Render Non-Bloom Scene if Applicable**
-//   renderer.setRenderTarget(nonBloomRT);
-//   renderer.clear();
-//   renderer.render(nonBloomScene, camera);
-
-//   // **4. Final Composite**
-//   finalComposer.render();
-
-//   // **5. Render Labels**
-//   labelRenderer.render(scene, camera);
-// }, 16);
-
-// Near your other global variables
-
 
 function setBloomParameters(timeOfDay) {
   if (timeOfDay >= 0.8) {
@@ -939,91 +867,6 @@ function setRendererExposure(timeOfDay) {
   }
 }
 
-
-// function setBackgroundBasedOnTime(scene, nonBloomScene) {
-//   // const nightColors = {
-//   //   deepNight: new THREE.Color(0x2a2a4d),
-//   //   twilight: new THREE.Color(0x3a3a6d),
-//   //   dawn: new THREE.Color(0x2a2a4d),
-//   //   morning: new THREE.Color(0x3a3a6d),    // Darke
-//   //   noon: new THREE.Color(0x6464c8),
-//   // };
-
-//   const nightColors = {
-//     deepNight: new THREE.Color(0x2a2a4d), // Dark Blue
-//     twilight: new THREE.Color(0x3a3a6d),  // Medium Dark Blue
-//     dawn: new THREE.Color(0x2a2a4d),      // Dark Blue
-//     morning: new THREE.Color(0x3a3a6d),   // Medium Dark Blue
-//     noon: new THREE.Color(0x2a2a5a),      // Slightly Darker Blue
-//   };
-  
-//   console.log("time of day", timeOfDay)
-
-//   // Label colors that contrast with backgrounds
-//   const labelColors = {
-//     deepNight: "#00ffff", // Cyan for deep night
-//     twilight: "#ffa500", // Orange for twilight
-//     dawn: "#ffffff", // White for dawn
-//     morning: "#ffff00", // Yellow for morning
-//     noon: "#ffffff", // White for noon
-//   };
-
-//   let bgColor = nightColors.deepNight;
-//   let labelColor;
-
-//   if (timeOfDay >= 0.0 && timeOfDay < 0.2) {
-//     bgColor = nightColors.deepNight;
-//     labelColor = labelColors.deepNight;
-//   } else if (timeOfDay >= 0.2 && timeOfDay < 0.4) {
-//     bgColor = nightColors.twilight;
-//     labelColor = labelColors.twilight;
-//   } else if (timeOfDay >= 0.4 && timeOfDay < 0.6) {
-//     bgColor = nightColors.dawn;
-//     labelColor = labelColors.dawn;
-//   } else if (timeOfDay >= 0.6 && timeOfDay < 0.8) {
-//     bgColor = nightColors.morning;
-//     labelColor = labelColors.morning;
-//   } else {
-//     bgColor = nightColors.noon;
-//     labelColor = labelColors.noon;
-//   }
-
-
-//    // Adjust bloom parameters based on time
-//    setBloomParameters(timeOfDay);
-
-//    // Adjust renderer exposure based on time
-//    setRendererExposure(timeOfDay);
-
-//   // renderer.setClearColor(bgColor, 1);
-//   renderer.setClearColor(bgColor, 0); // Set alpha to 0 for transparency
-//   scene.background = bgColor;
-//   // nonBloomScene.background = bgColor;
-
-//    // Set transparent background for nonBloomScene
-//   //  nonBloomScene.background = new THREE.Color(0x000000);
-//   //  nonBloomScene.background.alpha = 0;
-
-//   nonBloomScene.background = null;
-
-//   nonBloomScene.traverse((object) => {
-//     if (object.material) {
-//       object.material.transparent = true;
-//       object.material.needsUpdate = true;
-//     }
-//   });
-
-
-//   // Update all labels in the scene
-//   scene.traverse((object) => {
-//     if (object.isCSS2DObject) {
-//       object.element.style.color = labelColor;
-//     }
-//   });
-
-//   // markNeedsRender("cubeRemoval");
-//   markNeedsRender("full");
-// }
 
 // Global variable to switch between plain background and gradient sky
 let useGradientSky = false;
@@ -1298,55 +1141,6 @@ function ensureBaseSize(object) {
   }
 }
 
-// export function render() {
-//   camera.updateMatrixWorld();
-
-//   function updateObjectVisibilityAndScale(object) {
-//       if (object.isMesh || object.isLine || object.isPoints) {
-//           ensureBaseSize(object);
-
-//           const visible = isObjectVisible(object, camera);
-//           object.visible = visible;
-
-//           if (visible) {
-//               const distance = camera.position.distanceTo(object.position);
-//               const scaleFactor = getScaleFactorForDistance(distance);
-
-//               object.scale.setScalar(object.baseSize * scaleFactor);
-
-//               if (object.isCSS2DObject) {
-//                   // Update label scale inversely to maintain size
-//                   object.scale.setScalar(1 / scaleFactor);
-//               }
-//           }
-//       }
-//   }
-
-//   scene.traverse(updateObjectVisibilityAndScale);
-//   nonBloomScene.traverse(updateObjectVisibilityAndScale);
-
-//   // Render bloom scene
-//   bloomComposer.render();
-
-//   // Render non-bloom scene
-//   renderer.setRenderTarget(nonBloomRT);
-//   renderer.render(nonBloomScene, camera);
-
-//   // Final composite
-//   finalComposer.render();
-
-//   // Render labels
-//   labelRenderer.render(scene, camera);
-// }
-
-// function darkenNonBloomed(obj) {
-//   if (obj.isMesh && !bloomLayer.test(obj.layers)) {
-//     if (!materials[obj.uuid]) {
-//       materials[obj.uuid] = obj.material;
-//       obj.material = darkMaterial;
-//     }
-//   }
-// }
 function darkenNonBloomed(obj) {
   if (obj.isMesh && bloomLayer.test(obj.layers) === false) {
     if (!materials[obj.uuid]) {

@@ -3,6 +3,7 @@ import { generateUniqueId } from "../utils/utils";
 import { getFileSystem } from "./collaboration/file_colab";
 import { orchestrateTextProcessing } from "../ai/text_orchestration.js";
 import { textStats } from './text_stats.js';
+import { showPopup } from "../ui/popup.js";
 
 let compressionWorker;
 let workerIdleTimeout;
@@ -414,32 +415,64 @@ function addRowInteractions() {
 }
 
 
-function handleRowClick(event) {
-  // Prevent triggering if clicking checkbox
-  if (event.target.type === 'checkbox') return;
+// function handleRowClick(event) {
+//   // Prevent triggering if clicking checkbox
+//   if (event.target.type === 'checkbox') return;
+
+//   const row = event.currentTarget;
+//   const fileName = row.querySelector('.file-name span')?.textContent;
+//   const fileSize = row.querySelector('.file-size')?.textContent;
+//   const fileId = row.querySelector('input[type="checkbox"]')?.dataset.fileId;
+//   const isFolder = row.querySelector('.fa-folder, .fa-folder-open') !== null;
+
+//   // Toggle selected state
+//   document.querySelectorAll('.content-wrapper.selected').forEach(el => {
+//     el.classList.remove('selected');
+//   });
+//   row.classList.add('selected');
+
+//   // Log file/folder info
+//   const metadata = {
+//     type: isFolder ? 'folder' : 'file',
+//     name: fileName,
+//     size: fileSize,
+//     id: fileId,
+//     path: getElementPath(row)
+//   };
+
+// }
+
+// ... existing code ...
+
+async function handleRowClick(event) {
+  // Prevent triggering if clicking checkbox or folder icon
+  if (event.target.type === 'checkbox' || event.target.classList.contains('fa-folder') || event.target.classList.contains('fa-folder-open')) return;
 
   const row = event.currentTarget;
-  const fileName = row.querySelector('.file-name span')?.textContent;
-  const fileSize = row.querySelector('.file-size')?.textContent;
   const fileId = row.querySelector('input[type="checkbox"]')?.dataset.fileId;
-  const isFolder = row.querySelector('.fa-folder, .fa-folder-open') !== null;
+  
+  // Only proceed if we have a file ID and it's not a folder
+  if (!fileId || row.querySelector('.fa-folder, .fa-folder-open')) return;
 
-  // Toggle selected state
-  document.querySelectorAll('.content-wrapper.selected').forEach(el => {
-    el.classList.remove('selected');
-  });
-  row.classList.add('selected');
+  // Get the position of the clicked row
+  const rect = row.getBoundingClientRect();
+  
+  // Calculate position just to the right of the file tree
+  const x = rect.right + 10; // 10px offset from the tree
+  const y = rect.top;
 
-  // Log file/folder info
-  const metadata = {
-    type: isFolder ? 'folder' : 'file',
-    name: fileName,
-    size: fileSize,
-    id: fileId,
-    path: getElementPath(row)
-  };
-
+  // Get file metadata from fileSystem
+  const fileSystem = getFileSystem();
+  const metadata = await fileSystem.getItem(fileId, "file");
+  
+  if (metadata) {
+    // Import and call showPopup dynamically to avoid circular dependencies
+    const { showPopup } = await import('../ui/popup.js');
+    showPopup(metadata, x, y);
+  }
 }
+
+// ... rest of the file ...
 
 function getElementPath(element) {
   const path = [];

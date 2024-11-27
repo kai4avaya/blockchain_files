@@ -6,14 +6,13 @@ click node will also bring up input
 reorganize 3d space by smilar articles using embeddings matches
 
 ---
-0) fix collaborative files
-1) add llm and querying
-2) click canvas have upload options, 
-   b. proxy scrape
-3) double click cube brings up direct input of cube
- -- maybe this appears inside of the note pad with the files at the top highlighted
+0) fix scrape
+1) fix file upload on click canvas
+2) image upload llm
+3) data search
+3.5) data analytics
 4) file selector needs to correctly load the files I've used
-
+5) orbit controls spheres weird they slide 2d not allow camera to circle
 
 ****
 embedding pool workers
