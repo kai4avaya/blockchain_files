@@ -463,15 +463,24 @@ fileTreeBtn.addEventListener('click', (e) => {
     }
 
     function showSpinner(iconElement) {
+      // Remove any existing spinner first
+      const existingSpinner = iconElement.querySelector('.spinner');
+      if (existingSpinner) {
+        existingSpinner.remove();
+      }
+      
       const svgIcon = iconElement.querySelector('svg');
       const spinner = document.createElement('div');
       spinner.className = 'spinner';
       svgIcon.style.display = 'none';
       iconElement.insertBefore(spinner, svgIcon);
 
+      // Remove spinner after timeout or when operation completes
       setTimeout(() => {
-        spinner.remove();
-        svgIcon.style.display = '';
+        if (spinner && spinner.parentNode) {
+          spinner.remove();
+          svgIcon.style.display = '';
+        }
       }, 4000);
     }
 
@@ -537,7 +546,7 @@ function showSettingsModal() {
             </select>
         </div>
         <input type="text" class="settings-input" id="aiProviderInput" 
-            placeholder="Enter your AI provider" ${!useCustomProvider ? 'disabled' : ''}>
+            placeholder="https://api.openai.com..." ${!useCustomProvider ? 'disabled' : ''}>
         <input type="text" class="settings-input" id="apiKeyInput" 
             placeholder="Enter your API key" ${!useCustomProvider ? 'disabled' : ''}>
         <button id="saveSettingsButton" class="settings-save-btn">

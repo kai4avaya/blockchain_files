@@ -50,27 +50,26 @@ async function ensureWorkerInitialized() {
 }
 
 // Create a promise-based wrapper for UMAP processing
-async function performUMAPAsync(embeddings, labels) {
-    const worker = await getUMAPWorker(); // Wait for worker initialization
-    
+function performUMAPAsync(embeddings, labels) {
+    ensureWorkerInitialized();
     return new Promise((resolve, reject) => {
         const messageHandler = function (e) {
             const { type, data } = e.data;
 
             if (type === 'dimensionReductionResult') {
-                worker.removeEventListener('message', messageHandler);
+                umapWorker.removeEventListener('message', messageHandler);
                 resolve(data);
             } else if (type === 'error') {
-                worker.removeEventListener('message', messageHandler);
+                umapWorker.removeEventListener('message', messageHandler);
                 reject(new Error(data));
             } else if (type === 'progress') {
                 console.log(`UMAP progress: Epoch ${data.epoch}`);
             }
         };
 
-        worker.addEventListener('message', messageHandler);
+        umapWorker.addEventListener('message', messageHandler);
 
-        worker.postMessage({
+        umapWorker.postMessage({
             type: 'reduceDimensions',
             data: { embeddings, labels }
         });

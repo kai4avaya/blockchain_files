@@ -569,3 +569,56 @@
 .revoke-btn.loading span {
     opacity: 0;
 }
+
+.action-panel {
+    position: fixed;
+    bottom: 180px; /* Adjust this value to position above the minimap */
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 8px;
+    z-index: 9999 !important;
+    display: none;
+}
+
+.action-panel-spinner {
+    padding: 5px;
+    color: blue;
+}
+
+.action-panel-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.action-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s;
+}
+
+.action-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.action-btn svg {
+    width: 24px;
+    height: 24px;
+    color: white;
+}
+
+
+
+/* When slideout is active, shift the minimap and action panel */
+#chatSlideout.active ~ .minimap-container,
+#chatSlideout.active ~ .action-panel {
+    transform: translateX(-300px); /* Match the width of your slideout */
+}

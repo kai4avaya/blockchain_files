@@ -24,7 +24,7 @@ import { diffSceneChanges } from "../../memory/collaboration/scene_colab";
 import { updateConnectedLines } from "./lineGraphs.js";
 
 import { getFileSystem } from "../../memory/collaboration/file_colab";
-import { showContextMenu , contextMenu, hideContextMenu} from "./canvas_menu.js";
+import { showContextMenu} from "./canvas_menu.js";
 let lastClickTime = 0;
 const DOUBLE_CLICK_DELAY = 300; // milliseconds
 
@@ -51,6 +51,8 @@ const intersectPoint = new THREE.Vector3();
 const planeNormal = new THREE.Vector3();
 const plane = new THREE.Plane();
 const loginName = localStorage.getItem("login_block") || "no_login";
+
+let isTabDrop = false;
 
 window.fileMetadata = new Map(); // Track file metadata globally
 
@@ -1039,9 +1041,12 @@ function setupDragAndDrop() {
 }
 
 export function dropExporter(event) {
+  isTabDrop = true;
+  console.log("dropExporter event", event)
   // Handle both regular events and custom events with detail
   const processEvent = event.detail || event;
   
+  console.log("dropExporter", processEvent)
   handleFileDrop_sphere(processEvent);
   removeGhostCube();
   onPointerUp(processEvent);
@@ -1315,9 +1320,13 @@ function toggleBloom(object, isOnlyToCheckboxes = false) {
 
 // Update the onPointerUp function to use this new handleSphereDragEnd
 async function onPointerUp(event) {
+  // console.log("onPointerUp 0 isDragging", isFileDragging, "event", event, "isClick", isClick, "selectedSphere", selectedSphere)
   if (!isAllowed(event)){
     return
   }
+
+  console.log("onPointerUp 1", event)
+
 
   const { controls, scene, nonBloomScene, ghostCube, sceneSnapshot } =
     share3dDat();
@@ -1337,7 +1346,6 @@ async function onPointerUp(event) {
 
   if (isClick && selectedSphere) {
     toggleBloom(selectedSphere);
-    console.log("After toggling, layers.mask:", selectedSphere.layers.mask);
   } else if (isDragging || isFileDragging) {
     isDragging = false;
     isFileDragging = false;
@@ -1346,10 +1354,18 @@ async function onPointerUp(event) {
       handleSphereDragEnd(selectedSphere, ghostCube);
     }
 
+    console.log("onPointerUp 2")
+
     cleanupOldCubes();
     resetCubeHighlight();
     diffSceneChanges(scene, nonBloomScene, sceneSnapshot);
   }
+
+   
+    if(isTabDrop) {
+      diffSceneChanges(scene, nonBloomScene, sceneSnapshot);
+      isTabDrop = false;
+    }
 
   if (event.pointerId !== undefined && event.target?.hasPointerCapture) {
     try {
@@ -1368,138 +1384,6 @@ async function onPointerUp(event) {
   currentSnapshot = null;
 }
 
-
-// function handleSphereDragEnd(sphere, ghostCube) {
-//   const oldCube = getCubeContainingSphere(sphere);
-//   const sphereRadius = sphere.scale.x / 2 || sphere.geometry.parameters.radius;
-
-//   if (ghostCube) {
-//     if (ghostCube.existingCube) {
-//       // Handle adding sphere to existing cube
-//       const existingCube = ghostCube.existingCube;
-//       const cubeSize = existingCube.scale.x;
-//       const cubePosition = existingCube.position.clone();
-
-//       const offset = getRandomOffset(cubeSize, sphereRadius);
-//       sphere.position.copy(cubePosition.clone().add(offset));
-
-//       const containedSpheres = findSpheresInCube({
-//         wireframe: existingCube,
-//         solid: existingCube.userData.solidCube
-//       });
-      
-//       // Fire and forget, but with error handling
-//       updateCubeContents(existingCube, containedSpheres).catch(err => {
-//         console.error('Error updating existing cube contents:', err);
-//       });
-//     } else {
-//       // Create a new cube logic...
-//       const newCube = createWireframeCube(cubeData);
-//       const offset = getRandomOffset(cubeSize, sphereRadius);
-//       sphere.position.copy(cubePosition.clone().add(offset));
-
-//       const containedSpheres = findSpheresInCube({
-//         wireframe: newCube.wireframeCube,
-//         solid: newCube.solidCube
-//       });
-      
-//       // Fire and forget, but with error handling
-//       updateCubeContents(newCube.wireframeCube, containedSpheres).catch(err => {
-//         console.error('Error updating new cube contents:', err);
-//       });
-//     }
-
-//     if (oldCube && oldCube !== ghostCube?.existingCube) {
-//       const remainingSpheres = findSpheresInCube(oldCube);
-//       updateCubeContents(oldCube, remainingSpheres).catch(err => {
-//         console.error('Error updating old cube contents:', err);
-//       });
-//     }
-
-//     removeGhostCube();
-//   }
-  
-//   cleanupOldCubes();
-//   markNeedsRender();
-// }
-
-// function handleSphereDragEnd(sphere, ghostCube) {
-//   const oldCube = getCubeContainingSphere(sphere);
-//   const sphereRadius = sphere.scale.x / 2 || sphere.geometry.parameters.radius;
-
-//   if (ghostCube) {
-//     if (ghostCube.existingCube) {
-//       // Handle adding sphere to existing cube
-//       const existingCube = ghostCube.existingCube;
-//       const cubeSize = existingCube.scale.x;
-//       const cubePosition = existingCube.position.clone();
-
-//       const offset = getRandomOffset(cubeSize, sphereRadius);
-//       sphere.position.copy(cubePosition.clone().add(offset));
-
-//       const containedSpheres = findSpheresInCube({
-//         wireframe: existingCube,
-//         solid: existingCube.userData.solidCube
-//       });
-      
-//     } else {
-//       // Create a new cube with proper data
-//       const cubeSize = sphereRadius * RESCALEFACTOR;
-//       const cubePosition = ghostCube.position.clone();
-//       const cubeColor = ghostCube.material.color.clone();
-
-//       const cubeData = convertToThreeJSFormat({
-//         position: cubePosition.toArray(),
-//         size: cubeSize,
-//         color: cubeColor.getHex(),
-//         userData: { id: `cube_${Date.now()}` },
-//         lastEditedBy: loginName,
-//       });
-
-//       const newCube = createWireframeCube(cubeData);
-//       const offset = getRandomOffset(cubeSize, sphereRadius);
-//       sphere.position.copy(cubePosition.clone().add(offset));
-
-//       const containedSpheres = findSpheresInCube({
-//         wireframe: newCube.wireframeCube,
-//         solid: newCube.solidCube
-//       });
-      
-//       // updateCubeContents(newCube.wireframeCube, containedSpheres).catch(err => {
-//       //   console.error('Error updating new cube contents:', err);
-//       // });
-//     }
-
-//     if (oldCube && oldCube !== ghostCube?.existingCube) {
-//       const remainingSpheres = findSpheresInCube(oldCube);
-//       // try {
-//       //    updateCubeContents(oldCube, remainingSpheres);
-//       //   // Trigger file tree update after cube contents change
-//       //   window.dispatchEvent(new CustomEvent('updateFileTree'));
-//       // } catch (err) {
-//       //   console.error('Error updating old cube contents:', err);
-//       // }
-//     }
-
-//     removeGhostCube();
-//   }
-
-//   const { scene, nonBloomScene } = share3dDat();
-
-//   const snapshot = createSceneSnapshot([scene, nonBloomScene]);
-//     // Verify all cubes have correct contents
-//     snapshot.boxes.forEach(box => {
-//       if (box.wireframe) {
-//         const actualSpheres = findSpheresInCube(box);
-//         updateCubeContents(box.wireframe, actualSpheres).catch(err => {
-//           console.error('Error updating cube contents during verification:', err);
-//         });
-//       }
-//     });
-  
-//   cleanupOldCubes();
-//   markNeedsRender();
-// }
 
 function handleSphereDragEnd(sphere, ghostCube) {
   const oldCube = getCubeContainingSphere(sphere);

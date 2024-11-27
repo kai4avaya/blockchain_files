@@ -8,6 +8,7 @@ import {
   } from "./create.js";
 import { findAllSpheres, findAllCubes} from "./snapshot.js";
 import { calculateDistance  } from "../../utils/utils";
+import { createTrail, updateTrails } from './trail_effect.js';
 
 // import {sendSceneBoundingBoxToWorker} from '../../ai/umap.js'
 
@@ -60,63 +61,7 @@ export function getSceneBoundingBox(scene) {
     
     return scale;
   }
-  // export function updateSphereAndCubePositions(reducedData, labels) {
-  //   const { scene, nonBloomScene } = share3dDat();
-  
-  //   // Create a mapping from fileId (label) to coordinates
-  //   const idToCoordinates = {};
-  //   for (let i = 0; i < labels.length; i++) {
-  //       const fileId = labels[i];
-  //       const coords = reducedData[i];
-  //       idToCoordinates[fileId] = coords;
-  //   }
-  
-  //   console.log("idToCoordinates", idToCoordinates);
-  
-  //   // Find all spheres
-  //   const spheres = findAllSpheres([scene, nonBloomScene]);
-  
-  //   // Update sphere positions using userData.id (fileId)
-  //   spheres.forEach(sphere => {
-  //       const fileId = sphere.userData.id; // Get the fileId from userData.id
-  //       console.log("Update sphere positions using userData", fileId);
-  //       // Find the corresponding coordinates
-  //       const coords = idToCoordinates[fileId];
-  //       if (coords) {
-  //           sphere.position.set(coords[0], coords[1], coords[2]);
-  //           console.log(`Sphere ${fileId} position set to:`, sphere.position);
-  //       } else {
-  //           console.warn(`No coordinates found for sphere with fileId: ${fileId}`);
-  //       }
-  //   });
-  
-  //   // Find all cubes
-  //   const cubes = findAllCubes([scene, nonBloomScene]);
-  
-  //   // Update cube positions and sizes to fit the spheres
-  //   cubes.forEach(cube => {
-  //       resizeCubeToFitSpheres(cube);
-  //   });
-  
-  //   // Adjust camera to fit the updated scene
-  //   adjustCameraToFitScene();
-  
-  //   // Log the scene's bounding box
-  //   const sceneBoundingBox = getSceneBoundingBox(scene);
-  //   console.log("Scene Bounding Box:", sceneBoundingBox);
-  
-  //   // Visualize the bounding box
-  //   visualizeBoundingBox(sceneBoundingBox);
-  
-  //   // Log each sphere's position
-  //   spheres.forEach(sphere => {
-  //       const pos = sphere.position;
-  //       console.log(`Sphere ${sphere.userData.id} is at position: (${pos.x}, ${pos.y}, ${pos.z})`);
-  //   });
-  
-  //   // Mark the scene to re-render
-  //   markNeedsRender();
-  // }
+
   
   export function updateSphereAndCubePositions(reducedData, labels) {
     const { scene, nonBloomScene, camera } = share3dDat();
@@ -217,111 +162,24 @@ export function getSceneBoundingBox(scene) {
   
     // Ensure the scene is re-rendered
     markNeedsRender();
+  
+    // Add animation loop for trails
+    let lastTime = performance.now();
+    function animate(currentTime) {
+      const deltaTime = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+      
+      updateTrails(deltaTime);
+      markNeedsRender();
+      
+      requestAnimationFrame(animate);
+    }
+    
+    // Start the animation loop
+    requestAnimationFrame(animate);
   }
   
   
-  
-  // // Main function to update positions and scales
-  // export function updateSphereAndCubePositions(reducedData, labels) {
-  //   const { scene, nonBloomScene, camera, controls } = share3dDat();
-  
-  //   // Create a mapping from fileId (label) to coordinates
-  //   const idToCoordinates = {};
-  //   for (let i = 0; i < labels.length; i++) {
-  //     const fileId = labels[i];
-  //     const coords = reducedData[i];
-  //     idToCoordinates[fileId] = coords;
-  //   }
-  
-  //   console.log("idToCoordinates", idToCoordinates);
-  
-  //   // Find all spheres
-  //   const spheres = findAllSpheres([scene, nonBloomScene]);
-  
-  //   // Update sphere positions and scales using userData.id (fileId)
-  //   spheres.forEach(sphere => {
-  //     const fileId = sphere.userData.id;
-  //     const coords = idToCoordinates[fileId];
-  //     if (coords) {
-  //       // Create a movement line (optional)
-  //       const startPosition = sphere.position.clone();
-  //       const endPosition = new THREE.Vector3(coords[0], coords[1], coords[2]);
-  //       createMovementLine(startPosition, endPosition);
-  
-  //       // Create a ghost trail at the current position
-  //       createGhostTrail(sphere);
-  
-  //       // Animate position using GSAP
-  //       gsap.to(sphere.position, {
-  //         duration: 1.5,
-  //         x: coords[0],
-  //         y: coords[1],
-  //         z: coords[2],
-  //         ease: "power2.out",
-  //         onUpdate: () => markNeedsRender(),
-  //         onComplete: () => console.log(`Sphere ${fileId} moved to (${coords[0]}, ${coords[1]}, ${coords[2]})`)
-  //       });
-  
-  //       // Calculate distance and scale factor
-  //       const newPosition = new THREE.Vector3(coords[0], coords[1], coords[2]);
-  //       const distance = calculateDistance(newPosition, camera.position);
-  //       const scaleFactor = getScaleFactor(distance);
-  //       console.log(`Sphere ${fileId} - Distance: ${distance.toFixed(2)}, Scale: ${scaleFactor.toFixed(2)}`);
-  
-  //       // Animate scale with capping
-  //       if (scaleFactor < MIN_SCALE) {
-  //         gsap.to(sphere.scale, {
-  //           duration: 1.5,
-  //           x: MIN_SCALE,
-  //           y: MIN_SCALE,
-  //           z: MIN_SCALE,
-  //           ease: "power2.out",
-  //           onUpdate: () => markNeedsRender(),
-  //           onComplete: () => console.log(`Sphere ${fileId} scaled to minimum scale ${MIN_SCALE}`)
-  //         });
-  //       } else {
-  //         gsap.to(sphere.scale, {
-  //           duration: 1.5,
-  //           x: scaleFactor,
-  //           y: scaleFactor,
-  //           z: scaleFactor,
-  //           ease: "power2.out",
-  //           onUpdate: () => markNeedsRender(),
-  //           onComplete: () => console.log(`Sphere ${fileId} scaled to ${scaleFactor}`)
-  //         });
-  //       }
-  //     } else {
-  //       console.warn(`No coordinates found for sphere with fileId: ${fileId}`);
-  //     }
-  //   });
-  
-  //   // Find all cubes
-  //   const cubes = findAllCubes([scene, nonBloomScene]);
-  
-  //   // Update cube positions and sizes to fit the spheres
-  //   cubes.forEach(cube => {
-  //     resizeCubeToFitSpheres(cube);
-  //   });
-  
-  //   // Adjust camera to fit the updated scene with animation
-  //   adjustCameraToFitSceneAnimated();
-  
-  //   // Log the scene's bounding box
-  //   const sceneBoundingBox = getSceneBoundingBox(scene);
-  //   console.log("Scene Bounding Box:", sceneBoundingBox);
-  
-  //   // Visualize the bounding box
-  //   visualizeBoundingBox(sceneBoundingBox);
-  
-  //   // Log each sphere's position
-  //   spheres.forEach(sphere => {
-  //     const pos = sphere.position;
-  //     console.log(`Sphere ${sphere.userData.id} is at position: (${pos.x}, ${pos.y}, ${pos.z})`);
-  //   });
-  
-  //   // Ensure the scene is re-rendered
-  //   markNeedsRender();
-  // }
   
   // Function to create a ghost trail for a sphere
   function createGhostTrail(sphere) {
@@ -355,30 +213,38 @@ export function getSceneBoundingBox(scene) {
   }
   
   
+  // // Function to create a movement line for a sphere
+  // function createMovementLine(startPosition, endPosition) {
+  //   const { scene } = share3dDat();
+
+  //   const material = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.5, transparent: true });
+  //   const points = [];
+  //   points.push(startPosition.clone());
+  //   points.push(endPosition.clone());
+  //   const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  //   const line = new THREE.Line(geometry, material);
+    
+  //   scene.add(line);
+    
+  //   // Animate the line's opacity to fade out
+  //   gsap.to(line.material, {
+  //     duration: 20,
+  //     opacity: 0,
+  //     ease: "power2.out",
+  //     onComplete: () => {
+  //       scene.remove(line);
+  //       geometry.dispose();
+  //       material.dispose();
+  //     }
+  //   });
+  // }
+
+
+  
   // Function to create a movement line for a sphere
   function createMovementLine(startPosition, endPosition) {
-    const { scene } = share3dDat();
-
-    const material = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.5, transparent: true });
-    const points = [];
-    points.push(startPosition.clone());
-    points.push(endPosition.clone());
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(geometry, material);
-    
-    scene.add(line);
-    
-    // Animate the line's opacity to fade out
-    gsap.to(line.material, {
-      duration: 20,
-      opacity: 0,
-      ease: "power2.out",
-      onComplete: () => {
-        scene.remove(line);
-        geometry.dispose();
-        material.dispose();
-      }
-    });
+    // Create particle trail instead of line
+    createTrail(startPosition, endPosition, 30); // Adjust number of particles as needed
   }
   
   
@@ -703,73 +569,6 @@ export function clearScenesAndHideObjects() {
   }
   
   
-  
-  // function adjustCameraToFitScene() {
-  //   const { scene, nonBloomScene } = share3dDat();
-  
-  //   // Combine all spheres from both scenes
-  //   const spheres = findAllSpheres([scene, nonBloomScene]);
-  
-  //   if (spheres.length === 0) {
-  //     console.warn('No spheres found to adjust the camera.');
-  //     return;
-  //   }
-  
-  //   // Create a new Box3 to encompass all spheres
-  //   const boundingBox = new THREE.Box3();
-  
-  //   spheres.forEach(sphere => {
-  //     const sphereBox = new THREE.Box3().setFromObject(sphere);
-  //     boundingBox.expandByPoint(sphereBox.min);
-  //     boundingBox.expandByPoint(sphereBox.max);
-  //   });
-  
-  //   // Compute the center and size of the bounding box
-  //   const center = boundingBox.getCenter(new THREE.Vector3());
-  //   const size = boundingBox.getSize(new THREE.Vector3());
-  
-  //   // Compute the maximum dimension (x, y, or z)
-  //   const maxDim = Math.max(size.x, size.y, size.z);
-  
-  //   // Compute an appropriate distance for the camera
-  //   const fov = camera.fov * (Math.PI / 180);
-  //   let cameraDistance = maxDim / (2 * Math.tan(fov / 2));
-  
-  //   // Add some extra space
-  //   cameraDistance *= 1.2; // Adjust as needed
-  
-  //   // Update camera position and target
-  //   camera.position.set(center.x, center.y, center.z + cameraDistance);
-  //   camera.lookAt(center);
-  //   controls.target.copy(center);
-  //   controls.update();
-  
-  //   // Adjust camera's near and far planes if necessary
-  //   camera.near = cameraDistance / 100;
-  //   camera.far = cameraDistance * 10;
-  //   camera.updateProjectionMatrix();
-  // }
-  
-
-//   export function rescalePositions(scene, targetSize = 100) {
-//     const bbox = new THREE.Box3().setFromObject(scene);
-//     const center = bbox.getCenter(new THREE.Vector3());
-//     const size = bbox.getSize(new THREE.Vector3());
-//     const maxDim = Math.max(size.x, size.y, size.z);
-//     const scale = targetSize / maxDim;
-
-//     scene.traverse((object) => {
-//         if (object.isObject3D) {
-//             object.position.sub(center).multiplyScalar(scale).add(center);
-//             if (object.isLine) {
-//                 object.geometry.computeBoundingBox();
-//                 object.geometry.scale(scale, scale, scale);
-//             }
-//         }
-//     });
-
-//     return { center, scale };
-// }
 
 export function reorientCamera(scene, camera, controls) {
   const bbox = new THREE.Box3().setFromObject(scene);

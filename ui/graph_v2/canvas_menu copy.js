@@ -293,14 +293,7 @@ export function showContextMenu(x, y, intersectPoint) {
       const files = Array.from(e.target.files || []);
       
       for (const file of files) {
-        // Read file content
-        const content = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target.result);
-          reader.readAsText(file);
-        });
-
-        // Create synthetic event with file content
+        // Create synthetic event for each file
         const dt = new DataTransfer();
         dt.items.add(file);
 
@@ -323,14 +316,13 @@ export function showContextMenu(x, y, intersectPoint) {
             data: {
               id: generateUniqueId(),
               name: file.name,
-              type: 'file',
-              content: content
+              type: 'file'
             }
           },
           intersectPoint: currentIntersectPoint
         };
 
-        // Dispatch tabDrop event
+        // Dispatch tabDrop event for each file
         const canvas = document.querySelector('canvas');
         canvas.dispatchEvent(new CustomEvent('tabDrop', { 
           bubbles: true,

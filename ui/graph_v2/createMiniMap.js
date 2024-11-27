@@ -248,6 +248,33 @@ export function createMiniMap(camera, scene, nonBloomScene, markNeedsRender, con
       ctx.restore();
     }
   
+    // Add observer for chatSlideout
+    const chatSlideout = document.getElementById('chatSlideout');
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                if (chatSlideout.classList.contains('active')) {
+                    container.classList.add('slide-left');
+                    const actionPanel = document.querySelector('.action-panel');
+                    if (actionPanel) {
+                        actionPanel.classList.add('slide-left');
+                    }
+                } else {
+                    container.classList.remove('slide-left');
+                    const actionPanel = document.querySelector('.action-panel');
+                    if (actionPanel) {
+                        actionPanel.classList.remove('slide-left');
+                    }
+                }
+            }
+        });
+    });
+
+    observer.observe(chatSlideout, {
+        attributes: true,
+        attributeFilter: ['class']
+    });
+  
     // Initial update
     updateMiniMap();
   

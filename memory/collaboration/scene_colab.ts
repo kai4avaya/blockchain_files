@@ -49,6 +49,7 @@ class SceneState {
   private scenes: THREE.Scene[] = [];
   private selectedSpheres: Set<string> = new Set(); // Add this line
   
+  
 
 
   private constructor() {
@@ -601,7 +602,9 @@ export function diffSceneChanges(
   previousSnapShot = SceneState.getSceneObjArray(),
   options: { fromPeer?: boolean } = {}
 ) {
-  const changedObjects = [];
+
+  console.log("diffSceneChanges", scene, nonBloomScene)
+  const changedObjects: any = [];
   const currentSnapshot = {};
 
   // sceneState.addScene(scene)
