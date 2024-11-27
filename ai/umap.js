@@ -2,6 +2,7 @@
 import { share3dDat } from '../ui/graph_v2/create.js';
 import { getSceneBoundingBox, updateSphereAndCubePositions } from '../ui/graph_v2/reorientScene.js';
 import indexDBOverlay from '../memory/local/file_worker';
+import { updateStatus } from '../ui/components/process.js';
 
 import config from '../configs/config.json';
 
@@ -64,7 +65,10 @@ async function performUMAPAsync(embeddings, labels) {
                 worker.removeEventListener('message', messageHandler);
                 reject(new Error(data));
             } else if (type === 'progress') {
-                console.log(`UMAP progress: Epoch ${data.epoch}`);
+                if (data.epoch % 50 === 0) {
+                    updateStatus(`UMAP Progress: ${data.epoch}/500`, true);
+                    console.log(`UMAP progress: Epoch ${data.epoch}`);
+                }
             }
         };
 
@@ -80,11 +84,13 @@ async function performUMAPAsync(embeddings, labels) {
 // Function to perform UMAP dimensionality reduction without auto-updating the scene
 export async function performUMAPOnly(embeddings, labels) {
     try {
+        updateStatus("Starting UMAP reduction...", true);
         const result = await performUMAPAsync(embeddings, labels);
-        console.log('UMAP reduction completed.');
+        updateStatus("UMAP reduction completed");
         return result;
     } catch (error) {
         console.error('Error during UMAP processing:', error);
+        updateStatus("Error in UMAP processing");
         throw error;
     }
 }

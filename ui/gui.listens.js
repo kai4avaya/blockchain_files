@@ -12,14 +12,9 @@ export function initiate_gui_controls() {
     document.addEventListener('modalAction', (e) => {
         const action = e.detail.action;
         
-        // Show spinner, hide buttons
-        const actionPanel = document.querySelector('.action-panel');
-        if (actionPanel) {
-            actionPanel.style.display = 'flex';
-            actionPanel.querySelector('.action-panel-spinner').style.display = 'block';
-            actionPanel.querySelector('.action-panel-buttons').style.display = 'none';
-        }
-        
+        // Show spinner, hide buttons immediately when any action starts
+        showSpinner();
+
         // Check if we need to restore the scene before proceeding
         const needsRestore = document.querySelector('.restore-btn')?.style.display !== 'none';
         if (needsRestore) {
@@ -110,6 +105,29 @@ export function initiate_gui_controls() {
         }
     });
 
+    // Helper functions for consistent panel handling
+    function showSpinner() {
+        if (actionPanel) {
+            actionPanel.style.display = 'flex';
+            actionPanel.querySelector('.action-panel-spinner').style.display = 'block';
+            actionPanel.querySelector('.action-panel-buttons').style.display = 'none';
+        }
+    }
+
+    function handleVisualizationComplete() {
+        if (actionPanel) {
+            actionPanel.style.display = 'flex'; // Ensure panel is visible
+            actionPanel.querySelector('.action-panel-spinner').style.display = 'none';
+            actionPanel.querySelector('.action-panel-buttons').style.display = 'flex';
+            
+            // Make sure restore button is visible
+            const restoreBtn = actionPanel.querySelector('.restore-btn');
+            if (restoreBtn) {
+                restoreBtn.style.display = 'block';
+            }
+        }
+    }
+
     // Setup button handlers
     actionPanel.querySelector('.restore-btn').addEventListener('click', () => {
         if (restoreOriginalScene()) {
@@ -129,10 +147,4 @@ export function initiate_gui_controls() {
             console.error('Error taking screenshot:', error);
         }
     });
-
-    function handleVisualizationComplete() {
-        // Hide spinner and show buttons
-        actionPanel.querySelector('.action-panel-spinner').style.display = 'none';
-        actionPanel.querySelector('.action-panel-buttons').style.display = 'flex';
-    }
 }

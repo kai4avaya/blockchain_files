@@ -19,3 +19,10 @@ reorganize 3d space by smilar articles using embeddings matches
 ****
 embedding pool workers
 enter your name for record keeping
+
+
+
+embedding_worker.js:137 WebAssembly threads are not supported: CompileError: WebAssembly.Module(): section was shorter than expected size (7 bytes expected, 4 decoded) @+14
+    at isWasmThreadsSupported (embedding_worker.js:131:24)
+    at initializeExtractor (embedding_worker.js:146:40)
+    at self.onmessage (embedding_worker.js:195:19) when i do @gui.listens.js   cluster-n odes I'm getting this error which is strange because i do embeddings before....  @clustering.js  @embeddingBatches.js 
