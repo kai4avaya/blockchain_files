@@ -2105,3 +2105,81 @@ vertical-align: middle;
 .minimap-recenter-btn:hover {
   background-color: rgba(0, 0, 0, 0.7);
 }
+
+.search-result-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+.search-result-item:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+.search-result-item .small-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.result-content {
+  flex: 1;
+  overflow: hidden;
+}
+
+.file-name {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.match-text {
+  font-size: 0.9em;
+  color: #666;
+}
+
+mark {
+  background: #ffeb3b;
+  padding: 0 2px;
+}
+
+.no-results, .error-message {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+}
+
+.error-message {
+  color: #f44336;
+}
+
+.search-spinner {
+  display: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(52, 152, 219, 0.3);
+  border-top: 2px solid #3498db;
+  border-radius: 50%;
+  animation: searchSpin 1s linear infinite;
+  margin-left: 8px;
+}
+
+@keyframes searchSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+#searchButton.loading .button-text {
+  display: none;
+}
+
+#searchButton.loading .search-spinner {
+  display: inline-block;
+}

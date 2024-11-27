@@ -66,21 +66,6 @@ let DB_DEFAULTS = {
     #hashIndexStore;
     #hashIndexStorePrefix = config.hashindex_prefix;
   
-  
-  //   constructor(options = {}) {
-  //     const { dbName, storeName, vectorPath, dimensions, numPlanes } = {
-  //         ...DB_DEFAULTS,
-  //         ...options,
-  //     };
-  
-  //     this.#objectStore = storeName || DB_DEFAULTS.objectStore;
-  //   this.#vectorPath = vectorPath || DB_DEFAULTS.vectorPath;
-  //   this.#hashIndexStore = `${this.#objectStore}${DB_DEFAULTS.hashIndexSuffix}`;
-  //   this.#lsh = new LSH(
-  //     dimensions || DB_DEFAULTS.dimensions,
-  //     numPlanes || DB_DEFAULTS.numPlanes
-  //   );
-  // }
 
   constructor(options = {}) {
     const { dbName, storeName, vectorPath, dimensions, numPlanes } = {
@@ -109,55 +94,6 @@ let DB_DEFAULTS = {
   }
 
    
-// async insert(object) {
-//   const vector = object[this.#vectorPath];
-//   if (!Array.isArray(vector) && !(vector instanceof Int8Array)) {
-//     throw new Error(`${this.#vectorPath} on 'object' is expected to be an Array or Int8Array`);
-//   }
-
-//   try {
-//     if (!object.fileId) {
-//       throw new Error('Cannot insert record without fileId');
-//     }
-
-//     // Generate a 4-char vector ID
-//     const vectorId = generateUniqueId(4);
-//     const recordToSave = {
-//       id: vectorId,
-//       fileId: object.fileId,
-//       ...object
-//     };
-//     await indexDBOverlay.saveData(this.#objectStore, recordToSave);
-
-//     // Save hash buckets with explicit keys
-//     const hashes = this.#lsh.hashVector(vector);
-//     for (let hash of hashes) {
-//       const existingBucket = await indexDBOverlay.getItem(this.#hashIndexStore, hash);
-      
-//       // Use Set to ensure unique vectorIds
-//       const uniqueVectorIds = new Set(existingBucket?.vectorIds || []);
-//       uniqueVectorIds.add(vectorId);
-
-//       const hashBucket = {
-//         vectorIds: Array.from(uniqueVectorIds)
-//       };
-      
-//       await indexDBOverlay.saveData(
-//         this.#hashIndexStore, 
-//         hashBucket,
-//         hash
-//       );
-//     }
-
-//     return {
-//       vectorId,
-//       fileId: object.fileId
-//     };
-//   } catch (error) {
-//     console.error('Database error during insertion:', error);
-//     throw error;
-//   }
-// }
 
 async insert(object) {
   const vector = object[this.#vectorPath];

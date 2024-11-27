@@ -3,8 +3,9 @@ import { generateUniqueId } from "../utils/utils";
 import { getFileSystem } from "./collaboration/file_colab";
 import { orchestrateTextProcessing } from "../ai/text_orchestration.js";
 import { textStats } from './text_stats.js';
-import { showPopup } from "../ui/popup.js";
-
+// import { showPopup } from "../ui/popup.js";
+import { gsap } from 'gsap';
+import * as THREE from 'three';
 let compressionWorker;
 let workerIdleTimeout;
 
@@ -445,30 +446,79 @@ function addRowInteractions() {
 // ... existing code ...
 
 async function handleRowClick(event) {
-  // Prevent triggering if clicking checkbox or folder icon
+  // Keep existing popup logic
   if (event.target.type === 'checkbox' || event.target.classList.contains('fa-folder') || event.target.classList.contains('fa-folder-open')) return;
 
   const row = event.currentTarget;
   const fileId = row.querySelector('input[type="checkbox"]')?.dataset.fileId;
   
-  // Only proceed if we have a file ID and it's not a folder
   if (!fileId || row.querySelector('.fa-folder, .fa-folder-open')) return;
 
-  // Get the position of the clicked row
+  // Get file metadata and show popup
   const rect = row.getBoundingClientRect();
-  
-  // Calculate position just to the right of the file tree
-  const x = rect.right + 10; // 10px offset from the tree
+  const x = rect.right + 10;
   const y = rect.top;
 
-  // Get file metadata from fileSystem
   const fileSystem = getFileSystem();
   const metadata = await fileSystem.getItem(fileId, "file");
   
   if (metadata) {
-    // Import and call showPopup dynamically to avoid circular dependencies
+    // Show popup
     const { showPopup } = await import('../ui/popup.js');
     showPopup(metadata, x, y);
+
+    // Dynamically import share3dDat
+    const { share3dDat } = await import('../ui/graph_v2/create.js');
+    const { scene, camera, controls } = share3dDat();
+    
+    // Find sphere by recursively searching scene
+    let sphere = null;
+    scene.traverse((obj) => {
+      if (obj.userData?.id === fileId && 
+          (obj.geometry instanceof THREE.IcosahedronGeometry || 
+           obj.geometry instanceof THREE.SphereGeometry)) {
+        sphere = obj;
+      }
+    });
+
+    if (sphere) {
+      // Disable controls temporarily
+      controls.enabled = false;
+      
+      // Calculate positions
+      const targetPos = sphere.position.clone();
+      const distance = 20; // Adjust this value to change how far back the camera is
+      const offset = new THREE.Vector3(0, 0, distance);
+      
+      // Calculate final camera position
+      const finalPos = targetPos.clone().add(offset);
+
+      // Animate camera move with GSAP
+      gsap.to(camera.position, {
+        duration: 1,
+        x: finalPos.x,
+        y: finalPos.y,
+        z: finalPos.z,
+        ease: "power2.inOut",
+        onUpdate: () => {
+          camera.lookAt(targetPos);
+          controls.target.copy(targetPos);
+        },
+        onComplete: () => {
+          controls.enabled = true;
+          controls.update();
+        }
+      });
+
+      // Also animate controls target
+      gsap.to(controls.target, {
+        duration: 1,
+        x: targetPos.x,
+        y: targetPos.y,
+        z: targetPos.z,
+        ease: "power2.inOut"
+      });
+    }
   }
 }
 

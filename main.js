@@ -27,7 +27,9 @@ import {settingsPills} from './ui/components/settings_pills.js';
 import { eventBus } from './ui/eventBus.js';
 import { ShareManager } from "./network/share_manager";
 // import {createMiniMap} from './ui/graph_v2/createMiniMap.js';
+import { initializeSearchHandler } from './ui/components/search/searchHandler.js';
 
+// Call the function to set up the search handler
 
 let tabManager = null;
 const userId = "kai";
@@ -50,11 +52,8 @@ async function main() {
   settingsPills.setupEventListeners();
   ShareManager.handleIncomingShareLink();
   
+  initializeSearchHandler();
 
-  // Other initialization code...
-  // ...
-
-  console.log("Main function initialized");
 
   
   try {

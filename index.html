@@ -741,6 +741,14 @@ document.addEventListener('click', (e) => {
           </select>
         </div>
       </div>
+       <button id="searchButton" disabled style="pointer-events: all !important; align-items: center;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <span class="button-text">Search</span>
+        <span class="search-spinner"></span>
+        <span class="tooltip">Click to search the scene</span>
+    </button>
       <div class="search-results" id="searchResults">
         <!-- Results will be populated here -->
       </div>
@@ -756,13 +764,45 @@ document.addEventListener('click', (e) => {
     searchModalContainer.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
     activeIcon = searchBtn;
 
-    // Add search input handler
-    const searchInput = searchModalContainer.querySelector('#searchInput');
-    searchInput.addEventListener('input', handleSearch);
-    
-    // Add search type change handler
-    const searchTypeSelect = searchModalContainer.querySelector('#searchTypeSelect');
-    searchTypeSelect.addEventListener('change', handleSearch);
+    const searchButton = document.getElementById('searchButton');
+    const searchInput = document.getElementById('searchInput');
+    const searchTypeSelect = document.getElementById('searchTypeSelect');
+
+    // Enable search button when input has content
+    searchInput.addEventListener('input', (e) => {
+      searchButton.disabled = !e.target.value.trim();
+    });
+
+    // Dispatch search event when button is clicked
+    searchButton.addEventListener('click', () => {
+      searchButton.classList.add('loading');
+      const searchEvent = new CustomEvent('initiateSearch', {
+        detail: {
+          query: searchInput.value.trim(),
+          searchType: searchTypeSelect.value
+        }
+      });
+      window.dispatchEvent(searchEvent);
+    });
+
+    // Listen for search completion to remove loading state
+    window.addEventListener('searchComplete', () => {
+      searchButton.classList.remove('loading');
+    });
+
+    // Also trigger search on Enter key
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && searchInput.value.trim()) {
+        searchButton.classList.add('loading');
+        const searchEvent = new CustomEvent('initiateSearch', {
+          detail: {
+            query: searchInput.value.trim(),
+            searchType: searchTypeSelect.value
+          }
+        });
+        window.dispatchEvent(searchEvent);
+      }
+    });
   }
 
   function hideSearchModal() {
@@ -898,6 +938,8 @@ document.addEventListener('click', (e) => {
       document.removeEventListener('mouseup', handleUp);
   }
 </script>
+
+
 
 <script type="module" src="/main.js"></script>
 
