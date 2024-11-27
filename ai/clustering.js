@@ -2,7 +2,7 @@
 import { processKeywordEmbeddings } from './embeddingBatches.js';
 import { performUMAPOnly, sendSceneBoundingBoxToWorker } from './umap.js';
 import { createAnimatedPointCloud, adjustCameraAndRaycaster } from '../ui/graph_v2/createPointCloud.js';
-import { zoomCameraToPointCloud, clearScenesAndHideObjects } from '../ui/graph_v2/reorientScene.js';
+import { clearScenesAndHideObjects } from '../ui/graph_v2/reorientScene.js';
 
 // Initialize DBSCAN worker
 const dbscanWorker = new Worker(new URL('../workers/cluster_worker.js', import.meta.url), { type: 'module' });

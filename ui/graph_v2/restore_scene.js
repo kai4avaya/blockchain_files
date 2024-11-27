@@ -1,15 +1,28 @@
 import { share3dDat, markNeedsRender } from './create.js';
+// import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import * as THREE from 'three';
 
 let originalSceneState = null;
 
 export function saveCurrentSceneState() {
     const { scene, nonBloomScene } = share3dDat();
     
-    // Deep clone the scenes
+    // Save positions and states instead of cloning
     originalSceneState = {
-        scene: scene.clone(true),
-        nonBloomScene: nonBloomScene.clone(true)
+        objects: new Map()
     };
+    
+    // Store original positions and states of all objects
+    scene.traverse((object) => {
+        if (object.isMesh || object.isLineSegments) {
+            originalSceneState.objects.set(object.userData.id, {
+                position: object.position.clone(),
+                rotation: object.rotation.clone(),
+                scale: object.scale.clone(),
+                visible: object.visible
+            });
+        }
+    });
     
     console.log('Scene state saved');
 }
@@ -21,32 +34,96 @@ export function restoreOriginalScene() {
     }
 
     const { scene, nonBloomScene } = share3dDat();
+    const duration = 1000; // Animation duration in milliseconds
+    const startTime = performance.now();
     
-    // Clear current scenes
-    while(scene.children.length > 0) {
-        scene.remove(scene.children[0]);
-    }
-    while(nonBloomScene.children.length > 0) {
-        nonBloomScene.remove(nonBloomScene.children[0]);
-    }
-    
-    // Restore from saved state
-    originalSceneState.scene.children.forEach(child => {
-        scene.add(child.clone(true));
+    // Store initial positions for animation
+    const initialStates = new Map();
+    scene.traverse((object) => {
+        if (object.isMesh || object.isLineSegments) {
+            if (originalSceneState.objects.has(object.userData.id)) {
+                initialStates.set(object.userData.id, {
+                    position: object.position.clone(),
+                    rotation: object.rotation.clone(),
+                    scale: object.scale.clone()
+                });
+            }
+        }
     });
-    originalSceneState.nonBloomScene.children.forEach(child => {
-        nonBloomScene.add(child.clone(true));
-    });
-    
-    markNeedsRender();
-    const actionPanel = document.querySelector('.action-panel');
-    if (actionPanel) {
-        actionPanel.style.display = 'none';
+
+    // Animation function
+    function animate(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function for smooth animation
+        const eased = progress < 0.5 
+            ? 2 * progress * progress 
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+        scene.traverse((object) => {
+            if (object.isMesh || object.isLineSegments) {
+                const originalState = originalSceneState.objects.get(object.userData.id);
+                const initialState = initialStates.get(object.userData.id);
+                
+                if (originalState && initialState) {
+                    // Interpolate position
+                    object.position.lerpVectors(
+                        initialState.position,
+                        originalState.position,
+                        eased
+                    );
+                    
+                    // Interpolate rotation
+                    object.rotation.x = THREE.MathUtils.lerp(
+                        initialState.rotation.x,
+                        originalState.rotation.x,
+                        eased
+                    );
+                    object.rotation.y = THREE.MathUtils.lerp(
+                        initialState.rotation.y,
+                        originalState.rotation.y,
+                        eased
+                    );
+                    object.rotation.z = THREE.MathUtils.lerp(
+                        initialState.rotation.z,
+                        originalState.rotation.z,
+                        eased
+                    );
+                    
+                    // Interpolate scale
+                    object.scale.lerpVectors(
+                        initialState.scale,
+                        originalState.scale,
+                        eased
+                    );
+                    
+                    // Restore visibility at the end
+                    if (progress === 1) {
+                        object.visible = originalState.visible;
+                    }
+                }
+            }
+        });
+
+        markNeedsRender();
+
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            // Animation complete
+            const actionPanel = document.querySelector('.action-panel');
+            if (actionPanel) {
+                actionPanel.style.display = 'none';
+            }
+            console.log('Scene restored to original state');
+        }
     }
-    console.log('Scene restored to original state');
+
+    // Start animation
+    requestAnimationFrame(animate);
     return true;
 }
-
 
 // Add this function to create the button panel
 export function createActionPanel() {

@@ -20,12 +20,6 @@ export function initiate_gui_controls() {
             actionPanel.querySelector('.action-panel-buttons').style.display = 'none';
         }
         
-        // Check if we need to restore the scene before proceeding
-        const needsRestore = document.querySelector('.restore-btn')?.style.display !== 'none';
-        if (needsRestore) {
-            restoreOriginalScene();
-        }
-
         // Save initial scene state before any action
         saveCurrentSceneState();
 
