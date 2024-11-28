@@ -15,6 +15,12 @@ export function initiate_gui_controls() {
         // Show spinner, hide buttons immediately when any action starts
         showSpinner();
 
+        // Hide the modal that triggered the action
+        const modal = document.querySelector('.modal');
+        if (modal && modal.classList.contains('active')) {
+            modal.classList.remove('active');
+        }
+
         // Check if we need to restore the scene before proceeding
         const needsRestore = document.querySelector('.restore-btn')?.style.display !== 'none';
         if (needsRestore) {
@@ -103,6 +109,23 @@ export function initiate_gui_controls() {
                 updateStatus("Unknown action triggered");
                 setTimeout(() => updateStatus("done"), 2000);
         }
+    });
+
+    // Add click handlers for the modal cards
+    document.querySelectorAll('.modal-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            const action = card.dataset.action;
+            // Dispatch the modalAction event
+            document.dispatchEvent(new CustomEvent('modalAction', {
+                detail: { action }
+            }));
+            
+            // Hide the modal
+            const modal = e.target.closest('.modal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        });
     });
 
     // Helper functions for consistent panel handling

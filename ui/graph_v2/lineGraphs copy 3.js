@@ -38,21 +38,20 @@ async function connectSimilarSpheres() {
   await indexDBOverlay.openDB(config.dbName);
   await indexDBOverlay.initializeDB(Object.keys(config.dbStores));
 
+  // Create a map of sphere userIds to their keywords
   const sphereKeywords = new Map();
   console.log('🔍 Fetching keywords for spheres...');
   
-  // Fetch all keywords first
-  const keywordPromises = spheres.map(async sphere => {
-    if (sphere.userData?.id) {
+  for (const sphere of spheres) {
+    if (sphere.userData && sphere.userData.id) {
       const keywords = await getKeywordsForSphere(sphere.userData.id);
+      console.log(`Keywords for sphere ${sphere.userData.id}:`, keywords);
       sphereKeywords.set(sphere.userData.id, keywords);
     }
-  });
-  
-  await Promise.all(keywordPromises);
+  }
 
-  // Create all connections
-  const connectionPromises = [];
+  // Compare each pair of spheres
+  console.log('🔗 Creating connections between similar spheres...');
   let connectionCount = 0;
   
   for (let i = 0; i < spheres.length; i++) {
@@ -60,44 +59,29 @@ async function connectSimilarSpheres() {
       const sphere1 = spheres[i];
       const sphere2 = spheres[j];
       
-      if (sphere1.userData?.id && sphere2.userData?.id) {
+      if (sphere1.userData && sphere2.userData && 
+          sphere1.userData.id && sphere2.userData.id) {
         const keywords1 = sphereKeywords.get(sphere1.userData.id);
         const keywords2 = sphereKeywords.get(sphere2.userData.id);
         
-        if (!keywords1 || !keywords2) continue;
+        if (!keywords1 || !keywords2) {
+          console.warn('⚠️ Missing keywords for sphere:', 
+            !keywords1 ? sphere1.userData.id : sphere2.userData.id);
+          continue;
+        }
         
         const commonKeywords = keywords1.filter(keyword => keywords2.includes(keyword));
         
         if (commonKeywords.length > 0) {
-          console.log(`Found ${commonKeywords.length} connections between spheres ${sphere1.userData.id} and ${sphere2.userData.id}`);
-          
-          // Create all particle lines for this sphere pair with 3D distribution
-          for (let k = 0; k < commonKeywords.length; k++) {
-            const keyword = commonKeywords[k];
-            const angleStep = (2 * Math.PI) / commonKeywords.length;
-            const radius = 0.2; // Base radius for the distribution
-            
-            // Calculate 3D offset
-            const offset = radius * Math.cos(k * angleStep);
-            const heightOffset = radius * Math.sin(k * angleStep);
-            
-            connectionPromises.push(animateParticleLine(
-              sphere1, 
-              sphere2, 
-              keyword, 
-              offset, 
-              heightOffset,
-              k
-            ));
-            connectionCount++;
-          }
+          console.log(`Found connection between spheres ${sphere1.userData.id} and ${sphere2.userData.id}`);
+          console.log('Common keywords:', commonKeywords);
+          await animateParticleLine(sphere1, sphere2, commonKeywords[0]);
+          connectionCount++;
         }
       }
     }
   }
 
-  // Animate all lines simultaneously
-  await Promise.all(connectionPromises);
   console.log(`✅ Created ${connectionCount} connections between spheres`);
   markNeedsRender();
 }
@@ -127,13 +111,13 @@ async function getKeywordsForSphere(sphereId) {
   }
 }
 
-function createParticleLine(sphere1, sphere2, keyword, offset = 0, heightOffset = 0, index = 0) {
+function createParticleLine(sphere1, sphere2, keyword) {
   const { scene } = share3dDat();
-  
-  const midPoint = getMiddlePoint(sphere1.position, sphere2.position, offset, heightOffset, index);
+  console.log('Creating particle line between', sphere1.userData.id, 'and', sphere2.userData.id);
+
   const curve = new THREE.QuadraticBezierCurve3(
     sphere1.position,
-    midPoint,
+    getMiddlePoint(sphere1.position, sphere2.position),
     sphere2.position
   );
 
@@ -141,32 +125,28 @@ function createParticleLine(sphere1, sphere2, keyword, offset = 0, heightOffset 
   const positions = new Float32Array(PARTICLE_COUNT * 3);
   const colors = new Float32Array(PARTICLE_COUNT * 3);
 
-  // Initialize all positions at the start point
   for (let i = 0; i < PARTICLE_COUNT; i++) {
-    const idx = i * 3;
-    positions[idx] = sphere1.position.x;
-    positions[idx + 1] = sphere1.position.y;
-    positions[idx + 2] = sphere1.position.z;
-    
-    // Create unique colors based on keyword
-    const hue = Math.abs(keyword.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % 360;
-    const color = new THREE.Color().setHSL(hue / 360, 0.8, 0.6);
-    colors[idx] = color.r;
-    colors[idx + 1] = color.g;
-    colors[idx + 2] = color.b;
+    const t = i / (PARTICLE_COUNT - 1);
+    const point = curve.getPoint(t);
+    positions[i * 3] = point.x;
+    positions[i * 3 + 1] = point.y;
+    positions[i * 3 + 2] = point.z;
+
+    // Set color to a bright blue
+    colors[i * 3] = 0.3;     // R
+    colors[i * 3 + 1] = 0.6; // G
+    colors[i * 3 + 2] = 1.0; // B
   }
 
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   const material = new THREE.PointsMaterial({
-    size: 0.08,
+    size: 0.1,
     vertexColors: true,
     transparent: true,
-    opacity: 0,
+    opacity: 0.8,
     blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    depthTest: true
   });
 
   const line = new THREE.Points(geometry, material);
@@ -174,82 +154,75 @@ function createParticleLine(sphere1, sphere2, keyword, offset = 0, heightOffset 
     type: 'connection',
     sphere1Id: sphere1.userData.id,
     sphere2Id: sphere2.userData.id,
-    keyword: keyword,
-    offset: offset,
-    heightOffset: heightOffset,
-    index: index
+    keyword: keyword
   };
 
-  // Ensure the line is visible in all layers
-  line.layers.enableAll();
-  
+  // Add to scene and store in the map
   scene.add(line);
-  const connectionKey = `${sphere1.userData.id}-${sphere2.userData.id}-${keyword}-${index}`;
-  connectedLines.set(connectionKey, line);
+  connectedLines.set(`${sphere1.userData.id}-${sphere2.userData.id}`, line);
   
+  // Ensure the scene is re-rendered
+  markNeedsRender('immediate');
+  
+  console.log('Created particle line:', line);
   return line;
 }
 
-function getMiddlePoint(p1, p2, offset = 0, heightOffset = 0, index = 0) {
+function getMiddlePoint(p1, p2) {
   const midPoint = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+  // Increase the curve amount for more pronounced arcing
   const distance = p1.distanceTo(p2);
-  
-  // Add base curve
   midPoint.y += CURVE_AMOUNT * distance;
-  
-  // Calculate 3D offset using spherical coordinates
-  const direction = new THREE.Vector3().subVectors(p2, p1);
-  const angle = (index * Math.PI * 0.5) + (offset * Math.PI * 0.2); // Distribute around the connection line
-  
-  // Create perpendicular vectors for 3D distribution
-  const perpX = new THREE.Vector3(-direction.z, 0, direction.x).normalize();
-  const perpY = new THREE.Vector3(
-    -direction.y * direction.x,
-    direction.x * direction.x + direction.z * direction.z,
-    -direction.y * direction.z
-  ).normalize();
-  
-  // Apply 3D offset
-  midPoint.add(perpX.multiplyScalar(Math.cos(angle) * offset * distance));
-  midPoint.add(perpY.multiplyScalar(Math.sin(angle) * offset * distance));
-  midPoint.y += heightOffset * distance; // Additional height variation
-  
   return midPoint;
 }
 
-async function animateParticleLine(sphere1, sphere2, keyword, offset = 0, heightOffset = 0, index = 0) {
-    const line = createParticleLine(sphere1, sphere2, keyword, offset, heightOffset, index);
+async function animateParticleLine(sphere1, sphere2, keyword) {
+    console.log('Animating particle line between', sphere1.userData.id, 'and', sphere2.userData.id);
+    
+    const line = createParticleLine(sphere1, sphere2, keyword);
     const material = line.material;
     const geometry = line.geometry;
     const positions = geometry.attributes.position.array;
     
-    // Set initial state
-    material.opacity = 0;
+    // Store original positions
+    const originalPositions = positions.slice();
     
-    // Calculate curve once
+    // Set all positions to start from sphere1
+    for (let i = 0; i < PARTICLE_COUNT * 3; i += 3) {
+        positions[i] = sphere1.position.x;
+        positions[i + 1] = sphere1.position.y;
+        positions[i + 2] = sphere1.position.z;
+    }
+    
+    geometry.attributes.position.needsUpdate = true;
+    material.opacity = 0;
+
+    // Calculate the curve points
     const curve = new THREE.QuadraticBezierCurve3(
         sphere1.position,
-        getMiddlePoint(sphere1.position, sphere2.position, offset, heightOffset, index),
+        getMiddlePoint(sphere1.position, sphere2.position),
         sphere2.position
     );
 
-    return new Promise(resolve => {
-        // Fade in and maintain opacity
+    // Animate particles flowing from sphere1 to sphere2
+    await new Promise(resolve => {
         gsap.to(material, {
             opacity: 0.8,
-            duration: 1.0,
+            duration: 0.5,
             ease: "power2.out"
         });
 
         gsap.to({}, {
-            duration: 1.5,
+            duration: 2,
             onUpdate: function() {
                 const progress = this.progress();
                 for (let i = 0; i < PARTICLE_COUNT; i++) {
-                    const delay = i / PARTICLE_COUNT * 0.8;
+                    const delay = i / PARTICLE_COUNT; // Stagger the particles
                     const particleProgress = Math.max(0, Math.min(1, (progress - delay) * 1.5));
                     
+                    // Get point along the curve
                     const point = curve.getPoint(particleProgress);
+                    
                     const idx = i * 3;
                     positions[idx] = point.x;
                     positions[idx + 1] = point.y;
@@ -259,10 +232,7 @@ async function animateParticleLine(sphere1, sphere2, keyword, offset = 0, height
                 markNeedsRender();
             },
             onComplete: () => {
-                // Ensure final positions and opacity are set
-                material.opacity = 0.8;
-                material.needsUpdate = true;
-                
+                // Ensure final positions match exactly
                 for (let i = 0; i < PARTICLE_COUNT; i++) {
                     const t = i / (PARTICLE_COUNT - 1);
                     const point = curve.getPoint(t);
@@ -281,9 +251,10 @@ async function animateParticleLine(sphere1, sphere2, keyword, offset = 0, height
 
 export function updateConnectedLines() {
   connectedLines.forEach((line, key) => {
-    const [sphere1Id, sphere2Id, keyword, index] = key.split('-');
+    const [sphere1Id, sphere2Id] = key.split('-');
     const { scene } = share3dDat();
     
+    // Find the spheres in the scene
     let sphere1, sphere2;
     scene.traverse((object) => {
       if (object.userData?.id === sphere1Id) sphere1 = object;
@@ -295,14 +266,10 @@ export function updateConnectedLines() {
       return;
     }
 
-    const offset = line.userData.offset;
-    const heightOffset = line.userData.heightOffset;
-    const indexNum = parseInt(index) || 0;
-
-    // Calculate new curve with 3D distribution
+    // Calculate new curve
     const curve = new THREE.QuadraticBezierCurve3(
       sphere1.position,
-      getMiddlePoint(sphere1.position, sphere2.position, offset, heightOffset, indexNum),
+      getMiddlePoint(sphere1.position, sphere2.position),
       sphere2.position
     );
 

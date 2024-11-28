@@ -6,16 +6,12 @@ click node will also bring up input
 reorganize 3d space by smilar articles using embeddings matches
 
 ---
-0) fix scrape
-1) fix file upload on click canvas
-2) image upload llm
-3) data search
-3.5) data analytics
-4) file selector needs to correctly load the files I've used
-5) orbit controls spheres weird they slide 2d not allow camera to circle
-6) when we set a new peer we need to ensure we are no longer sharing with other peers (add a function to do this on new peer creation)
-7) when writing menu pps out we need to hide the minimap
 
+2) image upload llm
+3.5) data analytics
+6) when we set a new peer we need to ensure we are no longer sharing with other peers (add a function to do this on new peer creation)
+7) chunking needs to be smaller
+8) https://github.com/vasturiano/3d-force-graph
 ****
 embedding pool workers
 enter your name for record keeping
