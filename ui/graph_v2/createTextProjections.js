@@ -40,75 +40,85 @@ export function initLabelRenderer() {
 }
 
 
-export function createFloatingElement(text, position, key, fileId, hashKey) {
+export function createFloatingElement(text, position, key, fileId, hashKey, index) {
   const element = document.createElement('div');
-  element.className = 'element';
-  element.style.backgroundColor = `rgba(0,127,127,${Math.random() * 0.5 + 0.25})`;
-  element.style.width = '240px';  // Increased width
-  element.style.height = '320px'; // Increased height
-  element.style.boxShadow = '0px 0px 12px rgba(0,255,255,0.5)';
-  element.style.border = '1px solid rgba(127,255,255,0.25)';
-  element.style.fontFamily = 'Helvetica, sans-serif';
-  element.style.textAlign = 'center';
-  element.style.cursor = 'default';
-  element.style.padding = '10px';
-  element.style.overflow = 'hidden';
+  element.className = `vector-projection vector-${key}`;
+  element.id = `vector-${key}-${hashKey}`;
+  element.draggable = true;
+  
+  element.innerHTML = `
+    <div class="vector-header">
+      <span class="vector-id">${key}</span>
+      <span class="vector-hash">${hashKey}</span>
+    </div>
+    <div class="vector-content">
+      <div class="vector-text">${text.substring(0, 100)}...</div>
+      <div class="vector-file">${fileId}</div>
+    </div>
+  `;
+  
+  let isDragging = false;
+  let currentX;
+  let currentY;
+  let initialX;
+  let initialY;
 
-  const symbol = document.createElement('div');
-  symbol.className = 'symbol';
-  symbol.textContent = text.substring(0, 2).toUpperCase();
-  symbol.style.fontSize = '40px';
-  symbol.style.fontWeight = 'bold';
-  symbol.style.color = 'rgba(255,255,255,0.75)';
-  symbol.style.textShadow = '0 0 10px rgba(0,255,255,0.95)';
-  element.appendChild(symbol);
-
-  const textContent = document.createElement('div');
-  textContent.className = 'text-content';
-  textContent.style.height = '100px';
-  textContent.style.overflowY = 'auto';
-  textContent.style.marginBottom = '10px';
-  textContent.style.fontSize = '14px';
-  textContent.style.color = 'rgba(255,255,255,0.9)';
-  textContent.textContent = text.substring(0, 200);
-  element.appendChild(textContent);
-
-  const expandButton = document.createElement('button');
-  expandButton.textContent = 'Expand';
-  expandButton.style.marginBottom = '10px';
-  expandButton.addEventListener('click', () => {
-    textContent.textContent = text;
-    expandButton.style.display = 'none';
+  element.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    element.classList.add('active');
+    
+    initialX = e.clientX - element.offsetLeft;
+    initialY = e.clientY - element.offsetTop;
+    
+    e.preventDefault();
   });
-  element.appendChild(expandButton);
 
-  const textArea = document.createElement('textarea');
-  textArea.style.width = '90%';
-  textArea.style.height = '60px';
-  textArea.style.marginBottom = '10px';
-  element.appendChild(textArea);
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
 
-  const submitButton = document.createElement('button');
-  submitButton.textContent = 'Submit';
-  submitButton.addEventListener('click', () => {
-    console.log(`Submitted text for ${fileId}: ${textArea.value}`);
-    // Here you can add logic to handle the submitted text
+    currentX = e.clientX - initialX;
+    currentY = e.clientY - initialY;
+
+    element.style.left = `${currentX}px`;
+    element.style.top = `${currentY}px`;
   });
-  element.appendChild(submitButton);
 
-  const details = document.createElement('div');
-  details.className = 'details';
-  details.textContent = `${key} (${hashKey})`;
-  details.style.fontSize = '12px';
-  details.style.color = 'rgba(127,255,255,0.75)';
-  element.appendChild(details);
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+    element.classList.remove('active');
+  });
 
   const object = new CSS3DObject(element);
+  
+  const staggerOffset = 5; // pixels to offset each element
   object.position.copy(position);
-  object.userData = { fullText: text, key, fileId, hashKey };
-
-  console.log(`Created CSS3D object for ${fileId} at position: ${position.toArray()}`);
-
+  object.position.x += index * staggerOffset;
+  object.position.y += index * staggerOffset;
+  
+  object.scale.set(0.5, 0.5, 0.5);
+  
+  element.addEventListener('click', (e) => {
+    document.querySelectorAll('.vector-projection').forEach(el => {
+      el.classList.remove('active');
+      el.style.zIndex = '1';
+    });
+    
+    element.classList.add('active');
+    element.style.zIndex = '100000';
+    
+    e.stopPropagation();
+  });
+  
+  object.name = `vector-object-${key}`;
+  
+  console.log(`Created vector element at position:`, {
+    x: position.x,
+    y: position.y,
+    z: position.z,
+    scale: object.scale,
+    id: element.id
+  });
+  
   return object;
 }
 

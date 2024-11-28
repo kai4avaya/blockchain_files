@@ -4,7 +4,9 @@ import { performClustering } from '../ai/clustering.js'
 import { updateStatus } from './components/process.js'  // Import the updateStatus function
 import {setupTextProjectionVisualization} from '../ai/vector_text_patterns.js'
 import { saveCurrentSceneState, restoreOriginalScene, createActionPanel} from './graph_v2/restore_scene.js';
+import { createTextNetwork } from './graph_v2/text_network';
 
+let cleanupTextNetwork = null;
 
 export function initiate_gui_controls() {
     const actionPanel = createActionPanel();
@@ -102,6 +104,22 @@ export function initiate_gui_controls() {
                         handleVisualizationComplete();
                     }, 2000);
                 }, 4000);
+                break;
+
+            case 'hierarchy-view':
+                console.log('Hierarchy view action triggered');
+                try {
+                    if (cleanupTextNetwork) {
+                        cleanupTextNetwork();
+                        cleanupTextNetwork = null;
+                    } else {
+                        cleanupTextNetwork =  createTextNetwork();
+                    }
+                } catch (error) {
+                    console.error("Error in text network visualization:", error);
+                    updateStatus("Error in text network visualization");
+                    setTimeout(() => updateStatus("done"), 2000);
+                }
                 break;
 
             default:

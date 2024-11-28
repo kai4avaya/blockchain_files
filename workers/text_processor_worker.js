@@ -3,6 +3,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Import nlp from compromise if you're using it
 import nlp from 'compromise';
 
+const CHUNK_SIZE = 800;
+
 
 async function extractTextFromPDF(arrayBuffer) {
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -26,7 +28,7 @@ function removeStopWords(text) {
     }
 }
 
-function chunkText(text, chunkSize = 1000) {
+function chunkText(text, chunkSize = CHUNK_SIZE) {
     if (typeof text !== 'string') {
         console.error("chunkText received non-string input:", typeof text);
         return [];
