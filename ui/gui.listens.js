@@ -7,6 +7,7 @@ import { saveCurrentSceneState, restoreOriginalScene, createActionPanel} from '.
 import { createTextNetwork } from './graph_v2/text_network';
 
 let cleanupTextNetwork = null;
+let choice = 0;
 
 export function initiate_gui_controls() {
     const actionPanel = createActionPanel();
@@ -34,6 +35,7 @@ export function initiate_gui_controls() {
 
         switch (action) {
             case 'visualize-embeddings':
+                choice = 1;
                 console.log('Visualize embeddings action triggered');
                 updateStatus("Initializing embedding visualization...");
                 setTimeout(() => {
@@ -53,6 +55,7 @@ export function initiate_gui_controls() {
                 break;
 
             case 'cluster-nodes':
+                choice = 2;
                 console.log('Cluster nodes action triggered');
                 updateStatus("Initializing node clustering...");
                 setTimeout(() => {
@@ -72,6 +75,7 @@ export function initiate_gui_controls() {
                 break;
 
             case 'show-network-graph':
+                choice = 3;
                 console.log('Show network graph action triggered');
                 updateStatus("Initializing network graph...");
                 setTimeout(() => {
@@ -91,22 +95,32 @@ export function initiate_gui_controls() {
                 break;
 
             case 'filter-ideas':
+                choice = 4;
                 console.log('Filter ideas action triggered');
                 updateStatus("Initializing idea filtering...");
+                
+                // Save scene state specifically for this option
+                saveCurrentSceneState();
+                
                 setTimeout(() => {
                     updateStatus("Applying filters to ideas...");
-                    // Add your logic here
-                    // For now, we'll just simulate a process
                     setupTextProjectionVisualization()
-                    setTimeout(() => {
-                        updateStatus("Idea filtering complete");
-                        setTimeout(() => updateStatus("done"), 2000);
-                        handleVisualizationComplete();
-                    }, 2000);
+                        .then(() => {
+                            updateStatus("Idea filtering complete");
+                            setTimeout(() => updateStatus("done"), 2000);
+                            handleVisualizationComplete();
+                        })
+                        .catch(error => {
+                            console.error("Error in idea filtering:", error);
+                            updateStatus("Error in idea filtering");
+                            setTimeout(() => updateStatus("done"), 2000);
+                            restoreOriginalScene(); // Restore on error
+                        });
                 }, 4000);
                 break;
 
             case 'hierarchy-view':
+                choice = 5;
                 console.log('Hierarchy view action triggered');
                 try {
                     if (cleanupTextNetwork) {
@@ -177,8 +191,17 @@ export function initiate_gui_controls() {
 
     // Setup button handlers
     actionPanel.querySelector('.restore-btn').addEventListener('click', () => {
+        const filterElements = document.querySelectorAll('.vector-projection');
+
+        if (choice === 2 || choice === 4) {
+            // setTimeout(() => {
+                window.location.reload();
+            // }, 100);
+        }
+
         if (restoreOriginalScene()) {
             updateStatus("Scene restored to original state");
+            // Reload page if it was a filter-ideas view
         }
     });
 

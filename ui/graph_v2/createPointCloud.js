@@ -21,13 +21,33 @@ function getRaycaster() {
 }
 
 function initializeLabelRenderer() {
-  labelRenderer = new CSS2DRenderer();
-  labelRenderer.setSize(window.innerWidth, window.innerHeight);
-  labelRenderer.domElement.style.position = 'absolute';
-  labelRenderer.domElement.style.top = '0px';
-  labelRenderer.domElement.style.pointerEvents = 'none';
-  labelRenderer.domElement.style.zIndex = '1'; // Ensure labels are on top
-  document.body.appendChild(labelRenderer.domElement);
+  if (!labelRenderer) {
+    console.log("Initializing label renderer");
+    labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    const domElement = labelRenderer.domElement;
+    domElement.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 9999;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    `;
+    domElement.classList.add('css2d-renderer');
+    
+    // Remove any existing renderer
+    const existingRenderer = document.querySelector('.css2d-renderer');
+    if (existingRenderer) {
+      existingRenderer.remove();
+    }
+    
+    document.body.appendChild(domElement);
+    console.log("Label renderer added to DOM with styles:", domElement.style.cssText);
+  }
+  return labelRenderer;
 }
 
 function generateDistinctColors(numClusters) {
@@ -47,7 +67,9 @@ function generateDistinctColors(numClusters) {
 function createAnimatedPointCloud(reducedData, keywords, fileIds, clusters, fileNames) {
   const { scene, camera } = share3dDat();
 
+  // Initialize label renderer first thing
   if (!labelRenderer) {
+    console.log("Creating new label renderer");
     initializeLabelRenderer();
   }
   
@@ -195,15 +217,42 @@ function createAnimatedPointCloud(reducedData, keywords, fileIds, clusters, file
   animate();
 
   console.log(`Total point clouds created: ${pointClouds.length}`);
- // Initialize event listeners after creating the point cloud
- initializeEventListeners();
+  initializeEventListeners();
+  
+  // Force multiple immediate renders to ensure visibility
+  markNeedsRender("immediate");
+  if (labelRenderer) {
+    labelRenderer.render(scene, camera);
+  }
+  
+  // Add a delayed second render to catch any initialization issues
+  setTimeout(() => {
+    markNeedsRender("immediate");
+    if (labelRenderer) {
+      labelRenderer.render(scene, camera);
+    }
+    
+    // Add a final render after all animations should be complete
+    setTimeout(() => {
+      markNeedsRender("immediate");
+      const { renderer, scene, camera } = share3dDat();
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+        if (labelRenderer) {
+          labelRenderer.render(scene, camera);
+        }
+      }
+    }, 2600); // After GSAP animation (2.5s)
+  }, 100);
+  
   return pointClouds;
 }
 
 
 function createLabel(text) {
+  console.log("Creating label with text:", text); // Debug log
   const labelDiv = document.createElement('div');
-  labelDiv.className = 'label';
+  labelDiv.className = 'label point-label';
   labelDiv.innerHTML = text;
   labelDiv.style.cssText = `
     background-color: rgba(0,0,0,0.8);
@@ -215,42 +264,15 @@ function createLabel(text) {
     pointer-events: none;
     white-space: nowrap;
     transform: translate(-50%, -100%);
+    position: absolute;
+    z-index: 9999;
+    display: block;
+    visibility: visible;
   `;
+  console.log("Label div created with styles:", labelDiv.style.cssText); // Debug
   return new CSS2DObject(labelDiv);
 }
-function createInvisiblePointerPointCloud(reducedData, fileIds, keywords, fileNames) {
-  const { scene } = share3dDat();
-  const pointerGeometry = new THREE.BufferGeometry();
-  const positions = new Float32Array(reducedData.length * 3);
-  
-  // Populate positions
-  for (let i = 0; i < reducedData.length; i++) {
-    positions.set(reducedData[i], i * 3);
-  }
-  
-  pointerGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  
-  const pointerMaterial = new THREE.PointsMaterial({
-    size: 20.0, // Large size for easy detection
-    transparent: true,
-    opacity: 0.0, // Fully transparent
-  });
-  
-  const pointerPoints = new THREE.Points(pointerGeometry, pointerMaterial);
-  pointerPoints.name = 'invisiblePointer'; // Assign a unique name
-  
-  // Assign userData for raycasting
-  pointerPoints.userData = {
-    fileIds: fileIds,
-    keywords: keywords,
-    fileNames: fileNames,
-  };
-  
-  scene.add(pointerPoints);
-  console.log("Invisible pointer point cloud created.");
-  
-  return pointerPoints;
-}
+
 function onPointCloudInteraction(event) {
   const now = Date.now();
   if (now - lastCall < throttleMs) return;
@@ -263,6 +285,7 @@ function onPointCloudInteraction(event) {
   }
 
   const raycaster = getRaycaster();
+  console.log("Raycaster threshold:", raycaster.params.Points.threshold); // Debug log
 
   const mouse = new Vector2(
     (event.clientX / window.innerWidth) * 2 - 1,
@@ -272,14 +295,21 @@ function onPointCloudInteraction(event) {
 
   const pointClouds = scene.children.filter(child => child instanceof THREE.Points);
   const intersects = raycaster.intersectObjects(pointClouds);
+  
+  console.log("Intersection found:", intersects.length > 0); // Debug log
 
   if (intersects.length > 0) {
     const intersectedPoint = intersects[0].object;
     const index = intersects[0].index;
+    console.log("Intersected point data:", { 
+      index, 
+      hasUserData: !!intersectedPoint.userData,
+      keywords: intersectedPoint.userData?.keywords?.[index],
+      fileName: intersectedPoint.userData?.fileNames?.[index]
+    }); // Debug log
 
     if (index !== undefined && intersectedPoint.userData.fileIds && 
         intersectedPoint.userData.keywords && intersectedPoint.userData.fileNames) {
-      // const fileId = intersectedPoint.userData.fileIds[index];
       const keyword = intersectedPoint.userData.keywords[index];
       const fileName = intersectedPoint.userData.fileNames[index];
 
@@ -290,20 +320,29 @@ function onPointCloudInteraction(event) {
 
         currentLabel = createLabel(`File: ${fileName}<br>Keyword: ${keyword}`);
         currentLabel.position.copy(intersects[0].point);
-        currentLabel.userData.index = index; // Store the index to check if we're still on the same point
+        currentLabel.position.y += 0.5;
+        currentLabel.userData.index = index;
         scene.add(currentLabel);
+        console.log("New label added at position:", currentLabel.position);
       }
     }
   } else if (currentLabel) {
     scene.remove(currentLabel);
     currentLabel = null;
+    console.log("Label removed"); // Debug log
   }
   
   if (labelRenderer) {
     labelRenderer.render(scene, camera);
+    console.log("Label renderer called"); // Debug log
   }
   renderer.render(scene, camera);
   markNeedsRender();
+
+  if (!labelRenderer) {
+    console.log("Reinitializing missing label renderer");
+    initializeLabelRenderer();
+  }
 }
 
 function verifySceneScale() {
@@ -329,15 +368,21 @@ function adjustCameraAndRaycaster() {
   const center = boundingBox.getCenter(new THREE.Vector3());
   const size = boundingBox.getSize(new THREE.Vector3());
 
-  // Calculate new camera position
+  // Calculate new camera position with much wider view
   const maxDim = Math.max(size.x, size.y, size.z);
   const fov = camera.fov * (Math.PI / 180);
-  const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 5; // Increased multiplier from 1.5 to 5
-  const newPosition = new THREE.Vector3(center.x, center.y, center.z + cameraZ);
+  const cameraZ = Math.abs(maxDim / Math.tan(fov / 2)) * 6; // Increased from 4 to 6 for even wider view
+  
+  // Add larger offsets for better perspective
+  const newPosition = new THREE.Vector3(
+    center.x + maxDim * 0.8,  // Increased from 0.5 to 0.8
+    center.y + maxDim * 0.5,  // Increased from 0.3 to 0.5
+    center.z + cameraZ * 1.2  // Added 20% extra distance
+  );
 
-  // Animate camera position
+  // Animate camera position with GSAP
   gsap.to(camera.position, {
-    duration: 2,
+    duration: 2.5,
     x: newPosition.x,
     y: newPosition.y,
     z: newPosition.z,
@@ -348,25 +393,45 @@ function adjustCameraAndRaycaster() {
     }
   });
 
+  // Add a slight rotation for better perspective
+  gsap.to(camera.rotation, {
+    duration: 2.5,
+    x: -0.3,  // Increased angle
+    y: 0.3,   // Increased angle
+    ease: "power2.inOut"
+  });
+
+  // Adjust camera far plane to ensure visibility
+  camera.far = cameraZ * 3;  // Ensure far plane is far enough
+  camera.near = 0.1;         // Adjust near plane for better depth
+  camera.updateProjectionMatrix();
+
   // Adjust raycaster threshold
   const raycaster = getRaycaster();
-  raycaster.params.Points.threshold = maxDim / 100; // Increased divisor from 200 to 100
+  raycaster.params.Points.threshold = maxDim / 40; // Adjusted for better interaction at distance
 
   console.log("Animating camera to position:", newPosition);
-  console.log("Adjusted raycaster threshold:", raycaster.params.Points.threshold);
+  console.log("Adjusted camera settings:", {
+    far: camera.far,
+    position: newPosition,
+    maxDim: maxDim
+  });
 }
 function initializeEventListeners() {
-// window.addEventListener('mousemove', onPointCloudInteraction, false);
-window.addEventListener('mousemove', throttle(onPointCloudInteraction, 50), false);
-window.addEventListener('resize', () => {
-  const { camera, renderer } = share3dDat();
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  if (labelRenderer) {
-    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+  if (!labelRenderer) {
+    console.log("Initializing label renderer during event setup");
+    initializeLabelRenderer();
   }
-}, false);
+  window.addEventListener('mousemove', throttle(onPointCloudInteraction, 50), false);
+  window.addEventListener('resize', () => {
+    const { camera, renderer } = share3dDat();
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    if (labelRenderer) {
+      labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  }, false);
 
   
   console.log("Event listeners initialized.");

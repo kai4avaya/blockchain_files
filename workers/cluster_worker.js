@@ -67,7 +67,7 @@ function estimateEpsilon(data) {
     const distances = calculateDistances(data);
     distances.sort((a, b) => a - b);
     const k = Math.floor(Math.sqrt(data.length));
-    return distances[k] * 2.5;  // Increase epsilon more significantly
+    return distances[k] * 1.5;  // Reduced from 2.5 to 1.5 for tighter clusters
   }
 
 
@@ -87,7 +87,7 @@ self.onmessage = function(e) {
   const epsilon = estimateEpsilon(reducedData);
 //   const minPoints = Math.max(3, Math.floor(Math.log(reducedData.length) / 2)); // Reduce minPoints
 // const minPoints = Math.max(3, Math.ceil(Math.log(reducedData.length)));
-const minPoints = Math.max(5, Math.ceil(Math.log(reducedData.length) * 1.5));
+const minPoints = Math.max(3, Math.ceil(Math.log(reducedData.length) * 2)); // Increased multiplier from 1.5 to 2
   console.log("Estimated DBSCAN parameters:", { epsilon, minPoints });
 
   // Perform DBSCAN clustering
@@ -107,7 +107,7 @@ const minPoints = Math.max(5, Math.ceil(Math.log(reducedData.length) * 1.5));
 // Handle outliers
 const outliers = dbscan.noise;
 if (outliers.length > 0) {
-    const outlierClusterSize = Math.min(5, Math.ceil(outliers.length / 20));
+    const outlierClusterSize = Math.min(3, Math.ceil(outliers.length / 30)); // Reduced from 5 to 3, and 20 to 30
     for (let i = 0; i < outliers.length; i += outlierClusterSize) {
         clusters.push(outliers.slice(i, i + outlierClusterSize));
     }

@@ -472,8 +472,13 @@ export function zoomCameraToPointCloud(duration = 2) {
 export function clearScenesAndHideObjects() {
   const { scene, nonBloomScene } = share3dDat();
 
-  // Function to recursively hide objects
+  // Function to recursively hide objects, but skip labels
   function hideObject(obj) {
+    // Skip CSS2DObjects (labels)
+    if (obj.type === 'CSS2DObject' || obj.isCSS2DObject) {
+      return;
+    }
+    
     obj.visible = false;
     if (obj.children) {
       obj.children.forEach(hideObject);
@@ -486,7 +491,7 @@ export function clearScenesAndHideObjects() {
   // Hide all objects in non-bloom scene
   nonBloomScene.children.forEach(hideObject);
 
-  console.log(`Hidden ${scene.children.length} objects in main scene and ${nonBloomScene.children.length} objects in non-bloom scene.`);
+  console.log(`Hidden objects in main scene and non-bloom scene (preserved labels).`);
 
   markNeedsRender();
 }
