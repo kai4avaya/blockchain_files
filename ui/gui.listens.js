@@ -113,7 +113,13 @@ export function initiate_gui_controls() {
                         cleanupTextNetwork();
                         cleanupTextNetwork = null;
                     } else {
-                        cleanupTextNetwork =  createTextNetwork();
+                        cleanupTextNetwork = createTextNetwork();
+                        // Force loader to complete after 10 seconds
+                        setTimeout(() => {
+                            handleVisualizationComplete();
+                            updateStatus("Graph visualization complete");
+                            setTimeout(() => updateStatus("done"), 2000);
+                        }, 10000);
                     }
                 } catch (error) {
                     console.error("Error in text network visualization:", error);

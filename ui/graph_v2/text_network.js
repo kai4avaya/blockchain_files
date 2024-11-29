@@ -6,10 +6,10 @@ import gsap from 'gsap';
 // Force Graph Constants
 const FORCE_GRAPH_CONSTANTS = {
     // Force parameters
-    REPULSION_FORCE: -30,
-    LINK_DISTANCE: 50,
+    REPULSION_FORCE: -15,
+    LINK_DISTANCE: 20,
     DAMPING: 0.95,
-    CENTER_FORCE: 0.0001,
+    CENTER_FORCE: 0.002,
     
     // Minimum distances for axes
     MIN_DISTANCE_X: 10,
@@ -35,9 +35,9 @@ const FORCE_GRAPH_CONSTANTS = {
     CLOSE_REPULSION_MULTIPLIER: 3,
     
     // Graph separation parameters
-    GRAPH_SPACING: 150,     // Space between different file graphs
+    GRAPH_SPACING: 50,     // Space between different file graphs
     GRAPHS_PER_ROW: 2,      // Number of graphs to place side by side
-    GRAPH_INITIAL_SPREAD: 50,  // Initial spread within each graph
+    GRAPH_INITIAL_SPREAD: 40,  // Initial spread within each graph
     
     // Performance parameters
     BATCH_SIZE: 50,         // Process files in batches
@@ -49,7 +49,17 @@ const FORCE_GRAPH_CONSTANTS = {
     CAMERA_FINAL_POSITION: {
         y: 100,
         z: 200
-    }
+    },
+    
+    // Zoom settings
+    MIN_ZOOM_DISTANCE: 10,    // Allow closer zoom
+    MAX_ZOOM_DISTANCE: 800,  // Allow far zoom out
+    
+    // Line visibility settings
+    LINE_OPACITY: 0.6,        // Increased base opacity
+    LINE_GLOW_OPACITY: 0.3,   // Increased glow opacity
+    LINE_WIDTH: 1,
+    GLOW_LINE_WIDTH: 3        // Wider glow for better visibility
 };
 
 // Add this function to generate a random color
@@ -102,6 +112,15 @@ class ForceGraph {
         
         // Track if we've done the camera animation
         this.hasDoneCameraAnimation = false;
+        
+        // Set zoom limits
+        const { controls } = share3dDat();
+        if (controls) {
+            controls.minDistance = FORCE_GRAPH_CONSTANTS.MIN_ZOOM_DISTANCE;
+            controls.maxDistance = FORCE_GRAPH_CONSTANTS.MAX_ZOOM_DISTANCE;
+            controls.enableZoom = true;
+            controls.zoomSpeed = 1.5; // Increased zoom speed
+        }
     }
 
     addNode(node) {
@@ -165,14 +184,34 @@ class ForceGraph {
         const material = new THREE.LineBasicMaterial({ 
             color: color || 0xaaaaaa,
             transparent: true,
-            opacity: 0.3 
+            opacity: FORCE_GRAPH_CONSTANTS.LINE_OPACITY,
+            linewidth: FORCE_GRAPH_CONSTANTS.LINE_WIDTH,
+            fog: false
         });
+        
+        // Enhanced glow effect
+        const glowMaterial = new THREE.LineBasicMaterial({
+            color: color || 0xaaaaaa,
+            transparent: true,
+            opacity: FORCE_GRAPH_CONSTANTS.LINE_GLOW_OPACITY,
+            linewidth: FORCE_GRAPH_CONSTANTS.GLOW_LINE_WIDTH,
+            fog: false
+        });
+        
         const geometry = new THREE.BufferGeometry();
         const line = new THREE.Line(geometry, material);
+        const glowLine = new THREE.Line(geometry, glowMaterial);
         
         line.userData = { source, target };
+        glowLine.userData = { source, target, isGlow: true };
+        
+        // Ensure lines render on top
+        line.renderOrder = 1;
+        glowLine.renderOrder = 0;
+        
+        this.group.add(glowLine);
         this.group.add(line);
-        this.links.push({ source, target, line });
+        this.links.push({ source, target, line, glowLine });
     }
 
     updatePositions() {
@@ -347,22 +386,16 @@ class ForceGraph {
         const { camera, controls } = share3dDat();
         if (!camera || !controls) return;
 
-        // Calculate center point between graphs
+        // Adjust camera positions for closer graphs
         const centerX = (this.filePositions.size - 1) * FORCE_GRAPH_CONSTANTS.GRAPH_SPACING / 2;
         const centerY = 0;
         const centerZ = 0;
 
-        // Update controls settings for better zoom
-        controls.minDistance = 50;    // Allow closer zoom
-        controls.maxDistance = 1000;  // Allow far zoom out
-        controls.enableZoom = true;   // Ensure zoom is enabled
-        
-        // First animation: Move to first graph
         gsap.timeline()
             .to(camera.position, {
-                x: 50,  // Closer view
-                y: 50,
-                z: 50,
+                x: 30,  // Closer initial view
+                y: 30,
+                z: 30,
                 duration: FORCE_GRAPH_CONSTANTS.CAMERA_ANIMATION_DURATION,
                 ease: "power2.inOut",
                 onUpdate: () => {
