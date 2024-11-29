@@ -389,6 +389,10 @@ body {
     opacity 0.3s ease-out,
     transform 0.3s ease-out,
     visibility 0.3s ease-out;
+  font-family: 'Roboto Mono', monospace;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Arrow decoration */
@@ -2449,4 +2453,166 @@ mark {
   pointer-events: none !important;
   z-index: 99999 !important;
   overflow: visible !important;
+}
+
+/* Add these styles to standardize all modals */
+.modal {
+  /* ... existing styles ... */
+  font-family: 'Roboto Mono', monospace;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Style modal content similar to modal-card */
+.modal > div {
+  padding: 12px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.modal > div:hover {
+  background-color: #e2e8f0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Apply consistent text styling */
+.modal h2,
+.modal .title,
+.modal .header {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 14px;
+  color: #3b82f6;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.modal p,
+.modal .description,
+.modal .content {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+/* Style modal buttons consistently */
+.modal button:not(.close-btn) {
+  background-color: white;
+  border-radius: 8px;
+  padding: 8px;
+  transition: all 0.2s ease;
+  border: none;
+  color: #3b82f6;
+}
+
+.modal button:not(.close-btn):hover {
+  background-color: #e2e8f0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Database modal specific styles */
+.modal_databases {
+  font-family: 'Roboto Mono', monospace;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  min-width: 300px;
+}
+
+.modal_databases .modal-content {
+  background-color: #f8fafc;
+  border-radius: 8px;
+}
+
+.modal_databases h2 {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 14px;
+  color: #3b82f6;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.modal_databases .create-database-button {
+  background-color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #3b82f6;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.modal_databases .create-database-button:hover {
+  background-color: #e2e8f0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Style the accordion items */
+.accordion {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.accordion-header {
+  background-color: white;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.accordion-header button {
+  background-color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #3b82f6;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  margin-left: auto;
+}
+
+.accordion-header button:hover {
+  background-color: #e2e8f0;
+  transform: translateY(-1px);
+}
+
+.active-database .accordion-header {
+  background-color: #f0f7ff;
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.accordion-content {
+  padding: 12px;
+  background-color: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Close button styling */
+.popup-close {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 18px;
+  transition: color 0.2s ease;
+}
+
+.popup-close:hover {
+  color: #3b82f6;
 }
