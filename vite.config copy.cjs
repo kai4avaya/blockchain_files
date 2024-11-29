@@ -18,7 +18,6 @@ export default defineConfig({
       'compromise',
       'umap-js',
       'density-clustering',
-      'd3',
       '@xenova/transformers'
     ]
   },

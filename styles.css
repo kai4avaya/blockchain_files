@@ -2433,10 +2433,30 @@ mark {
   width: 100%;
   height: 100%;
   pointer-events: all;
-  z-index: 2; /* Above canvas but below UI */
-  background: transparent;
+  z-index: 1000;
+  background: #007bff;
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden; /* Ensure canvas doesn't cause scrollbars */
 }
 
 #text-network-container canvas {
-  opacity: 1 !important;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  background-color: #007bff;
+}
+
+.node-label {
+    color: white;
+    background-color: rgba(0,0,0,0.7);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    font-family: Arial, sans-serif;
+    white-space: nowrap;
+    user-select: none;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
 }

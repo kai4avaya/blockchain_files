@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import indexDBOverlay from '../../memory/local/file_worker';
-import { scene, markNeedsRender, share3dDat } from './create.js';
+import { scene, markNeedsRender } from './create.js';
 import gsap from 'gsap';
 
+const MAX_KEYWORDS_PER_FILE = 400;
 // Force Graph Constants
 const FORCE_GRAPH_CONSTANTS = {
     // Force parameters
@@ -12,9 +13,9 @@ const FORCE_GRAPH_CONSTANTS = {
     CENTER_FORCE: 0.0001,
     
     // Minimum distances for axes
-    MIN_DISTANCE_X: 10,
+    MIN_DISTANCE_X: 15,
     MIN_DISTANCE_Y: 8,
-    MIN_DISTANCE_Z: 8,
+    MIN_DISTANCE_Z: 12,
     
     // Equilibrium parameters
     EQUILIBRIUM_THRESHOLD: 0.01,
@@ -35,21 +36,9 @@ const FORCE_GRAPH_CONSTANTS = {
     CLOSE_REPULSION_MULTIPLIER: 3,
     
     // Graph separation parameters
-    GRAPH_SPACING: 150,     // Space between different file graphs
+    GRAPH_SPACING: 300,     // Space between different file graphs
     GRAPHS_PER_ROW: 2,      // Number of graphs to place side by side
-    GRAPH_INITIAL_SPREAD: 50,  // Initial spread within each graph
-    
-    // Performance parameters
-    BATCH_SIZE: 50,         // Process files in batches
-    MAX_KEYWORDS_PER_FILE: 200,  // Reduce keywords per file
-    GPU_ACCELERATION: true,  // Enable GPU optimizations
-    
-    // Camera animation parameters
-    CAMERA_ANIMATION_DURATION: 2,
-    CAMERA_FINAL_POSITION: {
-        y: 100,
-        z: 200
-    }
+    GRAPH_INITIAL_SPREAD: 100  // Initial spread within each graph
 };
 
 // Add this function to generate a random color
@@ -95,13 +84,9 @@ class ForceGraph {
         this.group = new THREE.Group();
         scene.add(this.group);
         
-        // Add file position tracking with logging
+        // Add file position tracking
         this.filePositions = new Map();
         this.fileCount = 0;
-        console.log('Created new ForceGraph instance');
-        
-        // Track if we've done the camera animation
-        this.hasDoneCameraAnimation = false;
     }
 
     addNode(node) {
@@ -114,7 +99,6 @@ class ForceGraph {
                 y: gridY * FORCE_GRAPH_CONSTANTS.GRAPH_SPACING,
                 z: 0
             });
-            console.log(`Created new graph position for file ${node.fileId} at grid (${gridX}, ${gridY})`);
             this.fileCount++;
         }
 
@@ -143,7 +127,7 @@ class ForceGraph {
         const sprite = new THREE.Sprite(material);
         sprite.scale.set(12, 3, 1);
         
-        // Position relative to file's grid position with reduced spread
+        // Position relative to file's grid position
         sprite.position.set(
             filePosition.x + (Math.random() - 0.5) * FORCE_GRAPH_CONSTANTS.GRAPH_INITIAL_SPREAD,
             filePosition.y + (Math.random() - 0.5) * FORCE_GRAPH_CONSTANTS.GRAPH_INITIAL_SPREAD,
@@ -161,9 +145,9 @@ class ForceGraph {
         this.nodes.push(node);
     }
 
-    addLink(source, target, color) {
+    addLink(source, target) {
         const material = new THREE.LineBasicMaterial({ 
-            color: color || 0xaaaaaa,
+            color: 0xaaaaaa,
             transparent: true,
             opacity: 0.3 
         });
@@ -178,14 +162,7 @@ class ForceGraph {
     updatePositions() {
         // Check if we've exceeded total animation time
         if (performance.now() - this.startTime > FORCE_GRAPH_CONSTANTS.TOTAL_ANIMATION_TIME) {
-            console.log('Force graph stabilized');
             this.isStable = true;
-            
-            // Perform camera animation if we haven't yet
-            if (!this.hasDoneCameraAnimation) {
-                this.animateCamera();
-                this.hasDoneCameraAnimation = true;
-            }
             return;
         }
 
@@ -324,11 +301,6 @@ class ForceGraph {
             this.equilibriumCount = 0;
             this.isStable = false;
         }
-
-        // Add logging for force updates
-        if (this.isStable) {
-            console.log('Graph reached stable state');
-        }
     }
 
     dispose() {
@@ -342,106 +314,19 @@ class ForceGraph {
         });
         scene.remove(this.group);
     }
-
-    animateCamera() {
-        const { camera, controls } = share3dDat();
-        if (!camera || !controls) return;
-
-        // Calculate center point between graphs
-        const centerX = (this.filePositions.size - 1) * FORCE_GRAPH_CONSTANTS.GRAPH_SPACING / 2;
-        const centerY = 0;
-        const centerZ = 0;
-
-        // Update controls settings for better zoom
-        controls.minDistance = 50;    // Allow closer zoom
-        controls.maxDistance = 1000;  // Allow far zoom out
-        controls.enableZoom = true;   // Ensure zoom is enabled
-        
-        // First animation: Move to first graph
-        gsap.timeline()
-            .to(camera.position, {
-                x: 50,  // Closer view
-                y: 50,
-                z: 50,
-                duration: FORCE_GRAPH_CONSTANTS.CAMERA_ANIMATION_DURATION,
-                ease: "power2.inOut",
-                onUpdate: () => {
-                    camera.lookAt(0, 0, 0);
-                    controls.update();
-                }
-            })
-            // Then move to second graph
-            .to(camera.position, {
-                x: FORCE_GRAPH_CONSTANTS.GRAPH_SPACING + 50,
-                y: 50,
-                z: 50,
-                duration: FORCE_GRAPH_CONSTANTS.CAMERA_ANIMATION_DURATION,
-                ease: "power2.inOut",
-                onUpdate: () => {
-                    camera.lookAt(FORCE_GRAPH_CONSTANTS.GRAPH_SPACING, 0, 0);
-                    controls.update();
-                }
-            })
-            // Finally, move to position where both graphs are visible
-            .to(camera.position, {
-                x: centerX,
-                y: FORCE_GRAPH_CONSTANTS.CAMERA_FINAL_POSITION.y,
-                z: FORCE_GRAPH_CONSTANTS.CAMERA_FINAL_POSITION.z,
-                duration: FORCE_GRAPH_CONSTANTS.CAMERA_ANIMATION_DURATION,
-                ease: "power2.inOut",
-                onUpdate: () => {
-                    camera.lookAt(centerX, centerY, centerZ);
-                    controls.update();
-                },
-                onComplete: () => {
-                    console.log('Camera animation complete');
-                    controls.target.set(centerX, centerY, centerZ);
-                    controls.update();
-                }
-            });
-    }
 }
 
 export async function createTextNetwork() {
     try {
         const summaries = await indexDBOverlay.getAll('summaries');
-        console.log(`Found ${summaries.length} files to process`);
         if (!summaries?.length) return null;
 
         const graph = new ForceGraph();
-        
-        // Process files in batches
-        const processBatch = async (startIdx) => {
-            const endIdx = Math.min(startIdx + FORCE_GRAPH_CONSTANTS.BATCH_SIZE, summaries.length);
-            const batch = summaries.slice(startIdx, endIdx);
-            
-            console.log(`Processing batch of files ${startIdx} to ${endIdx} of ${summaries.length}`);
-            const graphData = transformSummariesToGraph(batch, FORCE_GRAPH_CONSTANTS.MAX_KEYWORDS_PER_FILE);
-            console.log(`Created graph data with ${graphData.nodes.length} nodes and ${graphData.links.length} links`);
-            
-            // Log unique files being processed
-            const uniqueFiles = new Set(graphData.nodes.map(node => node.fileId));
-            console.log('Processing files:', Array.from(uniqueFiles));
+        const graphData = transformSummariesToGraph(summaries.slice(0, 50));
 
-            // Add nodes and links
-            graphData.nodes.forEach(node => graph.addNode(node));
-            graphData.links.forEach(link => {
-                const sourceColor = fileColors.get(link.fileId);
-                graph.addLink(link.source, link.target, sourceColor);
-            });
-
-            // Process next batch if available
-            if (endIdx < summaries.length) {
-                setTimeout(() => processBatch(endIdx), 0);
-            } else {
-                console.log('Finished processing all files');
-                return true; // Signal completion
-            }
-        };
-
-        // Start processing first batch and wait for completion
-        await processBatch(0);
-        console.log('Graph creation complete');
+        // Add nodes and links
+        graphData.nodes.forEach(node => graph.addNode(node));
+        graphData.links.forEach(link => graph.addLink(link.source, link.target));
 
         let lastFrameTime = 0;
         const startTime = performance.now();
@@ -449,8 +334,7 @@ export async function createTextNetwork() {
         function animate(currentTime) {
             // Stop animation after TOTAL_ANIMATION_TIME
             if (currentTime - startTime > FORCE_GRAPH_CONSTANTS.TOTAL_ANIMATION_TIME) {
-                console.log('Animation complete due to time limit');
-                return null; // Return null to signal completion
+                return;
             }
 
             const animationId = requestAnimationFrame(animate);
@@ -462,16 +346,14 @@ export async function createTextNetwork() {
             
             lastFrameTime = currentTime;
             graph.updatePositions();
-            return animationId;
         }
         
-        const animationId = animate(0);
+        animate(0);
 
         // Return cleanup function
         return () => {
-            if (animationId) cancelAnimationFrame(animationId);
+            cancelAnimationFrame(animationId);
             graph.dispose();
-            console.log('Graph cleanup complete');
         };
     } catch (error) {
         console.error('Error in createTextNetwork:', error);
@@ -479,36 +361,20 @@ export async function createTextNetwork() {
     }
 }
 
-function transformSummariesToGraph(summaries, maxKeywordsPerFile = FORCE_GRAPH_CONSTANTS.MAX_KEYWORDS_PER_FILE) {
-    console.log(`Transforming ${summaries.length} summaries with max ${maxKeywordsPerFile} keywords per file`);
-    
-    // Ensure each file gets a distinct color
-    summaries.forEach(summary => {
-        if (!fileColors.has(summary.fileId)) {
-            fileColors.set(summary.fileId, getRandomColor());
-            console.log(`Assigned color ${fileColors.get(summary.fileId)} to file ${summary.fileId}`);
-        }
-    });
-
+function transformSummariesToGraph(summaries, maxKeywordsPerFile = MAX_KEYWORDS_PER_FILE) {
     const nodes = [];
     const links = [];
     const nodeIds = new Map();
     let nodeIndex = 0;
 
     summaries.forEach(summary => {
-        if (!summary?.keywords?.length) {
-            console.log(`Skipping summary for file ${summary?.fileId} - no keywords found`);
-            return;
-        }
+        if (!summary?.keywords?.length) return;
         
         // Limit keywords per file
-        const keywords = summary.keywords
-            .slice(0, maxKeywordsPerFile)
-            .filter(keyword => keyword && keyword.length > 0);
+        const keywords = summary.keywords.slice(0, maxKeywordsPerFile);
         
-        console.log(`Processing file ${summary.fileId} with ${keywords.length} keywords`);
-
         keywords.forEach(keyword => {
+            if (!keyword) return;
             const nodeId = `${keyword}_${summary.fileId}`;
             
             if (!nodeIds.has(nodeId)) {
@@ -534,5 +400,6 @@ function transformSummariesToGraph(summaries, maxKeywordsPerFile = FORCE_GRAPH_C
         }
     });
 
+    console.log('Generated', nodes.length, 'nodes and', links.length, 'links');
     return { nodes, links };
 } 
