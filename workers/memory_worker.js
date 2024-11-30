@@ -430,6 +430,13 @@ self.onmessage = async function (event) {
         // Then actually delete the database
         result = await deleteDatabase();
         break;
+      case "clearStore": {
+        const { storeName } = data;
+        const tx = db.transaction(storeName, 'readwrite');
+        await tx.objectStore(storeName).clear();
+        await tx.done;
+        return { success: true };
+      }
       default:
         throw new Error(`Unknown action: ${action}`);
     }

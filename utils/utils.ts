@@ -1,4 +1,3 @@
-// import { observable } from "mobx";
 import * as THREE from "three";
 
 const generatedIds = new Set<string>();
@@ -89,9 +88,9 @@ export function debounce(func: Function, wait: number) {
   };
 }
 
-export function throttle(func, limit) {
-  let inThrottle;
-  return function(...args) {
+export function throttle(func: Function, limit: number) {
+  let inThrottle: boolean;
+  return function(...args: any[]) {
     const context = this;
     if (!inThrottle) {
       func.apply(context, args);

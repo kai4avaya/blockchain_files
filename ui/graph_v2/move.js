@@ -952,6 +952,8 @@ async function handleFileDrop_sphere(event) {
       lastEditedBy: loginName,
     });
 
+    
+
     window.fileMetadata.set(fileId, {
       filename: file.name,
       id: fileId,

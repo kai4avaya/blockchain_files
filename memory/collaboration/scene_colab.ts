@@ -542,6 +542,25 @@ class SceneState {
     
     console.groupEnd();
   }
+
+  // Add this new method
+  public clearState(): void {
+    this.objects.clear();
+    this.updatedObjects.clear();
+    this.savedObjects.clear();
+    this.scenes = [];
+    this.selectedSpheres.clear();
+    this.updateQueue = [];
+    this.isProcessingQueue = false;
+    this.sceneVersion = 0;
+
+    // Optionally close and reopen the broadcast channel
+    this.broadcastChannel.close();
+    this.broadcastChannel = new BroadcastChannel("sceneStateChannel");
+    this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
+
+    console.log('SceneState cleared');
+  }
 }
 
 export const sceneState = SceneState.getInstance();

@@ -44,11 +44,7 @@ async function main() {
   initializeDatabases();
   in_memory_store.loadFromLocalStorage();
   initiateMove();
-  // settingsPills.setupEventListeners();
-  // console.log("Initializing main function");
 
-  // Initialize SettingsPills
-  // console.log("Initializing SettingsPills");
   settingsPills.setupEventListeners();
   ShareManager.handleIncomingShareLink();
   
@@ -183,6 +179,8 @@ export async function initializeDatabases() {
       keyPath: storeConfig.keyPath || null,
       vectorConfig: storeConfig.vectorConfig || null,
     }));
+
+    console.log("DB initiatelize!!! ", config.dbName)
 
     // Initialize database using `indexDBOverlay`
     await indexDBOverlay.initialize(config.dbName);

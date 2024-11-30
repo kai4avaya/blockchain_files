@@ -5,11 +5,9 @@ import indexDBOverlay from '../../../memory/local/file_worker';
 // import { generateUniqueId } from '../../../utils/utils';
 import config from '../../../configs/config.json'
 import { showNotification } from '../notifications/popover.js';
-import { createAndInitializeNewDatabaseInstance, openDatabase } from '../../../memory/local/start_new_db';
+import { createAndInitializeNewDatabaseInstance, initializeDatabases, openDatabase } from '../../../memory/local/start_new_db';
 import toast from '../toast-alert';
 import { clearAllScenes, reconstructFromGraphData } from '../../graph_v2/create.js';
-import { initiate as initiateVectorDB } from '../../../memory/vectorDB/vectorDbGateway';
-import { sceneState } from '../../../memory/collaboration/scene_colab';
 
 // Add loading spinner HTML template
 const buttonSpinnerTemplate = `
@@ -23,7 +21,7 @@ async function loadDatabases() {
     const databasesContainer = document.getElementById('databasesContainer');
     databasesContainer.innerHTML = '';
     const databases = JSON.parse(localStorage.getItem('databases')) || [];
-    const currentDb = localStorage.getItem('latestDBName');
+    const currentDB = localStorage.getItem('latestDBName');
     
     // First, remove any existing active-database classes
     document.querySelectorAll('.active-database').forEach(el => {
@@ -32,7 +30,7 @@ async function loadDatabases() {
   
     for (const dbName of databases) {
         const displayName = dbName.split('_').slice(2).join('_');
-        const isActive = dbName === currentDb;
+        const isActive = dbName === currentDB;
   
         const dbAccordion = document.createElement('div');
         dbAccordion.className = `accordion ${isActive ? 'active-database' : ''}`;
@@ -392,9 +390,7 @@ export function setupDatabaseModal() {
   
     // Event listener for creating a new database
     createDbButton.addEventListener('click', async () => {
-        const newDbName = await createNewDatabaseInstance();
-        // Initialize vector database with isNewDB flag
-        await initiateVectorDB(true);
+        await createNewDatabaseInstance();
     });
 }
 
@@ -528,41 +524,25 @@ async function revokePeerSharing(dbName, peer) {
 }
 
 async function handleDatabaseOpen(dbName, loadButton) {
-    const originalContent = loadButton.innerHTML;
-    let timeoutId;
-    
     try {
-        // Add loading state
+        // Store original content and add spinner
+        const originalContent = loadButton.innerHTML;
         loadButton.innerHTML = buttonSpinnerTemplate + originalContent;
         loadButton.disabled = true;
-
-        // Set 5 second timeout to reset button state DO NOT SHOW NOTIFICATION
-        timeoutId = setTimeout(() => {
-            loadButton.innerHTML = originalContent;
-            loadButton.disabled = false;
-        }, 5000);
 
         // Show loading notification
         const displayName = dbName.split('_').slice(2).join('_');
         showNotification(`⏳ Loading database:\n   ${displayName}`);
 
-        // Clear any existing window metadata
-        window.fileMetadata = new Map();
-        window.currentGraph = null;
-        
         try {
-            // Clear scene state first
-            sceneState.clearState();
+            // Close all connections first
+            await indexDBOverlay.closeAllConnections(config.dbName);
             
-            // Proceed with database switch
-            await openDatabase(dbName);
+            // Small delay to ensure connections are closed
+            await new Promise(resolve => setTimeout(resolve, 100));
             
-            
-            // Reinitialize p2pSync with the new database context
-            await p2pSync.initialize(localStorage.getItem('myPeerId'));
-            
-            // Initialize vector database with isNewDB = false for existing databases
-            await initiateVectorDB(false);
+            // Open the new database
+            await indexDBOverlay.openDatabase(dbName);
             
             // Update localStorage
             localStorage.setItem('latestDBName', dbName);
@@ -571,6 +551,7 @@ async function handleDatabaseOpen(dbName, loadButton) {
             const allDatabases = document.querySelectorAll('.accordion');
             allDatabases.forEach(db => {
                 db.classList.remove('active-database');
+                // Reset all other load buttons to their original state
                 const otherLoadBtn = db.querySelector('.load-db-btn');
                 if (otherLoadBtn && otherLoadBtn !== loadButton) {
                     otherLoadBtn.disabled = false;
@@ -583,34 +564,26 @@ async function handleDatabaseOpen(dbName, loadButton) {
                 clickedDb.classList.add('active-database');
             }
             
-            // Clear scenes and reconstruct graph
-            // clearAllScenes();
-            // const graphData = await indexDBOverlay.getData("graph");
-            // if (graphData && graphData.length > 0) {
-            //     await reconstructFromGraphData();
-            // }
-            
-            // Clear the timeout since operation completed successfully
-            clearTimeout(timeoutId);
-            
-            // Reset button state and show success
-            loadButton.innerHTML = originalContent;
-            loadButton.disabled = false;
             showNotification(`✓ Switched to database:\n   ${displayName}`);
             
         } catch (error) {
-            clearTimeout(timeoutId);
-            loadButton.innerHTML = originalContent;
-            loadButton.disabled = false;
+            // Restore button state on error
+            if (loadButton) {
+                loadButton.innerHTML = originalContent;
+                loadButton.disabled = false;
+            }
             throw error;
         }
         
     } catch (error) {
-        clearTimeout(timeoutId);
         console.error(`Failed to open database "${dbName}":`, error);
         showNotification(`✗ Failed to open database:\n   ${error.message}`);
-        loadButton.innerHTML = originalContent;
-        loadButton.disabled = false;
+        
+        // Ensure button is restored even after error
+        if (loadButton) {
+            loadButton.innerHTML = originalContent;
+            loadButton.disabled = false;
+        }
     }
 }
 
@@ -672,52 +645,52 @@ async function handleDatabaseDeletion(dbName, deleteButton, dbAccordion) {
     }
 }
 
-// function createDatabaseAccordion(dbName) {
-//     // ... existing code ...
+function createDatabaseAccordion(dbName) {
+    // ... existing code ...
     
-//     const buttonContainer = document.createElement('div');
-//     buttonContainer.className = 'database-actions';
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'database-actions';
     
-//     // Add View Files button
-//     const viewFilesBtn = document.createElement('button');
-//     viewFilesBtn.className = 'view-files-btn';
-//     viewFilesBtn.innerHTML = '+ View Files';
-//     viewFilesBtn.onclick = async (e) => {
-//         e.stopPropagation();
-//         const filesList = await indexDBOverlay.getFilesList(dbName);
-//         displayFilesList(dbName, filesList, accordionContent);
-//     };
+    // Add View Files button
+    const viewFilesBtn = document.createElement('button');
+    viewFilesBtn.className = 'view-files-btn';
+    viewFilesBtn.innerHTML = '+ View Files';
+    viewFilesBtn.onclick = async (e) => {
+        e.stopPropagation();
+        const filesList = await indexDBOverlay.getFilesList(dbName);
+        displayFilesList(dbName, filesList, accordionContent);
+    };
     
-//     buttonContainer.appendChild(viewFilesBtn);
-//     // ... rest of existing buttons ...
+    buttonContainer.appendChild(viewFilesBtn);
+    // ... rest of existing buttons ...
     
-//     accordionHeader.appendChild(buttonContainer);
-// }
+    accordionHeader.appendChild(buttonContainer);
+}
 
-// function displayFilesList(dbName, files, container) {
-//     const existingList = container.querySelector('.files-list');
-//     if (existingList) {
-//         existingList.remove();
-//         return;
-//     }
+function displayFilesList(dbName, files, container) {
+    const existingList = container.querySelector('.files-list');
+    if (existingList) {
+        existingList.remove();
+        return;
+    }
     
-//     const filesList = document.createElement('div');
-//     filesList.className = 'files-list';
+    const filesList = document.createElement('div');
+    filesList.className = 'files-list';
     
-//     if (!files || files.length === 0) {
-//         filesList.innerHTML = '<div class="empty-state">No files in this database</div>';
-//     } else {
-//         files.forEach(file => {
-//             const fileItem = document.createElement('div');
-//             fileItem.className = 'file-item';
-//             fileItem.innerHTML = `
-//                 <span class="file-name">${file.name}</span>
-//                 <span class="file-status">${file.deleted ? '(deleted)' : ''}</span>
-//             `;
-//             filesList.appendChild(fileItem);
-//         });
-//     }
+    if (!files || files.length === 0) {
+        filesList.innerHTML = '<div class="empty-state">No files in this database</div>';
+    } else {
+        files.forEach(file => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <span class="file-name">${file.name}</span>
+                <span class="file-status">${file.deleted ? '(deleted)' : ''}</span>
+            `;
+            filesList.appendChild(fileItem);
+        });
+    }
     
-//     container.appendChild(filesList);
-// }
+    container.appendChild(filesList);
+}
   

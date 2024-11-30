@@ -1,5 +1,4 @@
 import indexDBOverlay from './local/file_worker';
-// import config from '../configs/config.json';
 import { generateVersionNonce, generateGlobalTimestamp } from '../utils/utils';
 
 let textStatsWorker;

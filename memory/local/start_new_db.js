@@ -1,23 +1,27 @@
 import {generateUniqueId} from '../../utils/utils'
 import indexDBOverlay from './file_worker';
 import config from '../../configs/config.json';
-import { clearAllScenes } from '../../ui/graph_v2/create.js';
+import { clearAllScenes, reconstructFromGraphData } from '../../ui/graph_v2/create.js';
 import { p2pSync } from '../../network/peer2peer_simple';
-import { reconstructFromGraphData } from '../../ui/graph_v2/create.js';
+import { initiate } from '../vectorDB/vectorDbGateway';
 
 export async function createAndInitializeNewDatabaseInstance(customName = null) {
     try {
         // Step 1: Clear all scenes first
         clearAllScenes();
         
+        // Clear file metadata - Initialize as Map instead of object
+        window.fileMetadata = new Map();
+        
         // Step 2: Close current database connection first
-        const currentDb = config.dbName;
+        // const currentDb = config.dbName;
+        const currentDb = localStorage.getItem('latestDBName');
         if (currentDb) {
             console.log(`Closing current database: ${currentDb}`);
             await indexDBOverlay.closeAllConnections(currentDb);
-            // Add small delay to ensure connection is fully closed
             await new Promise(resolve => setTimeout(resolve, 100));
         }
+
 
         // Step 3: Generate a unique name for the new database
         const randomCode = generateUniqueId().slice(-3);
@@ -31,20 +35,28 @@ export async function createAndInitializeNewDatabaseInstance(customName = null) 
         config.dbName = newDbName;
         localStorage.setItem('latestDBName', newDbName);
 
-        // Step 5: Initialize the new database
-        await indexDBOverlay.worker.postMessage({
-            type: 'INIT_CONFIG',
-            config: { dbName: newDbName }
-        });
+        indexDBOverlay.setIsInitialized(false);
+        await indexDBOverlay.initialize(newDbName);
 
-        // Step 6: Open and initialize the new database
+        // Step 5: Initialize the new database with ALL stores including vectors
+        // await indexDBOverlay.worker.postMessage({
+        //     type: 'INIT_CONFIG',
+        //     config: { dbName: newDbName }
+        // });
+
+        // Step 6: Open and initialize the new database with explicit vector store initialization
         await indexDBOverlay.openDB();
-        const storeConfigs = Object.entries(config.dbStores).map(([storeName, storeConfig]) => ({
-            storeName,
-            keyPath: storeConfig.keyPath || null,
-            vectorConfig: storeConfig.vectorConfig || null
-        }));
-        await indexDBOverlay.initializeDB(storeConfigs.map(config => config.storeName));
+        
+        // Get store names from config
+        const storeNames = Object.keys(config.dbStores || {});
+        
+        // Ensure vectors store is included if not already in config
+        if (!storeNames.includes('vectors')) {
+            storeNames.push('vectors');
+        }
+
+        // Initialize all stores
+        await indexDBOverlay.initializeDB(storeNames);
 
         // Step 7: Update databases list in localStorage
         const databases = JSON.parse(localStorage.getItem('databases')) || [];
@@ -108,6 +120,9 @@ export async function openDatabase(dbName) {
     try {
         console.log(`Opening database: ${dbName}`);
         
+        // Clear file metadata - Initialize as Map instead of object
+        window.fileMetadata = new Map();
+        
         // Step 1: Close current database connections first
         await indexDBOverlay.closeAllConnections(config.dbName);
         await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
@@ -115,12 +130,10 @@ export async function openDatabase(dbName) {
         // Step 2: Update config and localStorage
         config.dbName = dbName;
         localStorage.setItem('latestDBName', dbName);
+
+        await indexDBOverlay.setIsInitialized(false);
+        await indexDBOverlay.initialize(dbName);
         
-        // Step 3: Initialize the database
-        await indexDBOverlay.worker.postMessage({
-            type: 'INIT_CONFIG',
-            config: { dbName }
-        });
         
         // Step 4: Open and initialize stores
         await indexDBOverlay.openDB();
@@ -134,8 +147,12 @@ export async function openDatabase(dbName) {
         // Step 5: Reinitialize p2pSync with new database
         await p2pSync.initialize(localStorage.getItem('myPeerId')); // Re-initialize with current peer ID
         await p2pSync.loadAndDisplayAllPeers(); // Reload peers for new database
+
+
+        await initiate(true)
         
         // Step 6: Load and reconstruct graph data
+        clearAllScenes();
         const graphData = await indexDBOverlay.getData("graph");
         if (graphData && graphData.length > 0) {
             await reconstructFromGraphData();
