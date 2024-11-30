@@ -337,6 +337,26 @@ fileTreeBtn.addEventListener('click', (e) => {
       }
     }
 
+
+    function closeAllModals_notDBModal(flags={}) {
+      // Hide all slideouts
+
+      if(!flags.leftSlideout){
+      leftSlideout.classList.remove('active');
+      }
+      
+      // Hide all standard modals
+      hidePeerModal();
+      hideHomeModal();
+      hideSettingsModal();
+      hideSearchModal();
+      
+      // Hide databases modal with animation
+    }
+
+
+    window.closeAllModals_notDBModal = closeAllModals_notDBModal;
+
     // Functions for peer-btn-connect modal
     function showPeerModal() {
       const iconRect = peerConnBtn.getBoundingClientRect();

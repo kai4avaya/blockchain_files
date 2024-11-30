@@ -132,6 +132,7 @@ async function loadDatabases() {
                                     <button class="delete-btn" title="Delete file">×</button>
                                 `;
                                 
+                                window.dispatchEvent(new Event('updateFileTree'));
                                 showNotification('✓ File recovered successfully');
                             } catch (error) {
                                 console.error('Error recovering file:', error);
@@ -198,6 +199,7 @@ async function loadDatabases() {
                                                 <button class="delete-btn" title="Delete file">×</button>
                                             `;
                                             
+                                            window.dispatchEvent(new Event('updateFileTree'));
                                             showNotification('✓ File recovered successfully');
                                         } catch (error) {
                                             console.error('Error recovering file:', error);
@@ -206,6 +208,7 @@ async function loadDatabases() {
                                     });
                                 }
 
+                                window.dispatchEvent(new Event('updateFileTree'));
                                 showNotification('✓ File marked as deleted');
                             } catch (error) {
                                 console.error('Error marking file as deleted:', error);
@@ -331,6 +334,7 @@ export function setupDatabaseModal() {
 
     messagesButton.addEventListener('click', () => {
         loadDatabases();
+        window.closeAllModals_notDBModal();
         modal.style.display = 'block';
         overlay.style.display = 'block';
         
