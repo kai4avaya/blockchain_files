@@ -1,7 +1,7 @@
 // memory\local\file_worker.ts
 
 import config from "../../configs/config.json";
-import { generateVersionNonce } from "../../utils/utils";
+import { generateVersionNonce, generateUniqueId } from "../../utils/utils";
 import { p2pSync } from "../../network/peer2peer_simple";
 import { generateGlobalTimestamp, incrementVersion } from "../../utils/utils";
 import in_memory_store from "./in_memory";
@@ -24,17 +24,6 @@ interface IndexDBOverlay {
   getAll(tableName: string): Promise<any>;
   saveData(tableName: string, data: any): Promise<void>;
   // ... other methods ...
-}
-
-interface FileEntry {
-  name: string;
-  deleted: boolean;
-  id?: string;
-}
-
-interface FilesList {
-  files: FileEntry[];
-  lastUpdated: number;
 }
 
 class IndexDBWorkerOverlay {
@@ -62,37 +51,32 @@ class IndexDBWorkerOverlay {
   }
 
   public async initialize(dbName?: string): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized) return; // Prevent multiple initializations
 
     // Determine the database name to use
+    // const lastOpenedDB = localStorage.getItem('last_opened_db');
     const lastOpenedDB = localStorage.getItem("latestDBName");
     this.dbName = dbName || lastOpenedDB || config.dbName;
 
-    // Initialize the worker
+    // Post initial config to the worker
     this.worker.postMessage({
       type: "INIT_CONFIG",
-      config: { dbName: this.dbName },
+      config: {
+        dbName: this.dbName,
+      },
     });
 
-    // Initialize databases list if it doesn't exist
-    const databases = JSON.parse(localStorage.getItem("databases") || "[]");
+    // Save the dbName to localStorage if not already present in the databases list
+    const databases = JSON.parse(localStorage.getItem("databases") ?? "[]");
     if (!databases.includes(this.dbName)) {
       databases.push(this.dbName);
       localStorage.setItem("databases", JSON.stringify(databases));
     }
 
-    // Initialize dbSummaries if it doesn't exist for this database
-    const dbSummaries = JSON.parse(localStorage.getItem("dbSummaries") || "{}");
-    if (!dbSummaries[this.dbName]) {
-      dbSummaries[this.dbName] = {
-        fileCount: 0,
-        lastUpdated: Date.now(),
-        files: []
-      };
-      localStorage.setItem("dbSummaries", JSON.stringify(dbSummaries));
-    }
-
+    // Update localStorage with the last opened database
+    // localStorage.setItem('last_opened_db', this.dbName);
     localStorage.setItem("latestDBName", this.dbName);
+
     this.isInitialized = true;
   }
 
@@ -503,7 +487,12 @@ class IndexDBWorkerOverlay {
     const storeConfigs = storeNames.map((storeName) => {
       const storeConfig =
         config.dbStores[storeName as keyof typeof config.dbStores];
-     
+      // if (!storeConfig) {
+      //   return {
+      //     storeName,
+      //     keyPath: null
+      //   }
+      // }
       return {
         storeName,
         keyPath: "keyPath" in storeConfig ? storeConfig?.keyPath : null, // Allow null keyPath for stores that need explicit keys
@@ -596,49 +585,8 @@ class IndexDBWorkerOverlay {
     return false;
   }
 
-  private async updateDbSummary(dbName: string, fileData: any, isDeleted: boolean) {
-    try {
-      const dbSummaries = JSON.parse(localStorage.getItem('dbSummaries') || '{}');
-      if (!dbSummaries[dbName]) {
-        dbSummaries[dbName] = {
-          fileCount: 0,
-          lastUpdated: Date.now(),
-          files: []
-        };
-      }
-
-      const files: FileEntry[] = dbSummaries[dbName].files;
-      
-      // Handle both single file and array of files
-      const filesArray = Array.isArray(fileData) ? fileData : [fileData];
-      
-      filesArray.forEach(file => {
-        const existingFile = files.find(f => f.id === file.id || f.name === file.name);
-        if (existingFile) {
-          existingFile.deleted = isDeleted;
-          existingFile.id = file.id;  // Update ID if it exists
-        } else {
-          files.push({ 
-            name: file.name, 
-            deleted: isDeleted,
-            id: file.id 
-          });
-        }
-      });
-
-      dbSummaries[dbName].fileCount = files.filter(f => !f.deleted).length;
-      dbSummaries[dbName].lastUpdated = Date.now();
-      
-      localStorage.setItem('dbSummaries', JSON.stringify(dbSummaries));
-    } catch (error) {
-      console.error('Error updating dbSummaries:', error);
-    }
-  }
-
   async saveData(storeName: string, data: any, key?: string): Promise<void> {
     try {
-
-      console.log('saveDATA!! Saving data to:', storeName); // Debug log
       await this.ensureDBOpen();
 
       // Generate version and global timestamp if not present
@@ -654,17 +602,11 @@ class IndexDBWorkerOverlay {
         data.versionNonce = generateVersionNonce();
       }
 
-      console.log('saveDATA!! Saving data to 2:', storeName); // Debug log
-
-
       // Ensure lastEditedBy is set
       data.lastEditedBy =
         data.lastEditedBy || localStorage.getItem("login_block") || "no_login";
 
       if (await this.isMemoryOp("save data", storeName, data)) return;
-
-      console.log('saveDATA!! Saving data to 3:', storeName); // Debug log
-
       // Conflict resolution logic for CRDT-like behavior
       const existingItem = key ? await this.getItem(storeName, key) : null;
       if (existingItem) {
@@ -681,22 +623,14 @@ class IndexDBWorkerOverlay {
         }
       }
 
-
       // Save the data (overwrites if key is already present)
       const storeConfig =
         config.dbStores[storeName as keyof typeof config.dbStores];
       if (storeConfig && "keyPath" in storeConfig) {
-         this.sendToWorkerWithRetry("saveData", { storeName, data });
+        await this.sendToWorkerWithRetry("saveData", { storeName, data });
       } else {
-         this.sendToWorkerWithRetry("saveData", { storeName, data, key });
+        await this.sendToWorkerWithRetry("saveData", { storeName, data, key });
       }
-
-
-      // Update dbSummaries if this is a file operation
-      if (storeName === 'files') {
-        await this.updateDbSummary(config.dbName, data, data?.isDeleted || false);
-      }
-
 
       // Existing sync logic for broadcasting changes
       if (
@@ -797,135 +731,38 @@ class IndexDBWorkerOverlay {
   // Update the markDeletedAcrossTables function
   async markDeletedAcrossTables(fileId: string): Promise<void> {
     try {
-        // Clean up vector-related data first
-        await this.cleanupVectorData(fileId);
+      // Clean up vector-related data first
+      await this.cleanupVectorData(fileId);
 
-        // Get all regular tables from config
-        const tables = Object.keys(config.dbStores);
-        
-        for (const tableName of tables) {
-            // Skip vector tables as they're handled separately
-            if (tableName === 'vectors' || tableName.includes('vectors_hashIndex')) {
-                continue;
-            }
-
-            try {
-                const item = await this.getItem(tableName, fileId);
-                if (item) {
-                    const updatedItem = {
-                        ...item,
-                        isDeleted: true,
-                        version: (item.version || 0) + 1,
-                        globalTimestamp: Date.now(),
-                        versionNonce: Math.random(),
-                        lastEditedBy: localStorage.getItem('login_block') || 'no_login'
-                    };
-                    
-                    await this.saveData(tableName, updatedItem);
-                }
-            } catch (error) {
-                console.warn(`Error updating deleted status in table ${tableName}:`, error);
-            }
-        }
-
-        // Handle graph table separately
-        const graphData = await this.getData('graph');
-        let updatedAny = false;
-        
-        if (graphData && Array.isArray(graphData)) {
-            for (const node of graphData) {
-                if (node.userData?.id === fileId) {
-                    node.isDeleted = true;  // Add at root level
-                    if (node.userData) {
-                        node.userData.isDeleted = true;  // Also add in userData
-                    }
-                    node.version = (node.version || 0) + 1;
-                    node.globalTimestamp = Date.now();
-                    node.versionNonce = Math.random();
-                    node.lastEditedBy = localStorage.getItem('login_block') || 'no_login';
-                    updatedAny = true;
-                }
-            }
-
-            if (updatedAny) {
-                await this.saveData('graph', graphData);
-            }
-        }
-
-        // Update dbSummaries
-        const fileItem = await this.getItem('files', fileId);
-        if (fileItem?.name) {
-            this.updateDbSummary(config.dbName, fileItem, true);
-        }
-    } catch (error) {
-        console.error('Error marking deleted across tables:', error);
-        throw error;
-    }
-  }
-
-  async getFilesList(dbName: string): Promise<FileEntry[]> {
-    try {
-      const filesListKey = `${dbName}_files`;
-      const filesList = await this.getItem('filesLists', filesListKey);
-      return filesList?.files || [];
-    } catch (error) {
-      console.error('Error getting files list:', error);
-      // Fallback to localStorage if IndexDB fails
-      const dbSummaries = JSON.parse(localStorage.getItem('dbSummaries') || '{}');
-      return dbSummaries[dbName]?.files || [];
-    }
-  }
-
-  async recover(fileId: string): Promise<void> {
-    try {
-      // Step 1: Regular tables recovery
+      // Get all regular tables from config
       const tables = Object.keys(config.dbStores);
-      for (const tableName of tables) {
-        // if (tableName === 'graph') continue; // Handle graph separately
-        
-        const item = await this.getItem(tableName, fileId);
-        if (item?.isDeleted) {
-          const updatedItem = {
-            ...item,
-            isDeleted: false,
-            version: (item.version || 0) + 1,
-            globalTimestamp: Date.now(),
-            versionNonce: Math.random(),
-            lastEditedBy: localStorage.getItem('login_block') || 'no_login'
-          };
-          await this.saveData(tableName, updatedItem);
-        }
-      }
-
-      // Step 2: Graph table recovery (special handling)
-      const graphData = await this.getData('graph');
-      let updatedAny = false;
       
-      for (const node of graphData) {
-        if (node.userData?.id === fileId && node.userData?.isDeleted) {
-          node.userData.isDeleted = false;
-          node.version = (node.version || 0) + 1;
-          node.globalTimestamp = Date.now();
-          node.versionNonce = Math.random();
-          node.lastEditedBy = localStorage.getItem('login_block') || 'no_login';
-          updatedAny = true;
+      for (const tableName of tables) {
+        // Skip vector tables as they're handled separately
+        if (tableName === 'vectors' || tableName.includes('vectors_hashIndex')) {
+          continue;
+        }
+
+        try {
+          const item = await this.getItem(tableName, fileId);
+          if (item) {
+            const updatedItem = {
+              ...item,
+              isDeleted: true,
+              version: (item.version || 0) + 1,
+              globalTimestamp: Date.now(),
+              versionNonce: Math.random(),
+              lastEditedBy: localStorage.getItem('login_block') || 'no_login'
+            };
+            
+            await this.saveData(tableName, updatedItem);
+          }
+        } catch (error) {
+          console.warn(`Error updating deleted status in table ${tableName}:`, error);
         }
       }
-
-      if (updatedAny) {
-         this.saveData('graph', graphData);
-      }
-
-      // Step 3: Update dbSummaries
-      const fileItem = await this.getItem('files', fileId);
-      if (fileItem?.name) {
-         this.updateDbSummary(config.dbName, fileItem.name, false);
-      }
-
-
-      console.log(`Successfully recovered file with ID: ${fileId}`);
     } catch (error) {
-      console.error('Error recovering file:', error);
+      console.error('Error marking deleted across tables:', error);
       throw error;
     }
   }

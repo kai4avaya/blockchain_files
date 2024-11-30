@@ -5,8 +5,9 @@ import indexDBOverlay from '../../../memory/local/file_worker';
 // import { generateUniqueId } from '../../../utils/utils';
 import config from '../../../configs/config.json'
 import { showNotification } from '../notifications/popover.js';
-import { createAndInitializeNewDatabaseInstance } from '../../../memory/local/start_new_db';
+import { createAndInitializeNewDatabaseInstance, initializeDatabases, openDatabase } from '../../../memory/local/start_new_db';
 import toast from '../toast-alert';
+import { clearAllScenes, reconstructFromGraphData } from '../../graph_v2/create.js';
 
 // Add loading spinner HTML template
 const buttonSpinnerTemplate = `
@@ -43,19 +44,220 @@ async function loadDatabases() {
         dbAccordion.innerHTML = `
             <div class="accordion-header">
                 <span>${displayName}</span>
-                <button class="accordion-toggle">View Peers</button>
-                <button class="delete-db-button">Delete</button>
+                <button class="view-files-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                    View Files
+                </button>
+                <button class="accordion-toggle">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6m6 6V6" />
+                    </svg>
+                    View Peers
+                </button>
+                <button class="delete-db-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                    Delete
+                </button>
             </div>
-            <div class="accordion-content">
-                ${generatePeerPills(peers)}
+            <div class="accordion-content" style="display: none;">
+                <div class="files-container"></div>
+                <div class="peer-pills-container">${generatePeerPills(peers)}</div>
             </div>
         `;
   
-        // Add click event to open the database on header click
+        const accordionContent = dbAccordion.querySelector('.accordion-content');
+        const filesContainer = dbAccordion.querySelector('.files-container');
+        const peerContainer = dbAccordion.querySelector('.peer-pills-container');
+
+        // View Files button handler
+        const viewFilesBtn = dbAccordion.querySelector('.view-files-btn');
+        viewFilesBtn.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            const isVisible = filesContainer.style.display === 'block';
+            
+            if (!isVisible) {
+                const dbSummaries = JSON.parse(localStorage.getItem('dbSummaries') || '{}');
+                const currentDBFiles = dbSummaries[dbName]?.files || [];
+                
+                filesContainer.innerHTML = currentDBFiles.map(file => `
+                    <div class="pill file-pill" data-file-id="${file.id}">
+                        <span class="file-name">${file.name}</span>
+                        ${file.deleted 
+                            ? `
+                            <button class="recover-btn" title="Recover file">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                                </svg>
+                            </button>
+                            <span class="deleted-status">(deleted)</span>
+                            `
+                            : `
+                            <button class="delete-btn" title="Delete file">×</button>
+                            `
+                        }
+                    </div>
+                `).join('');
+
+                peerContainer.style.display = 'none';
+                filesContainer.style.display = 'block';
+                accordionContent.style.display = 'block';
+
+                // Add event listeners for file actions
+                filesContainer.querySelectorAll('.file-pill').forEach(pill => {
+                    const fileId = pill.dataset.fileId;
+                    const recoverBtn = pill.querySelector('.recover-btn');
+                    const deleteBtn = pill.querySelector('.delete-btn');
+
+                    if (recoverBtn) {
+                        recoverBtn.addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            try {
+                                // Set correct database context
+                                config.dbName = dbName;
+                                await indexDBOverlay.openDB();
+                                
+                                // Use recover function which internally updates dbSummaries
+                                await indexDBOverlay.recover(fileId);
+                                
+                                // Reconstruct graph to reflect changes
+                                reconstructFromGraphData();
+                                
+                                // Update pill to show active state
+                                pill.innerHTML = `
+                                    <span class="file-name">${pill.querySelector('.file-name').textContent}</span>
+                                    <button class="delete-btn" title="Delete file">×</button>
+                                `;
+                                
+                                showNotification('✓ File recovered successfully');
+                            } catch (error) {
+                                console.error('Error recovering file:', error);
+                                showNotification('✗ Failed to recover file');
+                            }
+                        });
+                    }
+
+                    if (deleteBtn) {
+                        deleteBtn.addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            try {
+                                const pill = e.target.closest('.file-pill');
+                                
+                                // Add loading state
+                                const originalContent = pill.innerHTML;
+                                pill.innerHTML = `
+                                    <span class="file-name">${pill.querySelector('.file-name').textContent}</span>
+                                    <svg class="spinner small-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                                    </svg>
+                                `;
+
+                                // Set correct database context
+                                config.dbName = dbName;
+                                await indexDBOverlay.openDB();
+                                
+                                // Use markDeletedAcrossTables which internally updates dbSummaries
+                                await indexDBOverlay.markDeletedAcrossTables(fileId);
+                                
+                                // Reconstruct graph to reflect changes
+                                reconstructFromGraphData();
+                                
+                                // Update the pill to show deleted state
+                                pill.innerHTML = `
+                                    <span class="file-name">${pill.querySelector('.file-name').textContent}</span>
+                                    <button class="recover-btn" title="Recover file">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                                        </svg>
+                                    </button>
+                                    <span class="deleted-status">(deleted)</span>
+                                `;
+
+                                // Add recover button listener to the new button
+                                const newRecoverBtn = pill.querySelector('.recover-btn');
+                                if (newRecoverBtn) {
+                                    newRecoverBtn.addEventListener('click', async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                            // Set correct database context
+                                            config.dbName = dbName;
+                                            await indexDBOverlay.openDB();
+                                            
+                                            // Use recover function which internally updates dbSummaries
+                                            await indexDBOverlay.recover(fileId);
+                                            
+                                            // Reconstruct graph to reflect changes
+                                            reconstructFromGraphData();
+                                            
+                                            // Update pill to show active state
+                                            pill.innerHTML = `
+                                                <span class="file-name">${pill.querySelector('.file-name').textContent}</span>
+                                                <button class="delete-btn" title="Delete file">×</button>
+                                            `;
+                                            
+                                            showNotification('✓ File recovered successfully');
+                                        } catch (error) {
+                                            console.error('Error recovering file:', error);
+                                            showNotification('✗ Failed to recover file');
+                                        }
+                                    });
+                                }
+
+                                showNotification('✓ File marked as deleted');
+                            } catch (error) {
+                                console.error('Error marking file as deleted:', error);
+                                showNotification('✗ Failed to delete file');
+                            }
+                        });
+                    }
+                });
+            } else {
+                filesContainer.style.display = 'none';
+                accordionContent.style.display = 'none';
+            }
+        });
+  
+        // View Peers button handler
+        const toggleButton = dbAccordion.querySelector('.accordion-toggle');
+        toggleButton.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            const isVisible = peerContainer.style.display === 'block';
+            
+            if (!isVisible) {
+                // Set the correct database context before fetching peers
+                config.dbName = dbName;
+                await indexDBOverlay.openDB();
+                const peers = await indexDBOverlay.getAll('peers');
+                const currentPeerId = p2pSync.getCurrentPeerId();
+                
+                peerContainer.innerHTML = peers
+                    .filter(peer => !peer.isDeleted && peer.peerId !== currentPeerId) // Exclude deleted peers and current user
+                    .map(peer => `
+                        <div class="pill peer-pill" data-peer-id="${peer.peerId}">
+                            ${peer.peerId}
+                            <button class="revoke-btn" data-peer="${peer.peerId}">×</button>
+                        </div>
+                    `).join('');
+
+                filesContainer.style.display = 'none';
+                peerContainer.style.display = 'block';
+                accordionContent.style.display = 'block';
+
+                // Setup peer pill listeners
+                setupPeerPillListeners(peerContainer);
+            } else {
+                peerContainer.style.display = 'none';
+                accordionContent.style.display = 'none';
+            }
+        });
+  
+        // Add existing event listeners
         const header = dbAccordion.querySelector('.accordion-header span');
         header.addEventListener('click', () => openDatabase(dbName));
   
-        // Add event listener for delete button
         const deleteButton = dbAccordion.querySelector('.delete-db-button');
         deleteButton.addEventListener('click', async (event) => {
             event.stopPropagation();
@@ -66,13 +268,6 @@ async function loadDatabases() {
         });
   
         databasesContainer.appendChild(dbAccordion);
-  
-        // Add event listener for toggle button
-        const toggleButton = dbAccordion.querySelector('.accordion-toggle');
-        const content = dbAccordion.querySelector('.accordion-content');
-        toggleButton.addEventListener('click', () => {
-            content.style.display = content.style.display === 'block' ? 'none' : 'block';
-        });
     }
 }
 
@@ -309,28 +504,53 @@ async function revokePeerSharing(dbName, peer) {
     }
 }
 
-async function openDatabase(dbName) {
+async function handleDatabaseOpen(dbName) {
     try {
-        console.log(`Opening database: ${dbName}`);
-        
         // Remove highlight from previously active database
         const previousActive = document.querySelector('.active-database');
         if (previousActive) {
             previousActive.classList.remove('active-database');
         }
         
-        // Close current database connections first
-        await indexDBOverlay.closeAllConnections(config.dbName);
+        // Add loading spinner to clicked database
+        const clickedDb = document.querySelector(`[data-db-name="${dbName}"]`);
+        const headerSpan = clickedDb?.querySelector('.accordion-header span');
+        const originalContent = headerSpan?.innerHTML || '';
         
-        // Update config and localStorage
-        config.dbName = dbName;
-        localStorage.setItem('latestDBName', dbName);
+        if (headerSpan) {
+            headerSpan.innerHTML = buttonSpinnerTemplate + originalContent;
+        }
         
-        // Open new database
-        await indexDBOverlay.openDB();
+        toast.show(`Loading database: ${dbName.split('_').slice(2).join('_')}`, 'info');
         
-        console.log(`Database "${dbName}" opened successfully.`);
-        showNotification(`✓ Switched to database:\n   ${dbName.split('_').slice(2).join('_')}`);
+        // Clear current scene
+        clearAllScenes();
+        
+        try {
+            // Open the database
+            await openDatabase(dbName);
+            
+            // Initialize peer connections for this database
+            p2pSync.initializePeerModal();
+            
+            // Set a minimum loading time of 1 second for UX
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Update UI
+            if (clickedDb) {
+                clickedDb.classList.add('active-database');
+                headerSpan.innerHTML = originalContent;
+            }
+            
+            showNotification(`✓ Switched to database:\n   ${dbName.split('_').slice(2).join('_')}`);
+            
+        } catch (error) {
+            // Remove spinner on error
+            if (headerSpan) {
+                headerSpan.innerHTML = originalContent;
+            }
+            throw error;
+        }
         
     } catch (error) {
         console.error(`Failed to open database "${dbName}":`, error);
@@ -394,5 +614,50 @@ async function handleDatabaseDeletion(dbName, deleteButton, dbAccordion) {
         deleteButton.innerHTML = originalContent;
         deleteButton.disabled = false;
     }
+}
+
+function createDatabaseAccordion(dbName) {
+    // ... existing code ...
+    
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'database-actions';
+    
+    // Add View Files button
+    const viewFilesBtn = document.createElement('button');
+    viewFilesBtn.className = 'view-files-btn';
+    viewFilesBtn.innerHTML = '+ View Files';
+    viewFilesBtn.onclick = async (e) => {
+        e.stopPropagation();
+        const filesList = await indexDBOverlay.getFilesList(dbName);
+        displayFilesList(dbName, filesList, accordionContent);
+    };
+    
+    buttonContainer.appendChild(viewFilesBtn);
+    // ... rest of existing buttons ...
+    
+    accordionHeader.appendChild(buttonContainer);
+}
+
+function displayFilesList(dbName, files, container) {
+    const existingList = container.querySelector('.files-list');
+    if (existingList) {
+        existingList.remove();
+        return;
+    }
+    
+    const filesList = document.createElement('div');
+    filesList.className = 'files-list';
+    
+    files.forEach(file => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <span class="file-name">${file.name}</span>
+            <span class="file-status">${file.deleted ? '(deleted)' : ''}</span>
+        `;
+        filesList.appendChild(fileItem);
+    });
+    
+    container.appendChild(filesList);
 }
   

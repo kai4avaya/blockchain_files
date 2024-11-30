@@ -1486,6 +1486,52 @@ export function isObjectDeleted(uuid) {
   return deletedObjects.has(uuid);
 }
 
+// Add this new function to create.js
+export function clearAllScenes() {
+  console.log('Clearing all scenes...');
+  
+  // Function to properly dispose of objects
+  function disposeObject(obj) {
+    if (obj.geometry) {
+      obj.geometry.dispose();
+    }
+    
+    if (obj.material) {
+      if (Array.isArray(obj.material)) {
+        obj.material.forEach(material => material.dispose());
+      } else {
+        obj.material.dispose();
+      }
+    }
+    
+    // Remove any CSS2D labels
+    if (obj.isCSS2DObject && obj.element && obj.element.parentNode) {
+      obj.element.parentNode.removeChild(obj.element);
+    }
+  }
+
+  // Clear main scene
+  scene.traverse(disposeObject);
+  scene.children.length = 0;
+
+  // Clear non-bloom scene
+  nonBloomScene.traverse(disposeObject);
+  nonBloomScene.children.length = 0;
+
+  // Reset any scene-related caches or maps
+  deletedObjects.clear();
+  labelMap?.clear();
+
+  // Re-add essential scene elements
+  addAxesHelper();
+  
+  // Force renderer to clear its internal state
+  renderer.renderLists.dispose();
+  renderer.clear();
+  
+  markNeedsRender('full');
+}
+
 function cleanupResources() {
   renderer.dispose();
   materialCache.clear();

@@ -2616,3 +2616,175 @@ mark {
 .popup-close:hover {
   color: #3b82f6;
 }
+
+/* Add these styles for modal buttons */
+.modal button:not(.close-btn),
+.modal_databases button:not(.close-btn) {
+  background-color: #f1f5f9; /* Understated slate background */
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+/* Style for delete button specifically */
+.delete-db-button {
+  background-color: #fee2e2 !important; /* Light red background */
+  color: #ef4444 !important; /* Red text */
+}
+
+.delete-db-button:hover {
+  background-color: #fecaca !important; /* Slightly darker on hover */
+}
+
+/* Style for accordion toggle button */
+.accordion-toggle {
+  background-color: #f1f5f9 !important; /* Match other buttons */
+  color: #3b82f6 !important; /* Blue text to match theme */
+}
+
+.files-list {
+    margin: 10px 0;
+    padding: 10px;
+    background: rgba(0,0,0,0.05);
+    border-radius: 4px;
+}
+
+.file-item {
+    padding: 4px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.file-status {
+    color: #666;
+    font-style: italic;
+}
+
+
+.view-files-btn:hover {
+    text-decoration: underline;
+}
+
+.view-files-btn {
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    color: #3b82f6;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.view-files-btn:hover {
+    background-color: #e2e8f0;
+    transform: translateY(-1px);
+}
+
+.files-list {
+    margin: 10px 0;
+    padding: 10px;
+    background: #f8fafc;
+    border-radius: 4px;
+}
+
+.file-item {
+    padding: 6px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-name {
+    color: #1f2937;
+    font-size: 12px;
+}
+
+.file-status {
+    color: #ef4444;
+    font-size: 12px;
+    font-style: italic;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.file-status:hover {
+    color: #dc2626;
+}
+
+/* Add tooltip styling */
+.file-status[title] {
+    position: relative;
+}
+
+.file-status[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: #1f2937;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+.file-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-pill .file-name {
+    flex: 1;
+}
+
+.file-pill .deleted-status {
+    color: #ef4444;
+    font-size: 0.9em;
+}
+
+.file-pill .recover-btn {
+    color: #16a34a;
+    padding: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.file-pill .recover-btn:hover {
+    background-color: #dcfce7;
+    border-radius: 4px;
+}
+
+.file-pill .delete-btn {
+    color: #ef4444;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 1.2em;
+    line-height: 1;
+}
+
+.file-pill .delete-btn:hover {
+    color: #dc2626;
+}
+
+.file-pill .recover-btn .small-icon {
+    width: 16px;
+    height: 16px;
+}

@@ -946,7 +946,7 @@ async function handleFileDrop_sphere(event) {
         id: fileId,
         filename: file.name,
         isTab: !!processEvent.tabId,
-        content: processEvent.source?.data?.content
+        // content: processEvent.source?.data?.content
       },
       color: randomColorGenerator(),
       lastEditedBy: loginName,
