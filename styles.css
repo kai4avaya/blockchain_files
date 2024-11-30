@@ -470,6 +470,10 @@ body {
   pointer-events: all !important;
 }
 
+.modal.active {
+  z-index: 9001 !important;
+}
+
 .tooltip {
   position: absolute;
   left: 100%;
@@ -1349,7 +1353,17 @@ display: block;
 }
 
 .label {
-z-index: 99999 !important;
+/* z-index: 99999 !important; */
+}
+
+.file-label {
+  z-index: 9000 !important;
+  pointer-events: auto;
+  cursor: pointer;
+  color: #4169E1;
+  font-family: monospace;
+  font-size: 16px;
+  padding: 2px;
 }
 
 .modal_databases {
@@ -1985,6 +1999,7 @@ border-radius: 4px;
 background: var(--background-color);
 color: var(--text-color);
 font-size: 12px;
+color: #3b82f6;
 }
 
 .search-results {

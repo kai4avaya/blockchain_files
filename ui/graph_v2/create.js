@@ -619,7 +619,7 @@ export function createSphere(convertedData) {
   removeExistingLabel(filename);
 
   const labelDiv = document.createElement("div");
-  labelDiv.className = "label";
+  labelDiv.className = "label file-label"; 
   labelDiv.textContent = filename;
   labelDiv.style.color = "#4169E1"; // Royal blue
   labelDiv.style.fontFamily = "monospace";
