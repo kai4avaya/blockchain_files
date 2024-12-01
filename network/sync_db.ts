@@ -4,11 +4,11 @@ import in_memory_store from "../memory/local/in_memory";
 
 class DBSyncManager {
     private static instance: DBSyncManager | null = null;
-    private syncInterval: number = 30000; // 30 seconds
-    private intervalId: NodeJS.Timeout | null = null;
+    private activeSyncs: Set<string> = new Set();
+    private syncTimeout: number = 5000;
+    private syncInProgress: boolean = false;
     private lastSyncTimestamps: Map<string, number> = new Map();
-    private activeSyncs: Set<string> = new Set(); // Track active sync operations
-    private syncTimeout: number = 5000; // 5 second timeout for sync operations
+    private isInEquilibrium: Map<string, boolean> = new Map();
 
     private constructor() {}
 
@@ -19,100 +19,64 @@ class DBSyncManager {
         return DBSyncManager.instance;
     }
 
-    // Initiate immediate sync with a specific peer
     async initiateSync(peerId: string): Promise<void> {
-        const syncKey = `${peerId}-${Date.now()}`;
-        if (this.activeSyncs.has(syncKey)) return;
+        if (this.activeSyncs.has(peerId) || this.isInEquilibrium.get(peerId)) {
+            return;
+        }
 
         try {
-            this.activeSyncs.add(syncKey);
+            this.activeSyncs.add(peerId);
             await this.checkAndSyncDatabases(peerId);
             
-            // Set a timeout to remove the sync key
             setTimeout(() => {
-                this.activeSyncs.delete(syncKey);
+                this.activeSyncs.delete(peerId);
             }, this.syncTimeout);
         } catch (error) {
             console.error('Error during sync initiation:', error);
-            this.activeSyncs.delete(syncKey);
-        }
-    }
-
-    startSync(): void {
-        if (this.intervalId) return;
-        
-        this.intervalId = setInterval(() => {
-            this.checkAndSyncDatabases();
-        }, this.syncInterval);
-    }
-
-    stopSync(): void {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
+            this.activeSyncs.delete(peerId);
         }
     }
 
     private async checkAndSyncDatabases(specificPeerId?: string): Promise<void> {
-        if (!p2pSync.isConnected()) return;
+        if (!p2pSync.isConnected() || this.syncInProgress) return;
 
         try {
-            const tables = (await indexDBOverlay.getAllTables())
-            
-            // .filter(
-            //     table => !table.includes('vectors_hashIndex')
-            // );
-
+            this.syncInProgress = true;
+            const tables = await indexDBOverlay.getAllTables();
             const manifest = await this.createDatabaseManifest(tables);
             
-            const manifestObject: Record<string, number> = Object.fromEntries(
-                Array.from(manifest.entries()).map(([key, value]) => [key, Number(value)])
-            );
+            const manifestObj = Object.fromEntries(manifest);
             
             const message = {
                 type: 'db_sync_check',
-                data: manifestObject,
+                data: manifestObj,
                 timestamp: Date.now()
             };
 
             if (specificPeerId) {
                 p2pSync.sendCustomMessage(specificPeerId, message);
-            } else {
-                p2pSync.broadcastCustomMessage(message);
             }
         } catch (error) {
             console.error('Error during database sync check:', error);
+        } finally {
+            this.syncInProgress = false;
         }
     }
 
-    private async createDatabaseManifest(tables: string[]): Promise<Map<string, number>> {
-        const manifest = new Map<string, number>();
-
-        for (const table of tables) {
-            const records = await indexDBOverlay.getAll(table);
-            manifest.set(table, records.length);
-        }
-
-        return manifest;
-    }
-
-    async handleSyncCheck(manifestData: Record<string, number>, peerId: string, timestamp?: number): Promise<void> {
+    async handleSyncCheck(manifestData: Record<string, any>, peerId: string, timestamp?: number): Promise<void> {
         try {
-            // Convert plain object to entries array, then to Map
-            const manifest = new Map(
-                Object.entries(manifestData)
-            );
-            
-            const lastSync = this.lastSyncTimestamps.get(peerId);
-            if (lastSync && timestamp && lastSync >= timestamp) {
+            if (this.isInEquilibrium.get(peerId)) {
                 return;
             }
 
             const localManifest = await this.createDatabaseManifest(
-                Array.from(manifest.keys())
+                Object.keys(manifestData)
             );
 
-            const mismatchedTables = this.findMismatchedTables(localManifest, manifest);
+            const mismatchedTables = this.findMismatchedTables(
+                localManifest, 
+                new Map(Object.entries(manifestData))
+            );
 
             if (mismatchedTables.length > 0) {
                 p2pSync.sendCustomMessage(peerId, {
@@ -120,6 +84,9 @@ class DBSyncManager {
                     data: mismatchedTables,
                     timestamp: Date.now()
                 });
+            } else {
+                this.isInEquilibrium.set(peerId, true);
+                console.log(`Reached equilibrium with peer ${peerId}`);
             }
 
             if (timestamp) {
@@ -130,23 +97,87 @@ class DBSyncManager {
         }
     }
 
+    private async createDatabaseManifest(tables: string[]): Promise<Map<string, any>> {
+        const manifest = new Map<string, any>();
+
+        for (const table of tables) {
+            try {
+                const records = await indexDBOverlay.getAll(table);
+                console.log(`Creating manifest for ${table}:`, records);
+
+                if (!Array.isArray(records) || records.length === 0) {
+                    manifest.set(table, {});
+                    continue;
+                }
+
+                const recordVersions = records.reduce((acc: Record<string, any>, record: any) => {
+                    let recordId = record.id || record.key;
+                    
+                    if (table === 'graph') {
+                        recordId = record.userData?.id;
+                    } else if (table === 'summaries') {
+                        recordId = record.fileId;
+                    }
+
+                    if (recordId) {
+                        acc[recordId] = {
+                            version: record.version || 0,
+                            globalTimestamp: record.globalTimestamp || 0,
+                            versionNonce: record.versionNonce
+                        };
+                    }
+                    return acc;
+                }, {});
+                
+                manifest.set(table, recordVersions);
+            } catch (error) {
+                console.error(`Error creating manifest for table ${table}:`, error);
+                manifest.set(table, {});
+            }
+        }
+
+        return manifest;
+    }
+
     private findMismatchedTables(
-        localManifest: Map<string, number>,
-        peerManifest: Map<string, number>
+        localManifest: Map<string, any>,
+        peerManifest: Map<string, any>
     ): string[] {
         const mismatched: string[] = [];
+        console.log('Comparing manifests:', {local: localManifest, peer: peerManifest}); // Debug log
 
-        // Ensure we're working with Maps
-        const localMap = localManifest instanceof Map ? localManifest : new Map(Object.entries(localManifest));
-        const peerMap = peerManifest instanceof Map ? peerManifest : new Map(Object.entries(peerManifest));
+        peerManifest.forEach((peerVersions, table) => {
+            const localVersions = localManifest.get(table) || {};
+            
+            if (Object.keys(peerVersions).length > 0 || Object.keys(localVersions).length > 0) {
+                const allRecordIds = new Set([
+                    ...Object.keys(localVersions),
+                    ...Object.keys(peerVersions)
+                ]);
 
-        peerMap.forEach((count, table) => {
-            const localCount = localMap.get(table);
-            if (localCount === undefined || localCount !== count) {
-                mismatched.push(table);
+                for (const recordId of allRecordIds) {
+                    const localRecord = localVersions[recordId];
+                    const peerRecord = peerVersions[recordId];
+
+                    if (!localRecord || !peerRecord || 
+                        localRecord.version !== peerRecord.version ||
+                        localRecord.globalTimestamp !== peerRecord.globalTimestamp ||
+                        localRecord.versionNonce !== peerRecord.versionNonce) {
+                        if (!mismatched.includes(table)) {
+                            console.log(`Mismatch found in table ${table}:`, {
+                                recordId,
+                                local: localRecord,
+                                peer: peerRecord
+                            });
+                            mismatched.push(table);
+                            break;
+                        }
+                    }
+                }
             }
         });
 
+        console.log('Mismatched tables:', mismatched); // Debug log
         return mismatched;
     }
 
@@ -169,12 +200,10 @@ class DBSyncManager {
 
     async handleSyncResponse(syncData: [string, any[]][], timestamp?: number): Promise<void> {
         try {
-            // Skip if this is an old sync response
             if (timestamp && Array.from(this.lastSyncTimestamps.values()).some(t => t >= timestamp)) {
                 return;
             }
 
-            // Ensure syncData is an array before processing
             if (Array.isArray(syncData)) {
                 for (const [table, records] of syncData) {
                     if (!(await indexDBOverlay.checkIfTableExists(table))) {
@@ -192,6 +221,10 @@ class DBSyncManager {
         } catch (error) {
             console.error('Error in handleSyncResponse:', error);
         }
+    }
+
+    resetEquilibrium(peerId: string): void {
+        this.isInEquilibrium.delete(peerId);
     }
 }
 

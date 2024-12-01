@@ -5,6 +5,8 @@ import { generateVersionNonce } from "../../utils/utils";
 import { p2pSync } from "../../network/peer2peer_simple";
 import { generateGlobalTimestamp, incrementVersion } from "../../utils/utils";
 import in_memory_store from "./in_memory";
+let reconstructFromGraphData: (() => Promise<void>) | null = null;
+
 
 interface VectorConfig {
   dimensions: number;
@@ -642,35 +644,105 @@ class IndexDBWorkerOverlay {
       console.error('Error updating dbSummaries:', error);
     }
   }
+
+  
  
   async saveData(storeName: string, data: any, key?: string): Promise<void> {
     try {
+
+      console.log('saveDATA!!', storeName, 'Saving data to:', data); // Debug log
       await this.ensureDBOpen();
 
-      // Special handling for graph table
-      if (storeName === 'graph' && Array.isArray(data)) {
-        // Handle graph data as individual nodes
-        for (const node of data) {
-          const existingNode = await this.getItem(storeName, node.id);
-          
-          // Compare versions for individual nodes
-          if (!existingNode || 
-              node.version > existingNode.version ||
-              (node.version === existingNode.version && 
-               node.globalTimestamp > existingNode.globalTimestamp)) {
-              
-              await this.sendToWorkerWithRetry("saveData", { 
-                  storeName, 
-                  data: node, 
-                  key: node.id 
-              });
-          }
-        }
-        return;
+      // Generate version and global timestamp if not present
+      if (!data.version) {
+        data.version = incrementVersion();
+      } else {
+        data.version += 1; // Increment version if already exists
+      }
+      data.globalTimestamp = generateGlobalTimestamp();
+
+      // Only generate versionNonce if it doesn't exist
+      if (!data.versionNonce) {
+        data.versionNonce = generateVersionNonce();
       }
 
-      // Regular handling for other tables
-      // ... rest of existing saveData code ...
+
+      // Ensure lastEditedBy is set
+      data.lastEditedBy =
+        data.lastEditedBy || localStorage.getItem("login_block") || "no_login";
+
+      if (await this.isMemoryOp("save data", storeName, data)) return;
+
+  
+
+      // Conflict resolution logic for CRDT-like behavior
+      const existingItem = key ? await this.getItem(storeName, key) : null;
+      if (existingItem) {
+        // Compare existing data with new data based on version and global timestamp
+        if (
+          data.version > existingItem.version ||
+          (data.version === existingItem.version &&
+            data.globalTimestamp > existingItem.globalTimestamp)
+        ) {
+       
+        } else {
+          // Existing data is newer or equally recent, skip saving
+          return;
+        }
+      }
+
+
+      // Save the data (overwrites if key is already present)
+      const storeConfig =
+        config.dbStores[storeName as keyof typeof config.dbStores];
+      if (storeConfig && "keyPath" in storeConfig) {
+         this.sendToWorkerWithRetry("saveData", { storeName, data });
+      } else {
+         this.sendToWorkerWithRetry("saveData", { storeName, data, key });
+      }
+
+
+      // Update dbSummaries if this is a file operation
+      if (storeName === 'files') {
+        await this.updateDbSummary(config.dbName, data, data?.isDeleted || false);
+      }
+
+      if (storeName === 'graph' && data?.isFromPeer && !reconstructFromGraphData) {
+        // @ts-ignore
+        const module = await import('../../ui/graph_v2/create.js');
+        reconstructFromGraphData = module.reconstructFromGraphData;
+    }
+    if (storeName === 'graph' && data?.isFromPeer && reconstructFromGraphData) {
+      await reconstructFromGraphData();
+  }
+
+
+      // Existing sync logic for broadcasting changes
+      if (
+        !data?.isFromPeer &&
+        p2pSync.isConnected() &&
+        !config.excludedSyncTables.includes(storeName)
+      ) {
+        const currentPeerId = p2pSync.getCurrentPeerId();
+
+
+        if (storeName.includes("vectors_hashIndex") && currentPeerId) {
+          storeName = `${storeName}_${currentPeerId}`;
+        }
+        p2pSync.broadcastCustomMessage({
+          type: "db_sync",
+          data: {
+            tableName: storeName,
+            data: data,
+            key: key,
+            isFromPeer: true,
+            version: data.version || incrementVersion(),
+            globalTimestamp: data.globalTimestamp || generateGlobalTimestamp(),
+            versionNonce: data.versionNonce || generateVersionNonce(),
+            lastEditedBy: localStorage.getItem("login_block") || "no_login",
+          },
+        });
+      }
     } catch (error) {
       console.error(`Failed to save data to ${storeName}:`, error);
       throw error;

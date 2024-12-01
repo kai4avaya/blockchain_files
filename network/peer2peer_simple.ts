@@ -56,7 +56,7 @@ class P2PSync {
 
   private peerConnectHandlers: Set<PeerConnectHandler> = new Set();
 
-  private peerStatuses: Map<string, PeerStatus> = new Map();
+  // private peerStatuses: Map<string, PeerStatus> = new Map();
 
   private constructor() {
     // Remove any existing event listener first
@@ -108,7 +108,10 @@ class P2PSync {
       this.loadAndDisplayAllPeers();
       
       this.startHeartbeat();
-      dbSyncManager.startSync();
+      // dbSyncManager.startSync();
+      dbSyncManager.resetEquilibrium(id);
+      dbSyncManager.initiateSync(id);
+
       this.updateButtonStates();
     });
 
@@ -226,7 +229,7 @@ class P2PSync {
   
 
   private handleConnection(conn: DataConnection): void {
-    console.log('Connection established with:', conn.peer); // Debug log
+    console.log('Connection established with:', conn.peer);
     
     // Ensure connection is in the map
     this.connections.set(conn.peer, conn);
@@ -234,20 +237,10 @@ class P2PSync {
     // Force status update
     this.updatePeerPillStatus(conn.peer, true);
     
-    conn.on("open", () => {
-        console.log('Connection opened with:', conn.peer); // Debug log
-        this.updatePeerPillStatus(conn.peer, true);
-    });
+    // Reset equilibrium and initiate sync when connection is established
+    dbSyncManager.resetEquilibrium(conn.peer);
+    dbSyncManager.initiateSync(conn.peer);  // Use initiateSync instead of startSync
 
-    conn.on("close", () => {
-        console.log('Connection closed with:', conn.peer); // Debug log
-        this.connections.delete(conn.peer);
-        this.updatePeerPillStatus(conn.peer, false);
-    });
-
-    // Call leader coordinator to handle the connection and election
-    leaderCoordinator.connectToPeer(conn.peer);
-  
     const checkConnection = setInterval(() => {
       if (!conn.open) {
         clearInterval(checkConnection);
@@ -265,11 +258,14 @@ class P2PSync {
     this.sendCurrentState(conn);
     conn.send({ type: "known_peers", data: Array.from(this.knownPeers) });
   
-    leaderCoordinator.triggerInitialDbSync(conn);
+    leaderCoordinator.triggerInitialDbSync(conn);  // DO I DELETE THIS??
   
 
     // Add immediate sync initiation
+    // dbSyncManager.initiateSync(conn.peer);
+    dbSyncManager.resetEquilibrium(conn.peer);
     dbSyncManager.initiateSync(conn.peer);
+
 
     conn.on("data", (rawData: unknown) => {
       const data = rawData as { type: string; docId?: string; data?: any, timestamp?: any };
@@ -393,11 +389,20 @@ class P2PSync {
       }
     });
 
+    conn.on("open", () => {
+      console.log('Connection opened with:', conn.peer); // Debug log
+      this.updatePeerPillStatus(conn.peer, true);
+      dbSyncManager.resetEquilibrium(conn.peer);
+      dbSyncManager.initiateSync(conn.peer);
+  });
+
 
     conn.on("close", () => {
       clearInterval(checkConnection);
       this.connections.delete(conn.peer);
       updateStatus(`Disconnected from peer: ${conn.peer}`);
+      
+      dbSyncManager.resetEquilibrium(conn.peer);  // Reset equilibrium on disconnect
       
       // Only attempt reconnect if peer is still known
       if (this.knownPeers.has(conn.peer)) {
@@ -414,6 +419,7 @@ class P2PSync {
     conn.on("error", (err) => {
       console.error(`Connection error with peer ${conn.peer}:`, err);
       updateStatus(`Connection error with peer ${conn.peer}: ${err.message}`);
+      dbSyncManager.resetEquilibrium(conn.peer);  // Reset equilibrium on error
       this.scheduleReconnect(conn.peer);
     });
 
@@ -426,7 +432,6 @@ class P2PSync {
         this.createPeerPill(remotePeerId);
     });
   }
-
   private cleanupStalePeers(): void {
     this.knownPeers.forEach(peerId => {
       const conn = this.connections.get(peerId);
@@ -1046,3 +1051,4 @@ document.addEventListener("visibilitychange", () => {
 });
 
 export { p2pSync };
+
