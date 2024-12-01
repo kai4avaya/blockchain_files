@@ -16,15 +16,18 @@ interface VectorConfig {
 
 interface StoreConfig {
   keyPath?: string;
-  vectorConfig?: VectorConfig;
+  indexes?: Array<{ name: string; keyPath: string }>;
+  vectorConfig?: {
+    dimensions: number;
+    [key: string]: any;
+  };
 }
 
-interface IndexDBOverlay {
-  getAllTables(): Promise<string[]>;
-  getAll(tableName: string): Promise<any>;
-  saveData(tableName: string, data: any): Promise<void>;
-  // ... other methods ...
+interface DBStores {
+  [key: string]: StoreConfig;
 }
+
+
 
 interface FileEntry {
   name: string;
@@ -32,10 +35,10 @@ interface FileEntry {
   id?: string;
 }
 
-interface FilesList {
-  files: FileEntry[];
-  lastUpdated: number;
-}
+// interface FilesList {
+//   files: FileEntry[];
+//   lastUpdated: number;
+// }
 
 class IndexDBWorkerOverlay {
   private worker: Worker;
@@ -61,7 +64,13 @@ class IndexDBWorkerOverlay {
     this.isInitialized = false; // Add a flag to track initialization
   }
 
+  public setIsInitialized(value: boolean) {
+    this.isInitialized = value;
+  }
+
   public async initialize(dbName?: string): Promise<void> {
+
+    console.log("initialize db", dbName || this.dbName, this.isInitialized);
     if (this.isInitialized) return;
 
     // Determine the database name to use
@@ -230,7 +239,6 @@ class IndexDBWorkerOverlay {
       if (forceRefresh) {
         await this.closeAllConnections(this.dbName);
       }
-
       try {
         const latestVersion = await this.getLatestDBVersion();
         this.dbVersion = latestVersion;
@@ -634,11 +642,11 @@ class IndexDBWorkerOverlay {
       console.error('Error updating dbSummaries:', error);
     }
   }
-
+ 
   async saveData(storeName: string, data: any, key?: string): Promise<void> {
     try {
 
-      console.log('saveDATA!! Saving data to:', storeName); // Debug log
+      console.log('saveDATA!!', storeName, 'Saving data to:', data); // Debug log
       await this.ensureDBOpen();
 
       // Generate version and global timestamp if not present
@@ -654,7 +662,7 @@ class IndexDBWorkerOverlay {
         data.versionNonce = generateVersionNonce();
       }
 
-      console.log('saveDATA!! Saving data to 2:', storeName); // Debug log
+   
 
 
       // Ensure lastEditedBy is set
@@ -663,7 +671,7 @@ class IndexDBWorkerOverlay {
 
       if (await this.isMemoryOp("save data", storeName, data)) return;
 
-      console.log('saveDATA!! Saving data to 3:', storeName); // Debug log
+  
 
       // Conflict resolution logic for CRDT-like behavior
       const existingItem = key ? await this.getItem(storeName, key) : null;
@@ -876,6 +884,33 @@ class IndexDBWorkerOverlay {
     }
   }
 
+  async clearAllData(): Promise<void> {
+    try {
+        // Ensure database is open
+        const db = await this.ensureDBOpen();
+        const stores = Object.keys(config.dbStores);
+        
+        // Clear each store one by one
+        for (const storeName of stores) {
+            try {
+                // Use our existing worker communication method
+                await this.sendToWorkerWithRetry("clearStore", { 
+                    storeName 
+                });
+                
+                console.log(`Cleared store: ${storeName}`);
+            } catch (error) {
+                console.error(`Error clearing store ${storeName}:`, error);
+            }
+        }
+        
+        console.log('All stores cleared successfully');
+    } catch (error) {
+        console.error('Error in clearAllData:', error);
+        throw error;
+    }
+}
+
   async recover(fileId: string): Promise<void> {
     try {
       // Step 1: Regular tables recovery
@@ -929,7 +964,47 @@ class IndexDBWorkerOverlay {
       throw error;
     }
   }
+
+  async switchDatabase(newDbName: string): Promise<void> {
+    try {
+        // Step 1: Close all existing connections
+        if (this.db) {
+            await this.closeAllConnections(this.dbName);
+            this.db = null;
+            this.isDBOpen = false;
+        }
+
+        // Step 2: Small delay to ensure connections are closed
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Step 3: Update worker config
+        await this.worker.postMessage({
+            type: 'INIT_CONFIG',
+            config: { dbName: newDbName }
+        });
+
+        // Step 4: Update internal state
+        this.dbName = newDbName;
+
+        // Step 5: Open and initialize the new database
+        await this.openDB();
+        
+        // Step 6: Initialize stores with config
+        const dbStores = config.dbStores as DBStores;
+        const storeNames = Object.keys(dbStores);
+
+        // Initialize stores with just their names
+        await this.initializeDB(storeNames);
+
+        console.log(`Successfully switched to database: ${newDbName}`);
+    } catch (err) {
+        const error = err as Error;
+        console.error(`Error switching to database ${newDbName}:`, error);
+        throw new Error(`Failed to switch database: ${error.message}`);
+    }
+  }
 }
 
 const indexDBOverlay = new IndexDBWorkerOverlay();
 export default indexDBOverlay;
+

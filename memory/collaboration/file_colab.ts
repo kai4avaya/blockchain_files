@@ -165,21 +165,26 @@ class FileSystem {
     await this.applyUpdate({ [key]: updatedItems });
   }
 
-//   async deleteItem(id: string, type: 'file' | 'directory'): Promise<void> {
-//     const key = type === 'file' ? 'files' : 'directories';
-//     const item = this.snapshot[key].find(i => i.id === id);
-//     if (item) {
-//       item.isDeleted = true;
-//       this.updateMetadata(item);
-//       // Cast the filtered array to the correct type
-//       this.snapshot[key] = this.snapshot[key].filter(i => i.id !== id) as any;
-//       await this.applyUpdate({ [key]: this.snapshot[key] });
+  public async refreshSnapshot(): Promise<void> {
+    try {
+        const files = await indexDBOverlay.getData('files');
+        const directories = await indexDBOverlay.getData('directories');
       
-//       await indexDBOverlay.deleteItem(key, id);
-//     }
-// }
+        this.snapshot = {
+            files: files || [],
+            directories: directories || [],
+            version: this.snapshot.version + 1
+        };
+        
+        console.log('FileSystem snapshot refreshed:', {
+            filesCount: files?.length,
+            directoriesCount: directories?.length
+        });
+    } catch (error) {
+        console.error('Error refreshing filesystem snapshot:', error);
+    }
+}
 
-// ... existing code ...
 
 async  deleteItem(id: string, type: 'file' | 'directory', isJustFolder: boolean = false): Promise<void> {
   const key = type === 'file' ? 'files' : 'directories';

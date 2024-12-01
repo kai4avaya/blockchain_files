@@ -7,7 +7,7 @@ import config from '../../../configs/config.json'
 import { showNotification } from '../notifications/popover.js';
 import { createAndInitializeNewDatabaseInstance, openDatabase } from '../../../memory/local/start_new_db';
 import toast from '../toast-alert';
-import { clearAllScenes, reconstructFromGraphData } from '../../graph_v2/create.js';
+import { reconstructFromGraphData } from '../../graph_v2/create.js';
 import { initiate as initiateVectorDB } from '../../../memory/vectorDB/vectorDbGateway';
 import { sceneState } from '../../../memory/collaboration/scene_colab';
 

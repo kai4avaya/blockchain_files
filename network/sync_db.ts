@@ -57,9 +57,11 @@ class DBSyncManager {
         if (!p2pSync.isConnected()) return;
 
         try {
-            const tables = (await indexDBOverlay.getAllTables()).filter(
-                table => !table.includes('vectors_hashIndex')
-            );
+            const tables = (await indexDBOverlay.getAllTables())
+            
+            // .filter(
+            //     table => !table.includes('vectors_hashIndex')
+            // );
 
             const manifest = await this.createDatabaseManifest(tables);
             

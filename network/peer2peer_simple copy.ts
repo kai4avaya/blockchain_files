@@ -74,14 +74,7 @@ class P2PSync {
     return P2PSync.instance;
   }
 
-  async initialize(userId: string): Promise<void> {
-
-    await this.disconnectFromAllPeers();
-        
-    // Add small delay to ensure cleanup is complete
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-
+  initialize(userId: string): void {
     // this.sceneState = sceneState;
     this.loadKnownPeers();
 
@@ -794,33 +787,6 @@ class P2PSync {
     }
   }
 
-  async disconnectFromAllPeers() {
-    try {
-        // Disconnect from the PeerJS server
-        if (this.peer) {
-            // Close all existing connections
-            for (const [peerId, conn] of Object.entries(this.connections)) {
-                if (conn) {
-                    conn.close();
-                }
-            }
-            
-            // Clear connections object
-            this.connections.clear();
-            
-            // Disconnect the peer
-            this.peer.disconnect();
-            
-            // Destroy the peer instance
-            this.peer.destroy();
-            this.peer = null;
-        }
-    } catch (error) {
-        console.error('Error disconnecting from peers:', error);
-    }
-}
-
-
   // Add this method to load peers from IndexedDB
   private async loadAndDisplayAllPeers(): Promise<void> {
     try {
@@ -987,7 +953,6 @@ const storedPeerId = localStorage.getItem("myPeerId");
 if (storedPeerId && userIdInput) {
   userIdInput.value = storedPeerId;
 }
-
 
 // Initialize P2PSync when user enters their ID or when the page loads with a stored ID
 function initializeP2PSync() {

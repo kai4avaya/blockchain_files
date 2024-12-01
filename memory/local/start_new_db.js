@@ -4,6 +4,7 @@ import config from '../../configs/config.json';
 import { clearAllScenes, reconstructFromGraphData } from '../../ui/graph_v2/create.js';
 import { p2pSync } from '../../network/peer2peer_simple';
 import { initiate } from '../vectorDB/vectorDbGateway';
+import { refreshFileTree } from '../../memory/fileHandler.js';
 
 export async function createAndInitializeNewDatabaseInstance(customName = null) {
     try {
@@ -12,6 +13,8 @@ export async function createAndInitializeNewDatabaseInstance(customName = null) 
         
         // Clear file metadata - Initialize as Map instead of object
         window.fileMetadata = new Map();
+
+        p2pSync.disconnectFromAllPeers();
         
         // Step 2: Close current database connection first
         // const currentDb = config.dbName;
@@ -28,6 +31,7 @@ export async function createAndInitializeNewDatabaseInstance(customName = null) 
         const newDbName = customName 
             ? `fileGraphDB_${randomCode}_${customName.trim()}`
             : `fileGraphDB_${randomCode}`;
+
 
         console.log(`Creating new database: ${newDbName}`);
 
@@ -65,6 +69,7 @@ export async function createAndInitializeNewDatabaseInstance(customName = null) 
             localStorage.setItem('databases', JSON.stringify(databases));
         }
 
+        refreshFileTree();
         console.log(`New database "${newDbName}" created and initialized successfully.`);
         return newDbName;
     } catch (error) {
@@ -120,20 +125,22 @@ export async function openDatabase(dbName) {
     try {
         console.log(`Opening database: ${dbName}`);
         
-        // Clear file metadata - Initialize as Map instead of object
+        // Clear file metadata
         window.fileMetadata = new Map();
         
-        // Step 1: Close current database connections first
-        await indexDBOverlay.closeAllConnections(config.dbName);
-        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+        // Step 1: Disconnect from all peers first
+        await p2pSync.disconnectFromAllPeers();
         
-        // Step 2: Update config and localStorage
+        // Step 2: Close current database connections
+        await indexDBOverlay.closeAllConnections(config.dbName);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Step 3: Update config and localStorage
         config.dbName = dbName;
         localStorage.setItem('latestDBName', dbName);
 
         await indexDBOverlay.setIsInitialized(false);
         await indexDBOverlay.initialize(dbName);
-        
         
         // Step 4: Open and initialize stores
         await indexDBOverlay.openDB();
@@ -145,9 +152,10 @@ export async function openDatabase(dbName) {
         await indexDBOverlay.initializeDB(storeConfigs.map(config => config.storeName));
         
         // Step 5: Reinitialize p2pSync with new database
-        await p2pSync.initialize(localStorage.getItem('myPeerId')); // Re-initialize with current peer ID
-        await p2pSync.loadAndDisplayAllPeers(); // Reload peers for new database
-
+        // Add small delay to ensure previous connections are fully closed
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await p2pSync.initialize(localStorage.getItem('myPeerId'));
+        await p2pSync.loadAndDisplayAllPeers();
 
         await initiate(true)
         
@@ -157,6 +165,8 @@ export async function openDatabase(dbName) {
         if (graphData && graphData.length > 0) {
             await reconstructFromGraphData();
         }
+
+        refreshFileTree();
         
         console.log(`Database "${dbName}" opened successfully`);
         return true;

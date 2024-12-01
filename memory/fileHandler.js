@@ -490,7 +490,6 @@ async function handleRowClick(event) {
   }
 }
 
-// ... rest of the file ...
 
 function getElementPath(element) {
   const path = [];
@@ -598,6 +597,8 @@ function getElementPath(element) {
   export function updateFileTreeUI() {
     const fileSystem = getFileSystem();
     const snapshot = fileSystem.getSnapshot();
+
+    console.log("updateFileTreeUI", snapshot)
     
     if (!snapshot || !fileTree) return;
     
@@ -748,10 +749,18 @@ function getElementPath(element) {
     return Array.from(checkedBoxes).map(checkbox => checkbox.dataset.fileId);
   }
 
+// export function refreshFileTree() {
+  
+//   const fileSystem = getFileSystem();
+//   fileSystem.onReady(() => {
+//     updateFileTreeUI();
+//   });
+// }
 export function refreshFileTree() {
   const fileSystem = getFileSystem();
-  fileSystem.onReady(() => {
-    updateFileTreeUI();
+  fileSystem.onReady(async () => {
+      await fileSystem.refreshSnapshot(); // Add this line
+      updateFileTreeUI();
   });
 }
 
