@@ -2887,3 +2887,83 @@ mark {
     text-align: center;
     font-size: 12px;
 }
+
+/* Add these styles */
+.my-peer-pill-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.peer-label {
+    font-size: 12px;
+    color: #666;
+    margin-left: 4px;
+}
+
+.my-peer-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    font-size: 14px;
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    background-color: #f3f4f6;
+}
+
+.stop-sharing-btn {
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 2px;
+    color: #666;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative; /* For tooltip positioning */
+}
+
+.stop-sharing-btn:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+.stop-sharing-btn:hover svg {
+    color: #ef4444; /* Red color on hover */
+    /* stroke: #ef4444; */
+}
+
+/* Tooltip styles */
+.stop-sharing-btn::after {
+    content: 'Stop Sharing';
+    position: absolute;
+    right: calc(100% + 8px); /* Position to the left of the button */
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: #333;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+}
+
+/* .stop-sharing-btn:hover svg {
+    color: #ef4444;
+    stroke: #ef4444;
+} */
+
+.stop-sharing-btn:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+.stop-sharing-btn .h-4 {
+    height: 1rem;
+    width: 1rem;
+}

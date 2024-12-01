@@ -28,7 +28,7 @@ class P2PModalManager {
               type="text" 
               class="p2p_peer_input" 
               id="peerIdInput" 
-              placeholder="Enter peer ID to connect"
+              placeholder="Enter peer ID to connect. Use commas to connect to multiple peers."
             >
             <button id="connectButton">
               Connect

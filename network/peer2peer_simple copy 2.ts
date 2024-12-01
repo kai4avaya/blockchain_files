@@ -56,7 +56,7 @@ class P2PSync {
 
   private peerConnectHandlers: Set<PeerConnectHandler> = new Set();
 
-  private peerStatuses: Map<string, PeerStatus> = new Map();
+  // private peerStatuses: Map<string, PeerStatus> = new Map();
 
   private constructor() {
     // Remove any existing event listener first
@@ -74,12 +74,20 @@ class P2PSync {
     return P2PSync.instance;
   }
 
-  initialize(userId: string): void {
+  async initialize(userId: string): Promise<void> {
+
+    await this.disconnectFromAllPeers();
+        
+    // Add small delay to ensure cleanup is complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+
     // this.sceneState = sceneState;
     this.loadKnownPeers();
 
     const peerId = localStorage.getItem("myPeerId") || userId;
     this.peer = new Peer(peerId);
+    this.createMyPeerPill(userId);
 
     // Add localStorage listener for userIdInput
     const userIdInput = document.getElementById("userIdInput") as HTMLInputElement;
@@ -101,7 +109,10 @@ class P2PSync {
       this.loadAndDisplayAllPeers();
       
       this.startHeartbeat();
-      dbSyncManager.startSync();
+      // dbSyncManager.startSync();
+      dbSyncManager.resetEquilibrium(id);
+      dbSyncManager.initiateSync(id);
+
       this.updateButtonStates();
     });
 
@@ -219,7 +230,7 @@ class P2PSync {
   
 
   private handleConnection(conn: DataConnection): void {
-    console.log('Connection established with:', conn.peer); // Debug log
+    console.log('Connection established with:', conn.peer);
     
     // Ensure connection is in the map
     this.connections.set(conn.peer, conn);
@@ -227,20 +238,10 @@ class P2PSync {
     // Force status update
     this.updatePeerPillStatus(conn.peer, true);
     
-    conn.on("open", () => {
-        console.log('Connection opened with:', conn.peer); // Debug log
-        this.updatePeerPillStatus(conn.peer, true);
-    });
+    // Reset equilibrium and initiate sync when connection is established
+    dbSyncManager.resetEquilibrium(conn.peer);
+    dbSyncManager.initiateSync(conn.peer);  // Use initiateSync instead of startSync
 
-    conn.on("close", () => {
-        console.log('Connection closed with:', conn.peer); // Debug log
-        this.connections.delete(conn.peer);
-        this.updatePeerPillStatus(conn.peer, false);
-    });
-
-    // Call leader coordinator to handle the connection and election
-    leaderCoordinator.connectToPeer(conn.peer);
-  
     const checkConnection = setInterval(() => {
       if (!conn.open) {
         clearInterval(checkConnection);
@@ -258,11 +259,14 @@ class P2PSync {
     this.sendCurrentState(conn);
     conn.send({ type: "known_peers", data: Array.from(this.knownPeers) });
   
-    leaderCoordinator.triggerInitialDbSync(conn);
+    leaderCoordinator.triggerInitialDbSync(conn);  // DO I DELETE THIS??
   
 
     // Add immediate sync initiation
+    // dbSyncManager.initiateSync(conn.peer);
+    dbSyncManager.resetEquilibrium(conn.peer);
     dbSyncManager.initiateSync(conn.peer);
+
 
     conn.on("data", (rawData: unknown) => {
       const data = rawData as { type: string; docId?: string; data?: any, timestamp?: any };
@@ -386,11 +390,20 @@ class P2PSync {
       }
     });
 
+    conn.on("open", () => {
+      console.log('Connection opened with:', conn.peer); // Debug log
+      this.updatePeerPillStatus(conn.peer, true);
+      dbSyncManager.resetEquilibrium(conn.peer);
+      dbSyncManager.initiateSync(conn.peer);
+  });
+
 
     conn.on("close", () => {
       clearInterval(checkConnection);
       this.connections.delete(conn.peer);
       updateStatus(`Disconnected from peer: ${conn.peer}`);
+      
+      dbSyncManager.resetEquilibrium(conn.peer);  // Reset equilibrium on disconnect
       
       // Only attempt reconnect if peer is still known
       if (this.knownPeers.has(conn.peer)) {
@@ -407,6 +420,7 @@ class P2PSync {
     conn.on("error", (err) => {
       console.error(`Connection error with peer ${conn.peer}:`, err);
       updateStatus(`Connection error with peer ${conn.peer}: ${err.message}`);
+      dbSyncManager.resetEquilibrium(conn.peer);  // Reset equilibrium on error
       this.scheduleReconnect(conn.peer);
     });
 
@@ -419,7 +433,6 @@ class P2PSync {
         this.createPeerPill(remotePeerId);
     });
   }
-
   private cleanupStalePeers(): void {
     this.knownPeers.forEach(peerId => {
       const conn = this.connections.get(peerId);
@@ -787,6 +800,33 @@ class P2PSync {
     }
   }
 
+  async disconnectFromAllPeers() {
+    try {
+        // Disconnect from the PeerJS server
+        if (this.peer) {
+            // Close all existing connections
+            for (const [peerId, conn] of Object.entries(this.connections)) {
+                if (conn) {
+                    conn.close();
+                }
+            }
+            
+            // Clear connections object
+            this.connections.clear();
+            
+            // Disconnect the peer
+            this.peer.disconnect();
+            
+            // Destroy the peer instance
+            this.peer.destroy();
+            this.peer = null;
+        }
+    } catch (error) {
+        console.error('Error disconnecting from peers:', error);
+    }
+}
+
+
   // Add this method to load peers from IndexedDB
   private async loadAndDisplayAllPeers(): Promise<void> {
     try {
@@ -868,6 +908,65 @@ class P2PSync {
         connectButton.disabled = true;
       }
     }
+  }
+
+  private createMyPeerPill(peerId: string): void {
+    const userIdInput = document.getElementById('userIdInput') as HTMLInputElement;
+    if (!userIdInput) return;
+
+    // Create container for the pill
+    const pillContainer = document.createElement('div');
+    pillContainer.className = 'my-peer-pill-container';
+    pillContainer.innerHTML = `
+        <span class="peer-label">My Peer ID</span>
+        <div class="my-peer-pill">
+            <span class="peer-id">${peerId}</span>
+            <button class="stop-sharing-btn" title="Stop Sharing">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-4 w-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+            </button>
+        </div>
+    `;
+
+    // Add click handler for stop sharing
+    const stopBtn = pillContainer.querySelector('.stop-sharing-btn');
+    if (stopBtn) {
+        stopBtn.addEventListener('click', async () => {
+            await this.stopSharing();
+        });
+    }
+
+    // Replace input with pill
+    userIdInput.style.display = 'none';
+    userIdInput.parentNode?.insertBefore(pillContainer, userIdInput);
+  }
+
+  private async stopSharing(): Promise<void> {
+    // Reset peer connection
+    await this.disconnectFromAllPeers();
+    
+    // Mark all peers as deleted
+    const peers = await indexDBOverlay.getData('peers');
+    for (const peer of peers) {
+        await indexDBOverlay.deleteItem_field('peers', peer.peerId);
+    }
+    
+    // Clear localStorage
+    localStorage.removeItem('myPeerId');
+    
+    // Restore input
+    const userIdInput = document.getElementById('userIdInput') as HTMLInputElement;
+    const pillContainer = document.querySelector('.my-peer-pill-container');
+    
+    if (userIdInput && pillContainer) {
+        userIdInput.value = '';
+        userIdInput.style.display = '';
+        pillContainer.remove();
+    }
+    
+    // Update button states
+    this.updateButtonStates();
   }
 }
 let isInitialized = false;
@@ -954,6 +1053,7 @@ if (storedPeerId && userIdInput) {
   userIdInput.value = storedPeerId;
 }
 
+
 // Initialize P2PSync when user enters their ID or when the page loads with a stored ID
 function initializeP2PSync() {
   if (isInitialized) {
@@ -1011,3 +1111,4 @@ document.addEventListener("visibilitychange", () => {
 });
 
 export { p2pSync };
+

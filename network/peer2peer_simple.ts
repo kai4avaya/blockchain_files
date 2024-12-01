@@ -6,6 +6,7 @@ import { TabManager } from "../ui/components/codemirror_md copy/codemirror-rich-
 import leaderCoordinator from './elections';
 import dbSyncManager from './sync_db';
 import indexDBOverlay from '../memory/local/file_worker';
+let isInitialized = false;
 
 interface SceneState {
   getSerializableState: () => any;
@@ -76,17 +77,25 @@ class P2PSync {
 
   async initialize(userId: string): Promise<void> {
 
-    await this.disconnectFromAllPeers();
+    if (this.peer) {
+      this.peer.removeAllListeners();
+      this.peer.destroy();
+      this.peer = null;
+      await new Promise(resolve => setTimeout(resolve, 100));
+  }
         
     // Add small delay to ensure cleanup is complete
     await new Promise(resolve => setTimeout(resolve, 100));
     
+
+    await this.disconnectFromAllPeers();
 
     // this.sceneState = sceneState;
     this.loadKnownPeers();
 
     const peerId = localStorage.getItem("myPeerId") || userId;
     this.peer = new Peer(peerId);
+    this.createMyPeerPill(userId);
 
     // Add localStorage listener for userIdInput
     const userIdInput = document.getElementById("userIdInput") as HTMLInputElement;
@@ -908,8 +917,131 @@ class P2PSync {
       }
     }
   }
+
+  private createMyPeerPill(peerId: string): void {
+    const userIdInput = document.getElementById('userIdInput') as HTMLInputElement;
+    if (!userIdInput) return;
+
+    // Create container for the pill
+    const pillContainer = document.createElement('div');
+    pillContainer.className = 'my-peer-pill-container';
+    pillContainer.innerHTML = `
+        <span class="peer-label">My Peer ID:</span>
+        <div class="my-peer-pill">
+            <span class="peer-id">${peerId}</span>
+            <button class="stop-sharing-btn" title="Stop Sharing">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-4 w-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+            </button>
+        </div>
+    `;
+
+    // Add click handler for stop sharing
+    const stopBtn = pillContainer.querySelector('.stop-sharing-btn');
+    if (stopBtn) {
+        stopBtn.addEventListener('click', async () => {
+            await this.stopSharing();
+        });
+    }
+
+    // Replace input with pill
+    userIdInput.style.display = 'none';
+    userIdInput.parentNode?.insertBefore(pillContainer, userIdInput);
+  }
+
+//   private async stopSharing(): Promise<void> {
+//     // Reset peer connection
+//     await this.disconnectFromAllPeers();
+    
+//     // Mark all peers as deleted
+//     const peers = await indexDBOverlay.getData('peers');
+//     for (const peer of peers) {
+//         await indexDBOverlay.deleteItem_field('peers', peer.peerId);
+//     }
+    
+//     // Clear localStorage
+//     localStorage.removeItem('myPeerId');
+    
+//     // Restore input
+//     const userIdInput = document.getElementById('userIdInput') as HTMLInputElement;
+//     const pillContainer = document.querySelector('.my-peer-pill-container');
+    
+//     if (userIdInput && pillContainer) {
+//         userIdInput.value = '';
+//         userIdInput.style.display = '';
+//         pillContainer.remove();
+//     }
+    
+//     // Update button states
+//     this.updateButtonStates();
+//   }
+// }
+private async stopSharing(): Promise<void> {
+  try {
+      // Properly destroy the peer connection
+      if (this.peer) {
+          this.peer.destroy();
+          this.peer = null;
+      }
+
+      isInitialized = false;
+
+      // Reset all connection-related state
+      this.connections.clear();
+      this.knownPeers.clear();
+      if (this.heartbeatTimer) {
+          clearInterval(this.heartbeatTimer);
+          this.heartbeatTimer = null;
+      }
+      
+      // Clear all reconnect timers
+      this.reconnectTimers.forEach((timer) => clearTimeout(timer));
+      this.reconnectTimers.clear();
+      
+      // Mark all peers as deleted
+      const peers = await indexDBOverlay.getData('peers');
+      for (const peer of peers) {
+          await indexDBOverlay.deleteItem_field('peers', peer.peerId);
+      }
+      
+      // Clear ALL related localStorage items
+      localStorage.removeItem('myPeerId');
+      localStorage.removeItem('login_block');
+      localStorage.removeItem('knownPeers');
+      
+      // Reset UI
+      const userIdInput = document.getElementById('userIdInput') as HTMLInputElement;
+      const pillContainer = document.querySelector('.my-peer-pill-container');
+      const peerPillsContainer = document.getElementById('peer-pills-container');
+      
+      if (userIdInput && pillContainer) {
+          userIdInput.value = '';
+          userIdInput.style.display = '';
+          pillContainer.remove();
+      }
+
+      // Clear peer pills container
+      if (peerPillsContainer) {
+          peerPillsContainer.innerHTML = '';
+      }
+
+      // Reset initialization flag
+      (window as any).isInitialized = false;
+      
+      // Small delay to ensure cleanup is complete
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Update button states
+      this.updateButtonStates();
+
+      console.log('Successfully stopped sharing and reset peer connection');
+  } catch (error) {
+      console.error('Error while stopping sharing:', error);
+  }
 }
-let isInitialized = false;
+}
+
 
 const p2pSync = P2PSync.getInstance();
 
