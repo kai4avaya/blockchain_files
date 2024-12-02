@@ -5,7 +5,9 @@ const dbWorker = new Worker('../workers/memory_worker.js');
 
 export function summarizeText(text_to_summarize, fileId, fileName) {
     return new Promise((resolve, reject) => {
+        
         const messageHandler = function(e) {
+            
             if (e.data.error) {
                 console.error("Worker error:", e.data.error);
                 summaryWorker.removeEventListener('message', messageHandler);
@@ -14,17 +16,14 @@ export function summarizeText(text_to_summarize, fileId, fileName) {
             }
             
             const { summary, keywords } = e.data;
-            
-            // Make sure to remove the event listener before resolving
+
             summaryWorker.removeEventListener('message', messageHandler);
             resolve({ summary, keywords });
         };
 
         summaryWorker.addEventListener('message', messageHandler);
         
-        // Send only the first 1000 words if not already limited
-        const limitedText = text_to_summarize.split(/\s+/).slice(0, 1000).join(' ');
-        summaryWorker.postMessage({ text: limitedText, fileId, fileName });
+        summaryWorker.postMessage({ text: text_to_summarize, fileId, fileName });
         
         // Add a timeout to prevent hanging
         setTimeout(() => {

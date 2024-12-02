@@ -151,9 +151,13 @@ async function processFile(fileEntry, id) {
             file.type === "application/pdf" ||
             file.type === 'text/javascript') {
           
-          // Process text stats and wait for it to complete
-          const stats =  textStats.processTextStats(content, id);
-           textStats.saveTextStats(id, stats);
+          try {
+            // Wait for stats to be processed before saving
+            const stats = textStats.processTextStats(content, id);
+            // textStats.saveTextStats(id, stats);
+          } catch (error) {
+            console.error('Error processing text stats:', error);
+          }
         }
 
         // Continue with other processing...
@@ -176,14 +180,6 @@ async function processFile(fileEntry, id) {
         
         // Process content for vectorization
         await orchestrateTextProcessing(content, file, id);
-        
-        // Process text statistics in background for text files
-        if (file.type === 'text/plain' || file.type === 'text/markdown' || file.type === 'text/javascript') {
-          // Don't await this - let it process in background
-          textStats.processTextStats(content, id)
-            .then(stats => textStats.saveTextStats(id, stats))
-            .catch(error => console.warn('Text stats processing error:', error));
-        }
         
         addFileToTree(fileMetadata);
         resolve();

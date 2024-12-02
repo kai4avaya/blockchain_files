@@ -1,4 +1,4 @@
-import config from '../configs/config.json';
+// import config from '../configs/config.json';
 import indexDBOverlay from '../memory/local/file_worker';
 
 const CHART_COLORS = {

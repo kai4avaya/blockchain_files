@@ -9,7 +9,7 @@ import { createAndInitializeNewDatabaseInstance, openDatabase } from '../../../m
 import toast from '../toast-alert';
 import { reconstructFromGraphData } from '../../graph_v2/create.js';
 import { initiate as initiateVectorDB } from '../../../memory/vectorDB/vectorDbGateway';
-import { sceneState } from '../../../memory/collaboration/scene_colab';
+// import { sceneState } from '../../../memory/collaboration/scene_colab';
 
 // Add loading spinner HTML template
 const buttonSpinnerTemplate = `
@@ -552,7 +552,7 @@ async function handleDatabaseOpen(dbName, loadButton) {
         
         try {
             // Clear scene state first
-            sceneState.clearState();
+            // sceneState.clearState();
             
             // Proceed with database switch
             await openDatabase(dbName);

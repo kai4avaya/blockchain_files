@@ -2967,3 +2967,45 @@ mark {
     height: 1rem;
     width: 1rem;
 }
+
+.master-status {
+    position: sticky;
+    top: 0;
+    background: var(--background-color, white);
+    border-bottom: 1px solid var(--border-color, #eee);
+    z-index: 2;  /* Increased z-index */
+    padding: 10px;
+    margin-bottom: 8px;
+    background-color: rgba(255, 255, 255, 0.98);  /* Slightly more opaque */
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    opacity: 0;
+    animation: fadeIn 0.5s ease-in forwards;
+    background-color: rgba(240, 240, 240, 0.9);
+    padding: 8px 12px;
+    border-radius: 6px;
+    position: relative;  /* Add this */
+    z-index: 1;  /* Add this */
+}
+
+.status-item.fade-out {
+    opacity: 0;
+    transform: translateY(-10px);  /* Reduced movement */
+}
+
+/* Add new styles for status container layout */
+#status-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;  /* Consistent spacing */
+}
+
+/* Add padding to account for master status */
+/* #status-container.has-master {
+    padding-top: 50px;  
+} */

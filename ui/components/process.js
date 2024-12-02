@@ -11,11 +11,24 @@ class StatusIndicator {
         this.setupEventListener();
         this.setupScrollbar();
         this.activeStatus = null;
+        this.masterStatus = null;
     }
 
     setupEventListener() {
         window.addEventListener('statusUpdate', (event) => {
-            this.addStatus(event.detail.status);
+            this.addStatus(
+                event.detail.status, 
+                event.detail.isPersistent,
+                event.detail.timeout
+            );
+        });
+        
+        window.addEventListener('masterStatusUpdate', (event) => {
+            this.addMasterStatus(event.detail.status);
+        });
+        
+        window.addEventListener('masterStatusComplete', (event) => {
+            this.completeMasterStatus(event.detail.status);
         });
     }
 
@@ -44,7 +57,7 @@ class StatusIndicator {
         }
     }
 
-    addStatus(status, isPersistent = false) {
+    addStatus(status, isPersistent = false, timeout = null) {
         this.show();
         
         if (status.toLowerCase() === 'done') {
@@ -52,14 +65,13 @@ class StatusIndicator {
             return;
         }
 
-        if (this.activeStatus) {
-            requestAnimationFrame(() => {
-                const spinner = this.activeStatus?.querySelector('.spinner');
-                if (spinner) {
-                    spinner.outerHTML = '<span class="checkmark">✓</span>';
-                    this.fadeOutStatus(this.activeStatus);
-                }
-            });
+        if (isPersistent && this.activeStatus) {
+            const prevSpinner = this.activeStatus?.querySelector('.spinner');
+            if (prevSpinner) {
+                prevSpinner.outerHTML = '<span class="checkmark">✓</span>';
+                this.fadeOutStatus(this.activeStatus);
+                this.activeStatus = null;
+            }
         }
 
         const statusItem = document.createElement('div');
@@ -69,12 +81,30 @@ class StatusIndicator {
             <div class="spinner"></div>
         `;
         
-        this.container.appendChild(statusItem);
+        if (this.masterStatus) {
+            this.container.insertBefore(statusItem, this.masterStatus.nextSibling);
+        } else {
+            this.container.appendChild(statusItem);
+        }
+        
         this.statuses.push(statusItem);
         this.scrollToBottom();
 
         if (isPersistent) {
             this.activeStatus = statusItem;
+            
+            if (timeout) {
+                setTimeout(() => {
+                    if (statusItem === this.activeStatus) {
+                        const spinner = statusItem.querySelector('.spinner');
+                        if (spinner) {
+                            spinner.outerHTML = '<span class="warning">⚠</span>';
+                            this.fadeOutStatus(statusItem);
+                            this.activeStatus = null;
+                        }
+                    }
+                }, timeout);
+            }
         } else {
             setTimeout(() => {
                 requestAnimationFrame(() => {
@@ -91,24 +121,39 @@ class StatusIndicator {
     fadeOutStatus(statusItem) {
         if (!statusItem?.isConnected) return;
         
-        setTimeout(() => {
-            statusItem.classList.add('fade-out');
+        if (statusItem === this.masterStatus) {
             setTimeout(() => {
-                if (statusItem?.isConnected && this.container.contains(statusItem)) {
-                    this.container.removeChild(statusItem);
-                    this.statuses = this.statuses.filter(item => item !== statusItem);
-                    
-                    if (this.statuses.length === 0) {
-                        this.hide();
+                statusItem.classList.add('fade-out');
+                setTimeout(() => {
+                    if (statusItem?.isConnected && this.container.contains(statusItem)) {
+                        this.container.removeChild(statusItem);
+                        this.statuses = this.statuses.filter(item => item !== statusItem);
+                        
+                        if (this.statuses.length === 0 && !this.masterStatus) {
+                            this.hide();
+                        }
                     }
+                }, 300);
+            }, 1000);
+            return;
+        }
+        
+        statusItem.classList.add('fade-out');
+        setTimeout(() => {
+            if (statusItem?.isConnected && this.container.contains(statusItem)) {
+                this.container.removeChild(statusItem);
+                this.statuses = this.statuses.filter(item => item !== statusItem);
+                
+                if (this.statuses.length === 0 && !this.masterStatus) {
+                    this.hide();
                 }
-            }, 300);
-        }, 1000);
+            }
+        }, 300);
     }
 
     complete() {
         requestAnimationFrame(() => {
-            if (this.activeStatus) {
+            if (this.activeStatus && this.activeStatus !== this.masterStatus) {
                 const spinner = this.activeStatus.querySelector('.spinner');
                 if (spinner) {
                     spinner.outerHTML = '<span class="checkmark">✓</span>';
@@ -118,34 +163,106 @@ class StatusIndicator {
             }
 
             this.statuses.forEach(statusItem => {
-                const spinner = statusItem?.querySelector('.spinner');
-                if (spinner && statusItem.isConnected) {
-                    spinner.outerHTML = '<span class="checkmark">✓</span>';
+                if (statusItem !== this.masterStatus) {
+                    const spinner = statusItem?.querySelector('.spinner');
+                    if (spinner && statusItem.isConnected) {
+                        spinner.outerHTML = '<span class="checkmark">✓</span>';
+                    }
                 }
             });
 
-            setTimeout(() => {
-                this.hide();
+            if (!this.masterStatus) {
                 setTimeout(() => {
-                    if (this.container) {
-                        this.container.innerHTML = '';
-                        this.statuses = [];
-                    }
-                }, 500);
-            }, 1000);
+                    this.hide();
+                    setTimeout(() => {
+                        if (this.container) {
+                            this.container.innerHTML = '';
+                            this.statuses = [];
+                        }
+                    }, 500);
+                }, 1000);
+            }
         });
+    }
+
+    addMasterStatus(status) {
+        this.show();
+        
+        if (!this.masterStatus) {
+            const masterStatusItem = document.createElement('div');
+            masterStatusItem.className = 'status-item master-status';
+            masterStatusItem.innerHTML = `
+                <span>${status}</span>
+                <div class="spinner"></div>
+            `;
+            
+            this.container.insertBefore(masterStatusItem, this.container.firstChild);
+            this.masterStatus = masterStatusItem;
+            this.container.classList.add('has-master');
+        }
+    }
+
+    completeMasterStatus(status) {
+        if (this.masterStatus) {
+            requestAnimationFrame(() => {
+                const spinner = this.masterStatus.querySelector('.spinner');
+                if (spinner) {
+                    if (status) {
+                        this.masterStatus.querySelector('span').textContent = status;
+                    }
+                    spinner.outerHTML = '<span class="checkmark">✓</span>';
+                    
+                    setTimeout(() => {
+                        this.fadeOutStatus(this.masterStatus);
+                        this.masterStatus = null;
+                        this.container.classList.remove('has-master');
+                    }, 2000);
+                }
+            });
+        }
     }
 }
 
 // Create a single instance
 const statusIndicator = new StatusIndicator();
 
-export function updateStatus(status, isPersistent = false) {
+export function updateStatus(status, isPersistent = false, timeout = null) {
     window.dispatchEvent(new CustomEvent('statusUpdate', { 
         detail: { 
-            status: status,
-            isPersistent: isPersistent 
+            status,
+            isPersistent,
+            timeout
         }
+    }));
+}
+
+export function startPersistentStatus(status, timeout = null) {
+    window.dispatchEvent(new CustomEvent('statusUpdate', { 
+        detail: { 
+            status,
+            isPersistent: true,
+            timeout
+        }
+    }));
+}
+
+export function completePersistentStatus(status = 'Done') {
+    window.dispatchEvent(new CustomEvent('statusUpdate', { 
+        detail: { 
+            status: status
+        }
+    }));
+}
+
+export function startMasterStatus(status) {
+    window.dispatchEvent(new CustomEvent('masterStatusUpdate', { 
+        detail: { status }
+    }));
+}
+
+export function completeMasterStatus(status) {
+    window.dispatchEvent(new CustomEvent('masterStatusComplete', { 
+        detail: { status }
     }));
 }
 

@@ -57,16 +57,39 @@ class TextStatsManager {
   async processTextStats(text, fileId) {
     this.initializeWorker();
     
-    console.log('Sending text to worker:', { fileId, textLength: text.length });
+    // Convert ArrayBuffer to text if needed
+    let processableText = text;
+    if (text instanceof ArrayBuffer) {
+      const decoder = new TextDecoder();
+      processableText = decoder.decode(text);
+    }
+    
+    console.log('Sending text to worker:', { 
+      fileId, 
+      textLength: processableText.length,
+      textType: typeof processableText 
+    });
     
     const taskId = `${fileId}-${Date.now()}`;
     
     return new Promise((resolve, reject) => {
-      this.workerTasks.set(taskId, { resolve, reject });
+      this.workerTasks.set(taskId, { 
+        resolve: async (stats) => {
+          try {
+            // Save the stats before resolving
+            await this.saveTextStats(fileId, stats);
+            resolve(stats);
+          } catch (error) {
+            console.error('Error saving text stats:', error);
+            reject(error);
+          }
+        }, 
+        reject 
+      });
       
       textStatsWorker.postMessage({
         taskId,
-        text,
+        text: processableText,
         fileId
       });
     });

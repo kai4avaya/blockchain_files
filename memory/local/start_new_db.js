@@ -5,9 +5,13 @@ import { clearAllScenes, reconstructFromGraphData } from '../../ui/graph_v2/crea
 import { p2pSync } from '../../network/peer2peer_simple';
 import { initiate } from '../vectorDB/vectorDbGateway';
 import { refreshFileTree } from '../../memory/fileHandler.js';
+import { sceneState } from '../collaboration/scene_colab';
 
 export async function createAndInitializeNewDatabaseInstance(customName = null) {
     try {
+        // Clear SceneState first
+        sceneState.clearState();
+        
         // Step 1: Clear all scenes first
         clearAllScenes();
         
@@ -124,6 +128,9 @@ export async function createAndInitializeNewDatabaseInstance(customName = null) 
 export async function openDatabase(dbName) {
     try {
         console.log(`Opening database: ${dbName}`);
+        
+        // Clear SceneState first
+        sceneState.clearState();
         
         // Clear file metadata
         window.fileMetadata = new Map();

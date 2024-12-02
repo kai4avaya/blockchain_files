@@ -1,9 +1,18 @@
 self.onmessage = async function(e) {
   const { taskId, text, fileId } = e.data;
   
-  console.log('Text stats worker received:', { fileId, textLength: text.length });
+  console.log('Text stats worker received:', { 
+    fileId, 
+    textLength: text?.length,
+    textType: typeof text 
+  });
   
   try {
+    // Ensure we have a string to work with
+    if (typeof text !== 'string') {
+      throw new Error(`Expected string but got ${typeof text}`);
+    }
+
     const stats = {
       fileId,
       lastUpdated: Date.now(),
@@ -24,10 +33,13 @@ self.onmessage = async function(e) {
 };
 
 function analyzeParagraphs(text) {
+  if (typeof text !== 'string') {
+    throw new Error('analyzeParagraphs requires string input');
+  }
   const paragraphs = text.split(/\n\s*\n/);
   return {
     distribution: paragraphs.map(p => p.length),
-    average: paragraphs.reduce((acc, p) => acc + p.length, 0) / paragraphs.length,
+    average: paragraphs.reduce((acc, p) => acc + p.length, 0) / paragraphs.length || 0,
     count: paragraphs.length
   };
 }

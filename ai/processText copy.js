@@ -1,9 +1,5 @@
 
-const pdfjsLib = await import('pdfjs-dist/build/pdf');
-const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
+// processText.js
 class TextProcessorWorker {
     constructor() {
         if (!TextProcessorWorker.instance) {
@@ -45,37 +41,13 @@ class TextProcessorWorker {
         return TextProcessorWorker.instance;
     }
 
-    async processText(content, fileType, fileId) {
-        try {
-            // Handle PDF extraction in the main thread
-            if (fileType === 'application/pdf') {
-                const pdf = await pdfjsLib.getDocument({ data: content }).promise;
-                let text = '';
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const content = await page.getTextContent();
-                    text += content.items.map(item => item.str).join(' ') + ' ';
-                }
-                content = text;
+    processText(content, fileType, fileId) {
+        return new Promise((resolve, reject) => {
+            this.taskQueue.push({ content, fileType, fileId, resolve, reject });
+            if (!this.isProcessing) {
+                this.processNextTask();
             }
-
-            // Send the extracted text to worker for further processing
-            return new Promise((resolve, reject) => {
-                this.taskQueue.push({ 
-                    content, 
-                    fileType: 'text/plain', // Always send as text now
-                    fileId, 
-                    resolve, 
-                    reject 
-                });
-                if (!this.isProcessing) {
-                    this.processNextTask();
-                }
-            });
-        } catch (error) {
-            console.error('Error processing content:', error);
-            throw error;
-        }
+        });
     }
 
     processNextTask() {

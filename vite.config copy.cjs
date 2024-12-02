@@ -18,27 +18,31 @@ export default defineConfig({
       'compromise',
       'umap-js',
       'density-clustering',
-      '@xenova/transformers',
-      'pdfjs-dist/build/pdf'
+      '@xenova/transformers'
     ]
   },
   build: {
     target: 'esnext',
-    minify: false
-  },
-  worker: {
-    format: 'es',
-    plugins: () => [wasm()],
+    minify: false,
+    commonjsOptions: {
+      include: [/node_modules/]
+    },
     rollupOptions: {
       output: {
-        inlineDynamicImports: true
+        format: 'es'
       }
     }
   },
+  worker: {
+    format: 'es'
+  },
   server: {
     headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin'
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp'
     }
+  },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV)
   }
 });
