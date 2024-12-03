@@ -44,7 +44,6 @@ const bloomLayer = new THREE.Layers();
 bloomLayer.set(BLOOM_SCENE);
 const SCALEFACTOR = 0.05;
 let isCubeRender = false;
-let renderer = null;
 export const scene = new THREE.Scene();
 export const nonBloomScene = new THREE.Scene();
 
@@ -68,165 +67,27 @@ const nonBloomRT = new THREE.WebGLRenderTarget(
 const darkMaterial = new THREE.MeshBasicMaterial({ color: "black" });
 const materials = {};
 
-// Add this function near the top of the file
-let isUsingFallbackRenderer = false;
-let currentRenderer = null;
 
-function createRenderer() {
-    // Try creating renderer with different configurations
-    const rendererConfigs = [
-        // Config 1: Optimal settings
-        {
-            antialias: true,
-            powerPreference: "high-performance",
-            failIfMajorPerformanceCaveat: false,
-            alpha: true,
-            stencil: false
-        },
-        // Config 2: Performance settings
-        {
-            antialias: false,
-            powerPreference: "default",
-            failIfMajorPerformanceCaveat: false,
-            alpha: true,
-            stencil: false
-        },
-        // Config 3: Compatibility settings
-        {
-            antialias: false,
-            powerPreference: "low-power",
-            failIfMajorPerformanceCaveat: false,
-            alpha: true,
-            precision: "lowp"
-        }
-    ];
-
-    let error = null;
-
-    // Try each config until one works
-    for (const config of rendererConfigs) {
-        try {
-            renderer = new THREE.WebGLRenderer(config);
-            console.log('Created renderer with config:', config);
-            break;
-        } catch (e) {
-            error = e;
-            console.warn('Failed to create renderer with config:', config, e);
-            continue;
-        }
-    }
-
-    // If all WebGL attempts failed, try CSS3D
-    if (!renderer) {
-        console.warn('All WebGL renderer attempts failed, falling back to CSS3D');
-        try {
-            renderer = new THREE.CSS3DRenderer();
-            isUsingFallbackRenderer = true;
-            showCompatibilityMessage();
-        } catch (e) {
-            console.error('CSS3D fallback also failed:', e);
-            throw error || e; // Throw the original error if CSS3D also fails
-        }
-    }
-
-    // Configure renderer
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    
-    if (!isUsingFallbackRenderer) {
-        renderer.toneMapping = THREE.ReinhardToneMapping;
-    }
-
-    // Add context loss handling
-    renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
-    renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored, false);
-
-    currentRenderer = renderer;
-    return renderer;
-}
-
-renderer = createRenderer();
-
-function handleContextLost(event) {
+const renderer = new THREE.WebGLRenderer({
+  antialias: false,
+  powerPreference: "high-performance",
+  failIfMajorPerformanceCaveat: false,
+  preserveDrawingBuffer: true,
+  alpha: true, // Add this line
+});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ReinhardToneMapping;
+renderer.domElement.addEventListener(
+  "webglcontextlost",
+  (event) => {
     event.preventDefault();
-    console.warn('WebGL context lost, attempting to restore...');
-    
     setTimeout(() => {
-        try {
-            if (currentRenderer.forceContextRestore) {
-                currentRenderer.forceContextRestore();
-            } else {
-                // Recreate renderer if restore not available
-                const newRenderer = createRenderer();
-                Object.assign(currentRenderer, newRenderer);
-            }
-            markNeedsRender('full');
-        } catch (e) {
-            console.error('Failed to restore context:', e);
-            showCompatibilityMessage();
-        }
+      renderer.forceContextRestore();
     }, 1000);
-}
-
-function handleContextRestored() {
-    console.log('Context restored');
-    markNeedsRender('full');
-}
-
-function showCompatibilityMessage() {
-    const message = document.createElement('div');
-    message.style.cssText = `
-        position: fixed;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(255, 165, 0, 0.9);
-        padding: 10px;
-        border-radius: 5px;
-        z-index: 1000;
-        font-family: sans-serif;
-        text-align: center;
-        max-width: 80%;
-    `;
-    message.innerHTML = `
-        <p style="margin: 0; color: black;">
-            ⚠️ Running in compatibility mode. For best experience:
-            <br>
-            1. Enable hardware acceleration in your browser settings
-            <br>
-            2. Update your graphics drivers
-            <br>
-            3. Try using Firefox or another modern browser
-        </p>
-    `;
-    document.body.appendChild(message);
-}
-
-// Modify the render function to handle fallbacks gracefully
-// const originalRender = render_cull;
-// export function render_cull() {
-//     try {
-//         if (isUsingFallbackRenderer) {
-//             renderer.render(scene, camera);
-//             labelRenderer.render(scene, camera);
-//             return;
-//         }
-//         originalRender();
-//     } catch (e) {
-//         console.error('Render error:', e);
-//         if (!isUsingFallbackRenderer) {
-//             console.warn('Attempting to switch to fallback renderer...');
-//             try {
-//                 const newRenderer = createRenderer();
-//                 Object.assign(renderer, newRenderer);
-//                 markNeedsRender('full');
-//             } catch (fallbackError) {
-//                 console.error('Failed to create fallback renderer:', fallbackError);
-//             }
-//         }
-//     }
-// }
-
+  },
+  false
+);
 document.body.appendChild(renderer.domElement);
 
 const camera = new THREE.PerspectiveCamera(
@@ -805,177 +666,77 @@ finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom sce
 finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
 
 // kai render
-// export function render_cull() {
-
-//   projScreenMatrix
-//     .copy(camera.projectionMatrix)
-//     .multiply(camera.matrixWorldInverse);
-//   frustum.setFromProjectionMatrix(projScreenMatrix);
-
-//   scene.traverse((object) => {
-//     if (object.isMesh) {
-//       let isVisible;
-
-//       if (object.geometry && object.geometry.boundingSphere) {
-//         // Update the object's bounding sphere
-//         if (!object.boundingSphere) {
-//           object.boundingSphere = new THREE.Sphere();
-//         }
-//         object.boundingSphere
-//           .copy(object.geometry.boundingSphere)
-//           .applyMatrix4(object.matrixWorld);
-
-//         // Add a small buffer to the bounding sphere radius
-//         const bufferFactor = 1.1; // Adjust this value as needed
-//         const bufferedRadius = object.boundingSphere.radius * bufferFactor;
-
-//         isVisible = frustum.intersectsSphere(
-//           new THREE.Sphere(object.boundingSphere.center, bufferedRadius)
-//         );
-//       } else {
-//         // For large objects like cubes, use a more lenient culling method
-//         isVisible =
-//           frustum.intersectsObject(object) ||
-//           object.position.distanceTo(camera.position) <
-//             (object.geometry.boundingSphere?.radius || 100);
-//       }
-
-//       object.visible = isVisible;
-
-//       if (isVisible && !object.layers.test(bloomLayer)) {
-//         darkenNonBloomed(object);
-//       }
-//     }
-//   });
-
-//   bloomComposer.render();
-//   scene.traverse(restoreMaterial);
-
-//   nonBloomScene.traverse((object) => {
-//     if (object.isMesh) {
-//       if (object.geometry && object.geometry.boundingSphere) {
-//         // Update the object's bounding sphere
-//         if (!object.boundingSphere) {
-//           object.boundingSphere = new THREE.Sphere();
-//         }
-//         object.boundingSphere
-//           .copy(object.geometry.boundingSphere)
-//           .applyMatrix4(object.matrixWorld);
-
-//         object.visible = frustum.intersectsSphere(object.boundingSphere);
-//       } else {
-//         // Fallback to using intersectsObject if boundingSphere is not available
-//         object.visible = frustum.intersectsObject(object);
-//       }
-//     }
-//   });
-
-//   renderer.setRenderTarget(nonBloomRT);
-//   renderer.clear();
-//   renderer.render(nonBloomScene, camera);
-//   labelRenderer.render(scene, camera);
-
-//   finalComposer.render();
-// }
-
-
-// First, store the original render_cull function implementation
-// const originalRenderCull = render_cull;
-
-// Then redefine render_cull with fallback handling while preserving original functionality
 export function render_cull() {
-    try {
-        if (isUsingFallbackRenderer) {
-            // Simple rendering path for fallback mode
-            renderer.render(scene, camera);
-            labelRenderer.render(scene, camera);
-            return;
+
+  projScreenMatrix
+    .copy(camera.projectionMatrix)
+    .multiply(camera.matrixWorldInverse);
+  frustum.setFromProjectionMatrix(projScreenMatrix);
+
+  scene.traverse((object) => {
+    if (object.isMesh) {
+      let isVisible;
+
+      if (object.geometry && object.geometry.boundingSphere) {
+        // Update the object's bounding sphere
+        if (!object.boundingSphere) {
+          object.boundingSphere = new THREE.Sphere();
         }
+        object.boundingSphere
+          .copy(object.geometry.boundingSphere)
+          .applyMatrix4(object.matrixWorld);
 
-        // Call the original render_cull implementation
-        projScreenMatrix
-            .copy(camera.projectionMatrix)
-            .multiply(camera.matrixWorldInverse);
-        frustum.setFromProjectionMatrix(projScreenMatrix);
+        // Add a small buffer to the bounding sphere radius
+        const bufferFactor = 1.1; // Adjust this value as needed
+        const bufferedRadius = object.boundingSphere.radius * bufferFactor;
 
-        scene.traverse((object) => {
-            if (object.isMesh) {
-                let isVisible;
+        isVisible = frustum.intersectsSphere(
+          new THREE.Sphere(object.boundingSphere.center, bufferedRadius)
+        );
+      } else {
+        // For large objects like cubes, use a more lenient culling method
+        isVisible =
+          frustum.intersectsObject(object) ||
+          object.position.distanceTo(camera.position) <
+            (object.geometry.boundingSphere?.radius || 100);
+      }
 
-                if (object.geometry && object.geometry.boundingSphere) {
-                    // Update the object's bounding sphere
-                    if (!object.boundingSphere) {
-                        object.boundingSphere = new THREE.Sphere();
-                    }
-                    object.boundingSphere
-                        .copy(object.geometry.boundingSphere)
-                        .applyMatrix4(object.matrixWorld);
+      object.visible = isVisible;
 
-                    // Add a small buffer to the bounding sphere radius
-                    const bufferFactor = 1.1; // Adjust this value as needed
-                    const bufferedRadius = object.boundingSphere.radius * bufferFactor;
-
-                    isVisible = frustum.intersectsSphere(
-                        new THREE.Sphere(object.boundingSphere.center, bufferedRadius)
-                    );
-                } else {
-                    // For large objects like cubes, use a more lenient culling method
-                    isVisible =
-                        frustum.intersectsObject(object) ||
-                        object.position.distanceTo(camera.position) <
-                        (object.geometry.boundingSphere?.radius || 100);
-                }
-
-                object.visible = isVisible;
-
-                if (isVisible && !object.layers.test(bloomLayer)) {
-                    darkenNonBloomed(object);
-                }
-            }
-        });
-
-        bloomComposer.render();
-        scene.traverse(restoreMaterial);
-
-        nonBloomScene.traverse((object) => {
-            if (object.isMesh) {
-                if (object.geometry && object.geometry.boundingSphere) {
-                    // Update the object's bounding sphere
-                    if (!object.boundingSphere) {
-                        object.boundingSphere = new THREE.Sphere();
-                    }
-                    object.boundingSphere
-                        .copy(object.geometry.boundingSphere)
-                        .applyMatrix4(object.matrixWorld);
-
-                    object.visible = frustum.intersectsSphere(object.boundingSphere);
-                } else {
-                    // Fallback to using intersectsObject if boundingSphere is not available
-                    object.visible = frustum.intersectsObject(object);
-                }
-            }
-        });
-
-        renderer.setRenderTarget(nonBloomRT);
-        renderer.clear();
-        renderer.render(nonBloomScene, camera);
-        labelRenderer.render(scene, camera);
-
-        finalComposer.render();
-
-    } catch (e) {
-        console.error('Render error:', e);
-        if (!isUsingFallbackRenderer) {
-            console.warn('Attempting to switch to fallback renderer...');
-            try {
-                const newRenderer = createRenderer();
-                Object.assign(renderer, newRenderer);
-                markNeedsRender('full');
-            } catch (fallbackError) {
-                console.error('Failed to create fallback renderer:', fallbackError);
-            }
-        }
+      if (isVisible && !object.layers.test(bloomLayer)) {
+        darkenNonBloomed(object);
+      }
     }
+  });
+
+  bloomComposer.render();
+  scene.traverse(restoreMaterial);
+
+  nonBloomScene.traverse((object) => {
+    if (object.isMesh) {
+      if (object.geometry && object.geometry.boundingSphere) {
+        // Update the object's bounding sphere
+        if (!object.boundingSphere) {
+          object.boundingSphere = new THREE.Sphere();
+        }
+        object.boundingSphere
+          .copy(object.geometry.boundingSphere)
+          .applyMatrix4(object.matrixWorld);
+
+        object.visible = frustum.intersectsSphere(object.boundingSphere);
+      } else {
+        // Fallback to using intersectsObject if boundingSphere is not available
+        object.visible = frustum.intersectsObject(object);
+      }
+    }
+  });
+
+  renderer.setRenderTarget(nonBloomRT);
+  renderer.clear();
+  renderer.render(nonBloomScene, camera);
+  labelRenderer.render(scene, camera);
+
+  finalComposer.render();
 }
 
 

@@ -10,10 +10,7 @@ export default defineConfig({
   },
   plugins: [
     wasm(),
-    topLevelAwait({
-      promiseExportName: '__tla',
-      promiseImportName: i => `__tla_${i}`
-    })
+    topLevelAwait()
   ],
   optimizeDeps: {
     include: [
@@ -23,8 +20,7 @@ export default defineConfig({
       'density-clustering',
       '@xenova/transformers',
       'pdfjs-dist/build/pdf'
-    ],
-    exclude: ['@xenova/transformers']
+    ]
   },
   build: {
     target: 'esnext',
@@ -33,18 +29,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'vendor': [
-            'three',
-            'onnxruntime-web',
-            '@xenova/transformers'
-          ],
-          'codemirror': [
-            '@codemirror/commands',
-            '@codemirror/lang-markdown',
-            '@codemirror/language',
-            '@codemirror/state',
-            '@codemirror/view'
-          ]
+          three: ['three'],
         }
       }
     }
@@ -62,7 +47,9 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin'
+    },
+    hmr: {
+      overlay: false
     }
-  },
-  base: '/'
+  }
 });
