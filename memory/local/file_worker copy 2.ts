@@ -5,14 +5,16 @@ import { generateVersionNonce } from "../../utils/utils";
 import { p2pSync } from "../../network/peer2peer_simple";
 import { generateGlobalTimestamp, incrementVersion } from "../../utils/utils";
 import in_memory_store from "./in_memory";
+let reconstructFromGraphData: (() => Promise<void>) | null = null;
 
-interface VectorConfig {
-  dimensions: number;
-  hyperplanes: number;
-  numPlanes: number;
-  vectorPath: string;
-  hashIndexSuffix: string;
-}
+
+// interface VectorConfig {
+//   dimensions: number;
+//   hyperplanes: number;
+//   numPlanes: number;
+//   vectorPath: string;
+//   hashIndexSuffix: string;
+// }
 
 interface StoreConfig {
   keyPath?: string;
@@ -642,6 +644,8 @@ class IndexDBWorkerOverlay {
       console.error('Error updating dbSummaries:', error);
     }
   }
+
+  
  
   async saveData(storeName: string, data: any, key?: string): Promise<void> {
     try {
@@ -661,8 +665,6 @@ class IndexDBWorkerOverlay {
       if (!data.versionNonce) {
         data.versionNonce = generateVersionNonce();
       }
-
-   
 
 
       // Ensure lastEditedBy is set
@@ -704,6 +706,15 @@ class IndexDBWorkerOverlay {
       if (storeName === 'files') {
         await this.updateDbSummary(config.dbName, data, data?.isDeleted || false);
       }
+
+      if (storeName === 'graph' && data?.isFromPeer && !reconstructFromGraphData) {
+        // @ts-ignore
+        const module = await import('../../ui/graph_v2/create.js');
+        reconstructFromGraphData = module.reconstructFromGraphData;
+    }
+    if (storeName === 'graph' && data?.isFromPeer && reconstructFromGraphData) {
+      await reconstructFromGraphData();
+  }
 
 
       // Existing sync logic for broadcasting changes

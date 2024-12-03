@@ -57,39 +57,6 @@ async function openDB(storeConfigs, version = undefined, preserveExistingStores 
 }
 
 
-// async function initializeDB(storeConfigs) {
-//   try {
-//     // Ensure storeConfigs is present and valid
-//     if (!storeConfigs || !Array.isArray(storeConfigs)) {
-//       throw new Error('Store configs must be an array');
-//     }
-
-//     // Ensure the database is open
-//     if (!dbs[DEFAULT_DB_NAME]) {
-//       await openDB(storeConfigs); // Open without version
-//     }
-
-//     const db = dbs[DEFAULT_DB_NAME];
-    
-//     // Check for missing stores
-//     const missingStores = storeConfigs.filter(
-//       ({ storeName }) => !db.objectStoreNames.contains(storeName)
-//     );
-
-//     if (missingStores.length > 0) {
-//       const newVersion = db.version + 1;
-//       db.close();
-//       delete dbs[DEFAULT_DB_NAME];
-//       await openDB(storeConfigs, newVersion); // Trigger onupgradeneeded
-//     }
-
-//     return "Database initialized successfully";
-//   } catch (error) {
-//     console.error("Error initializing database:", error);
-//     throw error;
-//   }
-// }
-
 async function initializeDB(storeConfigs, preserveExistingStores = true) {
   try {
     if (!storeConfigs || !Array.isArray(storeConfigs)) {

@@ -1,7 +1,7 @@
 // ai\summary.js
 
 const summaryWorker = new Worker(new URL('../workers/summary_worker.js', import.meta.url), { type: 'module' });
-const dbWorker = new Worker('../workers/memory_worker.js');
+const dbWorker = new Worker(new URL('../workers/memory_worker.js', import.meta.url), { type: 'module' });
 
 export function summarizeText(text_to_summarize, fileId, fileName) {
     return new Promise((resolve, reject) => {

@@ -8,13 +8,13 @@ import in_memory_store from "./in_memory";
 let reconstructFromGraphData: (() => Promise<void>) | null = null;
 
 
-interface VectorConfig {
-  dimensions: number;
-  hyperplanes: number;
-  numPlanes: number;
-  vectorPath: string;
-  hashIndexSuffix: string;
-}
+// interface VectorConfig {
+//   dimensions: number;
+//   hyperplanes: number;
+//   numPlanes: number;
+//   vectorPath: string;
+//   hashIndexSuffix: string;
+// }
 
 interface StoreConfig {
   keyPath?: string;
@@ -60,10 +60,11 @@ class IndexDBWorkerOverlay {
 
   constructor() {
     this.worker = new Worker(
-      new URL("../../workers/memory_worker.js", import.meta.url)
+      new URL("../../workers/memory_worker.js", import.meta.url),
+      { type: "module" }
     );
     this.worker.onmessage = this.handleWorkerMessage.bind(this);
-    this.isInitialized = false; // Add a flag to track initialization
+    this.isInitialized = false;
   }
 
   public setIsInitialized(value: boolean) {
