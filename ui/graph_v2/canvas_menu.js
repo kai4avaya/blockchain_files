@@ -85,23 +85,23 @@ function showURLInput(x, y, intersectPoint) {
   
   const input = document.createElement('input');
   input.className = 'url-input';
-  input.placeholder = 'Enter URL...';
+  input.placeholder = 'example.com';
   
   const buttonWrapper = document.createElement('div');
   buttonWrapper.style.display = 'flex';
   buttonWrapper.style.gap = '8px';
   
   const sendButton = document.createElement('button');
-  sendButton.className = 'url-button';
-  sendButton.textContent = 'Send';
-  
-  const backButton = document.createElement('button');
-  backButton.className = 'url-button';
-  backButton.textContent = 'Back';
+  sendButton.className = 'url-button modal-button';
+  sendButton.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+    </svg>
+    Scrape
+  `;
   
   inputWrapper.appendChild(input);
   buttonWrapper.appendChild(sendButton);
-  buttonWrapper.appendChild(backButton);
   container.appendChild(inputWrapper);
   container.appendChild(buttonWrapper);
   
@@ -137,48 +137,64 @@ function showURLInput(x, y, intersectPoint) {
   }
   
   sendButton.onclick = async () => {
-    console.log('Send button clicked');
     if (isFetching) {
-      console.log('Already fetching, ignoring click');
+      console.log('Cancel button clicked');
+      abortController.abort();
+      abortController = new AbortController();
+      isFetching = false;
+      sendButton.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+        </svg>
+        Scrape
+      `;
+      sendButton.disabled = false;
       return;
     }
-    
+
     const url = input.value;
     if (!url) {
       console.log('No URL provided');
       return;
     }
-    
+
     const originalText = sendButton.textContent;
     console.log('Starting fetch process');
-    
+
     try {
       isFetching = true;
-      
-      // Show spinner
-      sendButton.innerHTML = '<div class="button-spinner"></div>';
-      sendButton.disabled = true;
-      
+
+      // Show spinner and change button to "Cancel"
+      sendButton.innerHTML = '<div class="button-spinner"></div> Cancel';
+      sendButton.disabled = false;
+
       const formattedUrl = formatURL(url);
       const endpoint = NODE_ENV === 'development' ? LOCAL_SCRAPER_ENDPOINT : SCRAPER_ENDPOINT;
-      
-      // Fix URL construction by adding a separator
+
       const fetchUrl = `${endpoint}${endpoint.includes('?') ? '&' : '?'}url=${encodeURIComponent(formattedUrl)}`;
       console.log('Fetching from:', fetchUrl);
-      
+
       const response = await fetch(fetchUrl, {
         signal: abortController.signal
       });
-      
+
       console.log('Received response:', response.status);
       const text = await response.text();
       console.log('Received text length:', text.length);
-      
-      // Create synthetic event only if we haven't aborted
+
       if (!abortController.signal.aborted) {
+        // Extract hostname or use timestamp
+        let fileName;
+        try {
+          const urlObj = new URL(formattedUrl);
+          fileName = urlObj.hostname || `website_${Date.now()}`;
+        } catch (e) {
+          fileName = `website_${Date.now()}`;
+        }
+
         const file = new File(
           [text],
-          `${formattedUrl.split('/').pop() || 'webpage'}.md`,
+          `${fileName}.md`,
           { 
             type: 'text/markdown',
             lastModified: Date.now()
@@ -237,16 +253,6 @@ function showURLInput(x, y, intersectPoint) {
         sendButton.disabled = false;
       }
     }
-  };
-  
-  backButton.onclick = () => {
-    console.log('Back button clicked');
-    if (isFetching) {
-      console.log('Aborting fetch');
-      abortController.abort();
-      abortController = new AbortController();
-    }
-    showContextMenu(x, y, intersectPoint);
   };
 }
 
@@ -414,10 +420,8 @@ style.textContent = `
     padding: 8px 16px;
     border: none;
     border-radius: 4px;
-    background-color: #007bff;
     color: white;
     cursor: pointer;
-    transition: background-color 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -425,18 +429,12 @@ style.textContent = `
     min-height: 35px;
   }
 
-  .url-button:hover:not(:disabled) {
-    background-color: #0056b3;
-  }
 
   .url-button:disabled {
     opacity: 0.7;
     cursor: not-allowed;
   }
 
-  .url-button:last-child {
-    background-color: #6c757d;
-  }
 
   .url-button:last-child:hover:not(:disabled) {
     background-color: #545b62;
@@ -458,3 +456,59 @@ style.textContent = `
 `;
 
 document.head.appendChild(style);
+
+// Add after other styles
+const additionalStyles = `
+  .modal-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background-color: white;
+    border-radius: 8px;
+    padding: 8px;
+    transition: all 0.2s ease;
+    border: none;
+    color: #3b82f6;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12px;
+    width: auto;
+    min-width: 80px;
+  }
+
+  .modal-button:hover {
+    background-color: #e2e8f0;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .modal-button .small-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .modal-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background-color: #f0f0f0;
+    color: #999;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .button-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+document.head.insertAdjacentHTML('beforeend', `<style>${additionalStyles}</style>`);

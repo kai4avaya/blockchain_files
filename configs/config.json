@@ -48,7 +48,7 @@
   "apiConfig": {
     "endpoints": {
       "development": "http://localhost:8787",
-      "production": "https://lumi.kak2594.workers.dev/"
+      "production": "https://lumi2.kak2594.workers.dev"
     },
     "timeout" : 20000,
     "max_input_tokens": 4000,
@@ -58,7 +58,7 @@
           "provider": "OPEN",
           "endpoint": "https://openrouter.ai/api/v1/chat/completions",
           "headers": {
-            "HTTP-Referer": "https://lumi.kak2594.workers.dev",
+            "HTTP-Referer": "https://lumi2.kak2594.workers.dev",
             "X-Title": "Lumi AI Assistant"
           },
           "parameters": {

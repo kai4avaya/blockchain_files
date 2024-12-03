@@ -81,7 +81,7 @@ class P2PSync {
       this.peer.removeAllListeners();
       this.peer.destroy();
       this.peer = null;
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // await new Promise(env => setTimeout(resolve, 100));
   }
 
   this.cleanupExistingPeerPills();

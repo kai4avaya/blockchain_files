@@ -92,12 +92,22 @@ function showURLInput(x, y, intersectPoint) {
   buttonWrapper.style.gap = '8px';
   
   const sendButton = document.createElement('button');
-  sendButton.className = 'url-button';
-  sendButton.textContent = 'Send';
+  sendButton.className = 'url-button modal-button';
+  sendButton.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+    </svg>
+    Scrape
+  `;
   
   const backButton = document.createElement('button');
-  backButton.className = 'url-button';
-  backButton.textContent = 'Back';
+  backButton.className = 'url-button modal-button';
+  backButton.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+    </svg>
+    Cancel Scrape
+  `;
   
   inputWrapper.appendChild(input);
   buttonWrapper.appendChild(sendButton);
@@ -293,7 +303,14 @@ export function showContextMenu(x, y, intersectPoint) {
       const files = Array.from(e.target.files || []);
       
       for (const file of files) {
-        // Create synthetic event for each file
+        // Read file content
+        const content = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsText(file);
+        });
+
+        // Create synthetic event with file content
         const dt = new DataTransfer();
         dt.items.add(file);
 
@@ -316,13 +333,14 @@ export function showContextMenu(x, y, intersectPoint) {
             data: {
               id: generateUniqueId(),
               name: file.name,
-              type: 'file'
+              type: 'file',
+              content: content
             }
           },
           intersectPoint: currentIntersectPoint
         };
 
-        // Dispatch tabDrop event for each file
+        // Dispatch tabDrop event
         const canvas = document.querySelector('canvas');
         canvas.dispatchEvent(new CustomEvent('tabDrop', { 
           bubbles: true,
@@ -406,10 +424,8 @@ style.textContent = `
     padding: 8px 16px;
     border: none;
     border-radius: 4px;
-    background-color: #007bff;
     color: white;
     cursor: pointer;
-    transition: background-color 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -417,18 +433,12 @@ style.textContent = `
     min-height: 35px;
   }
 
-  .url-button:hover:not(:disabled) {
-    background-color: #0056b3;
-  }
 
   .url-button:disabled {
     opacity: 0.7;
     cursor: not-allowed;
   }
 
-  .url-button:last-child {
-    background-color: #6c757d;
-  }
 
   .url-button:last-child:hover:not(:disabled) {
     background-color: #545b62;
@@ -450,3 +460,59 @@ style.textContent = `
 `;
 
 document.head.appendChild(style);
+
+// Add after other styles
+const additionalStyles = `
+  .modal-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background-color: white;
+    border-radius: 8px;
+    padding: 8px;
+    transition: all 0.2s ease;
+    border: none;
+    color: #3b82f6;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12px;
+    width: auto;
+    min-width: 80px;
+  }
+
+  .modal-button:hover {
+    background-color: #e2e8f0;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .modal-button .small-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .modal-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background-color: #f0f0f0;
+    color: #999;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .button-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+document.head.insertAdjacentHTML('beforeend', `<style>${additionalStyles}</style>`);
