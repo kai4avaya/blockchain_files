@@ -3070,3 +3070,30 @@ mark {
 .switch-checkbox:checked ~ .switch-icon {
     color: #4CAF50;
 } */
+
+ /* REMOVE CLICK FROM UI LAYER */ 
+
+ /* Add these styles to your CSS */
+#ui-layer {
+  pointer-events: none !important; /* Make entire UI layer pass through events by default */
+}
+
+/* Only enable pointer events for specific interactive elements */
+#ui-layer .modal,
+#ui-layer .sidebar,
+#ui-layer .context-menu,
+#ui-layer .url-input-container,
+#ui-layer .slideout,
+#ui-layer .modal-button,
+#ui-layer button,
+#ui-layer input,
+#ui-layer select,
+#ui-layer .drop-indicator {
+  pointer-events: auto;
+}
+
+/* Ensure modals don't block when hidden */
+#ui-layer .modal:not(.visible),
+#ui-layer .slideout:not(.active) {
+  pointer-events: none;
+}

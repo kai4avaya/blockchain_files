@@ -25,6 +25,7 @@ document.addEventListener('mousedown', (event) => {
     
     // Prevent closing if it's a double click that created the menu
     if (event.detail === 2) {
+      console.log('Double click detected in mousedown');
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -33,6 +34,21 @@ document.addEventListener('mousedown', (event) => {
     hideContextMenu();
   }
 });
+
+document.querySelector('canvas')?.addEventListener('dblclick', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  console.log('2nd dblclick event triggered:', {
+    clientX: event.clientX,
+    clientY: event.clientY,
+    hasIntersectPoint: !!currentIntersectPoint
+  });
+  // Store the intersection point if needed
+  if (currentIntersectPoint) {
+    showContextMenu(event.clientX, event.clientY, currentIntersectPoint);
+  }
+}, { passive: false });
 
 // Add ESC key handler
 document.addEventListener('keydown', (event) => {

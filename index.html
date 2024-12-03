@@ -826,6 +826,7 @@
           // Close other modals/slideouts
           hidePeerModal();
           hideHomeModal();
+          hideSearchModal();
           leftSlideout.classList.remove('active');
           chatSlideout.classList.remove('active');
         });
@@ -1069,6 +1070,13 @@
           document.removeEventListener('mousemove', handleMove);
           document.removeEventListener('mouseup', handleUp);
         }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeAllModals();
+  }
+});
+        
       </script>
 
 
