@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
-import topLevelAwait from 'vite-plugin-top-level-await';
 
 export default defineConfig({
   resolve: {
@@ -9,13 +8,7 @@ export default defineConfig({
     }
   },
   plugins: [
-    wasm(),
-    topLevelAwait({
-      promiseExportName: '__tla',
-      promiseImportName: i => `__tla_${i}`,
-      swc: false,
-      babel: true
-    })
+    wasm()
   ],
   optimizeDeps: {
     include: [
@@ -30,7 +23,7 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    minify: false,
+    minify: 'esbuild',
     sourcemap: true,
     rollupOptions: {
       output: {
@@ -47,7 +40,9 @@ export default defineConfig({
             '@codemirror/state',
             '@codemirror/view'
           ]
-        }
+        },
+        preserveModules: true,
+        preserveModulesRoot: 'src'
       }
     }
   },
