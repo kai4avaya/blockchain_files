@@ -24,7 +24,14 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    minify: false
+    minify: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'worker': ['./memory/local/file_worker.ts']
+        }
+      }
+    }
   },
   worker: {
     format: 'es',
