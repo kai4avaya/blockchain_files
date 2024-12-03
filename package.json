@@ -62,7 +62,6 @@
     "vite-plugin-markdown": "^2.2.0",
     "vite-plugin-singlefile": "^2.0.2",
     "vite-plugin-static-copy": "^1.0.6",
-    "vite-plugin-top-level-await": "^1.4.4",
     "vite-plugin-wasm": "^3.3.0"
   },
   "resolutions": {
