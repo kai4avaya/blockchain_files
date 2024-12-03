@@ -10,7 +10,10 @@ export default defineConfig({
   },
   plugins: [
     wasm(),
-    topLevelAwait()
+    topLevelAwait({
+      promiseExportName: '__tla',
+      promiseImportName: i => `__tla_${i}`
+    })
   ],
   optimizeDeps: {
     include: [
