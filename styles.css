@@ -3015,7 +3015,7 @@ mark {
 } */
 
 /* Switch Toggle Styles */
-.switch-container {
+/* .switch-container {
     display: flex;
     align-items: center;
     margin-left: 8px;
@@ -3069,4 +3069,4 @@ mark {
 
 .switch-checkbox:checked ~ .switch-icon {
     color: #4CAF50;
-}
+} */
