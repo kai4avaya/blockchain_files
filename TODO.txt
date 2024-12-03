@@ -8,9 +8,10 @@ reorganize 3d space by smilar articles using embeddings matches
 ---
 
 2) image upload llm
-6) when we set a new peer we need to ensure we are no longer sharing with other peers (add a function to do this on new peer creation)
-3) file system fileSystemHandle... save grant permissions in indexdb
-4) when i download the file it does not seem to work
+3) peers get created with new double
+4) cluster issue camera?
+
+
 ****
 embedding pool workers
 enter your name for record keeping

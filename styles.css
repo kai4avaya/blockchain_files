@@ -1238,7 +1238,7 @@ vertical-align: middle;
 
 /* Optional: Add dots pattern for better visibility */
 .resize-handle::after {
-  content: '⋮';
+  content: ':';
   position: absolute;
   left: 50%;
   top: 50%;
