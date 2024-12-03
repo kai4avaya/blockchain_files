@@ -6,9 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "vite",
-    "build": "npm run clean && vite build",
+    "build": "npm run clean && vite build && npm run copy-workers",
     "preview": "vite preview",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "copy-workers": "cp -r workers dist/"
   },
   "keywords": [],
   "author": "",

@@ -42,6 +42,15 @@ export default defineConfig({
           ]
         }
       }
+    },
+    worker: {
+      format: 'es',
+      plugins: () => [wasm()],
+      rollupOptions: {
+        output: {
+          inlineDynamicImports: true
+        }
+      }
     }
   },
   worker: {
@@ -50,6 +59,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         inlineDynamicImports: true
+      }
+    }
+  },
+  experimental: {
+    renderBuiltUrl(filename, { hostType }) {
+      if (hostType === 'js' && filename.includes('worker')) {
+        return { runtime: `new URL('${filename}', import.meta.url).href` };
       }
     }
   },
