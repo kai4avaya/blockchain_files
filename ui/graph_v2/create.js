@@ -622,7 +622,7 @@ function setupScene() {
   window.addEventListener("resize", resizeCanvases);
   resizeCanvases(); // Initial resize
 
-  markNeedsRender('cubeRemoval');
+  markNeedsRender('immediate');
 }
 
 // Add an event listener to save camera state when the window is about to unload
@@ -1289,6 +1289,7 @@ function restoreMaterial(obj) {
   }
 }
 
+const updateMiniMap = createMiniMap(camera, scene, nonBloomScene, markNeedsRender, controls);
 
 
 export function markNeedsRender(type = "full") {
@@ -1778,5 +1779,5 @@ function cleanupResources() {
 }
 window.addEventListener("beforeunload", cleanupResources);
 
-const updateMiniMap = createMiniMap(camera, scene, nonBloomScene, markNeedsRender, controls);
+// const updateMiniMap = createMiniMap(camera, scene, nonBloomScene, markNeedsRender, controls);
 
