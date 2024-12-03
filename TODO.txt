@@ -8,11 +8,9 @@ reorganize 3d space by smilar articles using embeddings matches
 ---
 
 2) image upload llm
-3.5) data analytics
 6) when we set a new peer we need to ensure we are no longer sharing with other peers (add a function to do this on new peer creation)
-7) chunking needs to be smaller
-8) https://github.com/vasturiano/3d-force-graph
-9) buttefly https://github.com/teochewthunder/browserbutterfly?
+3) file system fileSystemHandle... save grant permissions in indexdb
+4) when i download the file it does not seem to work
 ****
 embedding pool workers
 enter your name for record keeping

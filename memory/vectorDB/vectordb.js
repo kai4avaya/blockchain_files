@@ -110,6 +110,7 @@ async insert(object) {
     const recordToSave = {
       id: vectorId,
       fileId: object.fileId,
+      position: object.position || 0,
       ...object
     };
     await indexDBOverlay.saveData(this.#objectStore, recordToSave);

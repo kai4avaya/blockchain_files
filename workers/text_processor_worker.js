@@ -22,7 +22,10 @@ function chunkText(text, chunkSize = CHUNK_SIZE) {
     const words = text.split(/\s+/);
     const chunks = [];
     for (let i = 0; i < words.length; i += chunkSize) {
-        chunks.push(words.slice(i, i + chunkSize).join(' '));
+        chunks.push({
+            text: words.slice(i, i + chunkSize).join(' '),
+            position: 0 // this is not used!
+        });
     }
     return chunks;
 }
@@ -34,7 +37,16 @@ async function processContent(content) {
         }
         const textWithoutStopWords = removeStopWords(content);
         const chunks = chunkText(textWithoutStopWords);
-        return { chunks, text: content }; // return both processed chunks and original text
+        
+        // Create two versions of chunks - one with position info and one without
+        const processedChunks = chunks.map(chunk => chunk.text); // For embedding worker
+        const positionedChunks = chunks; // For vector storage
+        
+        return { 
+            chunks: processedChunks,  // Compatible format for embedding worker
+            positionedChunks: positionedChunks, // New format with position info
+            text: content 
+        };
     } catch (error) {
         console.error("Error in processContent:", error);
         throw error;
@@ -47,7 +59,15 @@ self.onmessage = function(e) {
     if (type === 'processText') {
         processContent(data)
             .then(result => {
-                self.postMessage({ type: 'processedText', data: result, fileId });
+                self.postMessage({ 
+                    type: 'processedText', 
+                    data: {
+                        chunks: result.chunks, // For embedding worker
+                        positionedChunks: result.positionedChunks, // For vector storage
+                        text: result.text
+                    },
+                    fileId 
+                });
             })
             .catch(error => {
                 self.postMessage({ type: 'error', data: error.message, fileId });

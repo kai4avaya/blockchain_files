@@ -114,6 +114,7 @@ export async function quickStart(params, storeType = 'vectors', dbName = config.
           fileId: fileId,
           ...otherMetaData,
           text: chunks[i],
+          position: i
         });
 
         inMemoryRecord.push({

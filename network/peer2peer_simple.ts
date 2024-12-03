@@ -2,7 +2,7 @@
 
 import { Peer, DataConnection } from "peerjs";
 import MousePositionManager from "../memory/collaboration/mouse_colab";
-import { TabManager } from "../ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
+import { TabManager } from "../ui/components/codemirror_md_copy/codemirror-rich-markdoc/editor/extensions/tabManager";
 import leaderCoordinator from './elections';
 import dbSyncManager from './sync_db';
 import indexDBOverlay from '../memory/local/file_worker';

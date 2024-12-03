@@ -7,6 +7,7 @@ import { initiate } from '../vectorDB/vectorDbGateway';
 import { refreshFileTree } from '../../memory/fileHandler.js';
 import { sceneState } from '../collaboration/scene_colab';
 
+let tabManager = null;
 export async function createAndInitializeNewDatabaseInstance(customName = null) {
     try {
         // Clear SceneState first
@@ -14,6 +15,20 @@ export async function createAndInitializeNewDatabaseInstance(customName = null) 
         
         // Step 1: Clear all scenes first
         clearAllScenes();
+
+              // Dynamically import the TabManager getter only when needed
+              try {
+                if(!tabManager) {
+                  const { getTabManager } = await import('../../main.js');
+                   tabManager = getTabManager();
+                }
+                  if (tabManager) {
+                      await tabManager.saveCurrentTabState();
+                      await tabManager.clearAllTabs();
+                  }
+              } catch (error) {
+                  console.warn('TabManager not available:', error);
+              }
         
         // Clear file metadata - Initialize as Map instead of object
         window.fileMetadata = new Map();
@@ -73,6 +88,8 @@ export async function createAndInitializeNewDatabaseInstance(customName = null) 
             localStorage.setItem('databases', JSON.stringify(databases));
         }
 
+  
+
         refreshFileTree();
         console.log(`New database "${newDbName}" created and initialized successfully.`);
         return newDbName;
@@ -128,6 +145,19 @@ export async function createAndInitializeNewDatabaseInstance(customName = null) 
 export async function openDatabase(dbName) {
     try {
         console.log(`Opening database: ${dbName}`);
+
+        try {
+          if(!tabManager) {
+            const { getTabManager } = await import('../../main.js');
+             tabManager = getTabManager();
+          }
+            if (tabManager) {
+                await tabManager.saveCurrentTabState();
+                // await tabManager.clearAllTabs();
+            }
+        } catch (error) {
+            console.warn('TabManager not available:', error);
+        }
         
         // Clear SceneState first
         sceneState.clearState();
@@ -171,6 +201,15 @@ export async function openDatabase(dbName) {
         const graphData = await indexDBOverlay.getData("graph");
         if (graphData && graphData.length > 0) {
             await reconstructFromGraphData();
+        }
+
+        // NEW STEP: Restore saved tab state for this database
+        try {
+          if (tabManager) {
+            await tabManager.restoreSavedTabState(dbName);
+          }
+        } catch (error) {
+          console.warn('Error restoring tab state:', error);
         }
 
         refreshFileTree();

@@ -641,15 +641,52 @@ async function openFile(fileId) {
 // Function to download the file
 async function downloadFile(fileId) {
   try {
-    const file = await retrieveFile(fileId);
-    const url = URL.createObjectURL(file);
+    const fileSystem = getFileSystem();
+    const fileMetadata = await fileSystem.getItem(fileId, "file");
+    
+    // Check if it's a text file
+    if (fileMetadata.type === 'text/plain' || fileMetadata.type === 'text/markdown') {
+      // Get all vectors for this file
+      const vectors = await indexDBOverlay.getData('vectors');
+      console.log("vectors file", vectors);
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    a.click();
+      const fileVectors = vectors.filter(v => v.fileId === fileId);
 
-    URL.revokeObjectURL(url);
+      console.log("fileVectors file", fileVectors);
+      
+      // Combine all text content
+      let textContent = '';
+      if (fileVectors.length > 0) {
+        // Sort vectors by their position/order if available
+        fileVectors.sort((a, b) => (a.position || 0) - (b.position || 0));
+        textContent = fileVectors.map(v => v.text || '').join('\n');
+
+        console.log("textContent file", textContent);
+      }
+      console.log("textContent 2 file", textContent);
+
+      // Create a new blob with the combined text
+      const blob = new Blob([textContent], { type: fileMetadata.type });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileMetadata.name;
+      a.click();
+
+      URL.revokeObjectURL(url);
+    } else {
+      // Use existing flow for non-text files
+      const file = await retrieveFile(fileId);
+      const url = URL.createObjectURL(file);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      a.click();
+
+      URL.revokeObjectURL(url);
+    }
   } catch (error) {
     console.error('Error downloading file:', error);
   }

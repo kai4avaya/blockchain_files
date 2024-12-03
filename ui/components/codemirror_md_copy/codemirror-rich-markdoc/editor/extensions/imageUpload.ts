@@ -5,7 +5,7 @@ import { generateUniqueId } from "../../../../../../utils/utils"
 
 
 // Effect to handle image insertion
-const insertImageEffect = StateEffect.define<{
+export const insertImageEffect = StateEffect.define<{
   url: string,
   pos: number,
   id?: string
@@ -130,7 +130,7 @@ async function handleFilePath(filePath: string, view: EditorView) {
 }
 
 // Add this helper function to process image files
-async function processImageFile(file: File, view: EditorView) {
+export async function processImageFile(file: File, view: EditorView) {
   console.log('Processing image file:', file.name)
   
   const imageId = `img_${generateUniqueId(8)}`
@@ -349,7 +349,7 @@ const imageUploadStyle = EditorView.theme({
   },
   '.cm-image-widget': {
     display: 'inline-block',
-    maxWidth: '100%',
+    width: '100%',
     margin: '8px 0'
   }
 })

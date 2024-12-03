@@ -16,7 +16,7 @@ import { initiate } from "./memory/vectorDB/vectorDbGateway.js"; // Assuming you
 import { initiate_gui_controls } from "./ui/gui.listens.js";
 import indexDBOverlay from "./memory/local/file_worker";
 import { throttle, generateUniqueId } from "./utils/utils";
-import { TabManager } from "./ui/components/codemirror_md copy/codemirror-rich-markdoc/editor/extensions/tabManager";
+import { TabManager } from "./ui/components/codemirror_md_copy/codemirror-rich-markdoc/editor/extensions/tabManager";
 import { initializeWorker, updateFileTreeUI } from "./memory/fileHandler.js";
 import config from './configs/config.json';
 import { dbSyncManager } from "./memory/collaboration/dbState_sync"; // need this so it activates!
@@ -36,6 +36,20 @@ const userId = "kai";
 localStorage.setItem("login_block", userId);
 
 const p2pSync_instance = p2pSync;
+
+// Create a global instance holder
+let tabManagerInstance = null;
+
+// Function to initialize and get the TabManager instance
+export function getTabManager() {
+    if (!tabManagerInstance) {
+        const editorApp = document.getElementById("editor-app");
+        if (editorApp) {
+            tabManagerInstance = new TabManager(editorApp);
+        }
+    }
+    return tabManagerInstance;
+}
 
 async function main() {
   embeddingWorker.initialize();

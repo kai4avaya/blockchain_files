@@ -98,7 +98,7 @@ class StatusIndicator {
                     if (statusItem === this.activeStatus) {
                         const spinner = statusItem.querySelector('.spinner');
                         if (spinner) {
-                            spinner.outerHTML = '<span class="warning">⚠</span>';
+                            spinner.outerHTML = '<span class="warning"> ✓</span>';
                             this.fadeOutStatus(statusItem);
                             this.activeStatus = null;
                         }

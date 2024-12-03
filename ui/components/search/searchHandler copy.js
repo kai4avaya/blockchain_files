@@ -13,7 +13,6 @@ export function initializeSearchHandler() {
   window.addEventListener('initiateSearch', async (event) => {
     const { query, searchType } = event.detail;
     const searchResults = document.getElementById('searchResults');
-    searchResults.style.display = 'block';
     
     console.log('Search initiated:', { query, searchType });
 
@@ -43,8 +42,7 @@ async function performExactSearch(query, searchResults) {
     const vectors = await indexDBOverlay.getAll('vectors');
     console.log('Vectors retrieved:', vectors);
 
-    const normalizedQuery = query.toLowerCase();
-    const matches = vectors.filter(vector => vector.text?.toLowerCase().includes(normalizedQuery));
+    const matches = vectors.filter(vector => vector.text?.includes(query));
     console.log('Exact matches found:', matches);
 
     if (matches.length === 0) {
@@ -142,39 +140,31 @@ function zoomToSphere(fileId) {
     controls.enabled = false;
     const targetPos = sphere.position.clone();
     const distance = 20;
-    
-    // Calculate start and end positions for arc movement
-    const startPos = camera.position.clone();
-    const endPos = targetPos.clone().add(new THREE.Vector3(0, 0, distance));
-    const midPoint = startPos.clone().add(endPos.clone().sub(startPos).multiplyScalar(0.5));
-    midPoint.y += 30; // Add some height for arc effect
+    const offset = new THREE.Vector3(0, 0, distance);
+    const finalPos = targetPos.clone().add(offset);
 
-    // Animate using timeline for smoother motion
-    const tl = gsap.timeline({
+    gsap.to(camera.position, {
+      duration: 1,
+      x: finalPos.x,
+      y: finalPos.y,
+      z: finalPos.z,
+      ease: "power2.inOut",
+      onUpdate: () => {
+        camera.lookAt(targetPos);
+        controls.target.copy(targetPos);
+      },
       onComplete: () => {
         controls.enabled = true;
         controls.update();
       }
     });
 
-    tl.to(camera.position, {
-      duration: 1.5,
-      x: endPos.x,
-      y: endPos.y,
-      z: endPos.z,
-      ease: "power2.inOut",
-      onUpdate: () => {
-        camera.lookAt(targetPos);
-        controls.target.copy(targetPos);
-      }
-    });
-
-    tl.to(controls.target, {
-      duration: 1.5,
+    gsap.to(controls.target, {
+      duration: 1,
       x: targetPos.x,
       y: targetPos.y,
       z: targetPos.z,
       ease: "power2.inOut"
-    }, 0); // Run parallel with camera animation
+    });
   }
 }

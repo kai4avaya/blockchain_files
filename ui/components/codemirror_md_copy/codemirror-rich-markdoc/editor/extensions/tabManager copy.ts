@@ -20,6 +20,12 @@ import { BaseEventPayload, ElementDragType } from "@atlaskit/pragmatic-drag-and-
 
 import { marked } from 'marked';
 import jsPDF from 'jspdf';
+// @ts-ignore
+import switchToggle from '../../../../mermaidButton.js';
+// @ts-ignore
+import { generateAndSaveMermaidDiagram } from '../../../../../../ai/providers/mermaid/mermaid_api_worker.js';
+// @ts-ignore
+import toast from '../../../../toast-alert.js';
 
 declare global {
   interface Window {
@@ -106,81 +112,7 @@ export class TabManager {
     const { renderer } = share3dDat();
     const canvas = renderer?.domElement;
 
-    
-    // dropTargetForElements({
-    //   element: canvas,
-    //   canDrop: args => {
-    //     const data = args.source.data as unknown as TabDragData;
-    //     return data.type === 'tab';
-    //   },
-    //   onDrop: async args => {
-    //     const data = args.source.data as unknown as TabDragData;
-    //     const { clientX, clientY } = args.location.current.input;
-    
-    //     // Create a File object
-    //     const file = new File(
-    //       [data.content],
-    //       `${data.title || 'Untitled'}.md`,
-    //       { 
-    //         type: 'text/markdown',
-    //         lastModified: Date.now()
-    //       }
-    //     );
-    
-    //     // Create a FileSystemFileEntry-like object that matches what handleFileDrop expects
-    //     const fileEntry = {
-    //       isFile: true,
-    //       isDirectory: false,
-    //       name: file.name,
-    //       file: (callback: (file: File) => void) => callback(file)
-    //     };
-    
-    //     // Simulate DataTransfer for handleFileDrop
-    //     const dt = new DataTransfer();
-    //     dt.items.add(file);
-    
-    //     // Create a synthetic drop event
-    //     const syntheticDropEvent = {
-    //       preventDefault: () => {},
-    //       dataTransfer: {
-    //         items: [
-    //           {
-    //             webkitGetAsEntry: () => fileEntry
-    //           }
-    //         ]
-    //       },
-    //       clientX,
-    //       clientY
-    //     };
-    
-    //     // Process through your existing file handling system
-    //     // const { fileIds, fileNames, fileEntries } = handleFileDrop(syntheticDropEvent);
-    
-    //     // After file is processed, create sphere
-    //     const modifiedEvent = {
-    //       clientX,
-    //       clientY,
-    //       dataTransfer: dt,
-    //       preventDefault: () => {},
-    //       // fileIds,
-    //       // fileNames,
-    //       // fileEntries,
-    //       // tabId: fileIds[0], // Use the generated fileId
-    //       source: {
-    //         data: {
-    //           id: 'tab_'+generateUniqueId(5),//fileIds[0],
-    //           name: data.title,
-    //           content: data.content
-    //         }
-    //       }
-    //     };
-    
-    //     // Now create the sphere
-    //     window.handleFileDrop_sphere(modifiedEvent);
-    //     window.removeGhostCube();
-    //     window.onPointerUp(modifiedEvent);
-    //   }
-    // });
+  
     dropTargetForElements({
       element: canvas,
       canDrop: args => {
@@ -191,9 +123,6 @@ export class TabManager {
         const data = args.source.data as unknown as TabDragData;
         const { clientX, clientY } = args.location.current.input;
         const index = data.index; // Get index from the drag data
-    
-        // Create a unique ID for this tab
-        // const tabId = 'tab_' + generateUniqueId(5);
 
         const docId = this.yjsProviders[index].getDocId();
     
@@ -313,12 +242,17 @@ async initialize() {
     } else {
       await this.addTab(this.makeTitle(), "doc-welcome-" + generateUniqueId(3));
     }
+
+    // Initialize the mermaid switch after tabs are loaded
+    // requestAnimationFrame(() => {
+    //   switchToggle.initialize();
+    // });
+
   } catch (error) {
     console.error("Error in TabManager initialization:", error);
     await this.addTab(this.makeTitle(), "doc-welcome-" + generateUniqueId(3));
   }
 }
-
 
 
   createTab(title: string) {
@@ -1184,6 +1118,7 @@ private setupEditorButtons(editor: EditorView, index: number) {
   newCopyBtn?.addEventListener('click', debounce(handleCopy, 300));
   newDownloadMd?.addEventListener('click', debounce(handleDownloadMd, 300));
   newDownloadPdf?.addEventListener('click', debounce(handleDownloadPdf, 300));
+
 }
 
 

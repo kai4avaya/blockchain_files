@@ -68,7 +68,7 @@ class AIPluginView {
       let line = update.state.doc.lineAt(pos);
       
       if (line.length > this.lastLineLength) {
-        if (line.text.endsWith(">>>")) {
+        if (line.text.endsWith("]]]")) {
           this.handleTestResponse(update.view, line);
         }
         else if (line.text.endsWith("//")) {

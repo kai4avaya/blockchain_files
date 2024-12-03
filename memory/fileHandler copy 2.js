@@ -49,7 +49,7 @@ function resolveWorkerTask(type, data) {
   }
 }
 
-function compressData(arrayBuffer) {
+function compressData_old(arrayBuffer) {
   return new Promise((resolve, reject) => {
     initializeWorker();
     workerTasks.compress = { resolve, reject };
@@ -57,7 +57,7 @@ function compressData(arrayBuffer) {
   });
 }
 
-function decompressData(uint8Array) {
+function decompressData_old(uint8Array) {
   return new Promise((resolve, reject) => {
     initializeWorker();
     workerTasks.decompress = { resolve, reject };
@@ -119,9 +119,9 @@ async function readFileContent(file) {
     reader.onload = async () => {
       try {
         if (file.type === "application/pdf") {
-          resolve(reader.result); // ArrayBuffer for PDFs
+          resolve(reader.result); // Keep as ArrayBuffer for PDFs
         } else {
-          resolve(reader.result); // Text for other files
+          resolve(reader.result); // String for text files
         }
       } catch (error) {
         reject(error);
@@ -148,22 +148,33 @@ async function processFile(fileEntry, id) {
         // Process text files for stats
         if (file.type === 'text/plain' || 
             file.type === 'text/markdown' || 
-            file.type === "application/pdf" ||
             file.type === 'text/javascript') {
-          
           try {
-            // Wait for stats to be processed before saving
             const stats = textStats.processTextStats(content, id);
-            // textStats.saveTextStats(id, stats);
           } catch (error) {
             console.error('Error processing text stats:', error);
           }
         }
 
-        // Continue with other processing...
-        const compressedContent = await compressData(content);
+        // Determine if content should be treated as text
+        const isText = file.type.startsWith('text/') || 
+                      file.type === 'application/javascript' ||
+                      file.type === 'application/json';
+
+        // For PDFs, content is already an ArrayBuffer
+        // For text, content is a string that needs encoding
+        let dataToCompress;
+        if (file.type === 'application/pdf') {
+          dataToCompress = new Uint8Array(content);
+        } else if (isText) {
+          dataToCompress = content; // Will be encoded in worker
+        } else {
+          dataToCompress = content;
+        }
+
+        // Compress the content
+        const compressedContent = await compressData(dataToCompress, isText);
         
-        // First save to IndexedDB
         const fileMetadata = {
           id,
           name: file.name,
@@ -179,7 +190,12 @@ async function processFile(fileEntry, id) {
         await fileSystem.addOrUpdateItem(fileMetadata, "file");
         
         // Process content for vectorization
-        await orchestrateTextProcessing(content, file, id);
+        // For PDFs, pass the raw ArrayBuffer
+        await orchestrateTextProcessing(
+          file.type === 'application/pdf' ? content : content,
+          file,
+          id
+        );
         
         addFileToTree(fileMetadata);
         resolve();
@@ -199,37 +215,27 @@ export async function retrieveFile(id) {
     try {
       // Convert content to Uint8Array if it's not already
       const compressedContent = new Uint8Array(fileMetadata.content);
-
-      console.log("compressedContent file", compressedContent);
       
-      // Await the decompression
-      const decompressedContent = await decompressData(compressedContent);
-
-      console.log("decompressedContent file", decompressedContent);
+      // Determine if this is a text file
+      const isText = fileMetadata.type.startsWith('text/') || 
+                    fileMetadata.type === 'application/javascript' ||
+                    fileMetadata.type === 'application/json';
       
-      // Create the appropriate Blob based on file type
+      // Decompress with text flag
+      const decompressedContent = await decompressData(compressedContent, isText);
+      
+      // Create the appropriate Blob
       let blob;
       if (fileMetadata.type === "application/pdf") {
         // For PDFs, use the raw ArrayBuffer
         blob = new Blob([decompressedContent], { type: fileMetadata.type });
+      } else if (isText) {
+        // For text files, the worker has already decoded the content
+        blob = new Blob([decompressedContent], { type: fileMetadata.type });
       } else {
-        // For text files, ensure we have a string
-        let textContent;
-        if (decompressedContent instanceof ArrayBuffer) {
-          textContent = new TextDecoder().decode(decompressedContent);
-        } else if (decompressedContent instanceof Uint8Array) {
-          textContent = new TextDecoder().decode(decompressedContent);
-        } else {
-          textContent = decompressedContent.toString();
-        }
-        
-        // Create blob from the text content
-        blob = new Blob([textContent], { type: fileMetadata.type });
+        // For other binary files
+        blob = new Blob([decompressedContent], { type: fileMetadata.type });
       }
-
-      // Add debug logging
-      console.log('File content size:', blob.size);
-      console.log('File type:', fileMetadata.type);
 
       return new File([blob], fileMetadata.name, {
         type: fileMetadata.type,
@@ -831,3 +837,55 @@ window.addEventListener('fileDeleted', (event) => {
   // Refresh the file tree UI
   refreshFileTree();
 });
+
+export async function compressData(data, isText = false) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('../workers/compress_worker.js', import.meta.url));
+    
+    worker.onmessage = (e) => {
+      if (e.data.success) {
+        resolve(e.data.compressedData);
+      } else {
+        reject(new Error(e.data.error));
+      }
+      worker.terminate();
+    };
+    
+    worker.onerror = (error) => {
+      reject(error);
+      worker.terminate();
+    };
+    
+    worker.postMessage({
+      action: 'compress',
+      data: data,
+      isText: isText
+    });
+  });
+}
+
+export async function decompressData(data, isText = false) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('../workers/compress_worker.js', import.meta.url));
+    
+    worker.onmessage = (e) => {
+      if (e.data.success) {
+        resolve(e.data.decompressedData);
+      } else {
+        reject(new Error(e.data.error));
+      }
+      worker.terminate();
+    };
+    
+    worker.onerror = (error) => {
+      reject(error);
+      worker.terminate();
+    };
+    
+    worker.postMessage({
+      action: 'decompress',
+      data: data,
+      isText: isText
+    });
+  });
+}

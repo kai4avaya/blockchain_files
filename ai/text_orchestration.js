@@ -20,7 +20,7 @@ export async function orchestrateTextProcessing(content, file, id) {
       // Process text into chunks
       const chunkStatus = "Processing text into chunks...";
       startPersistentStatus(chunkStatus);
-      const { chunks, text } = await textProcessorWorker.processText(
+      const { chunks, positionedChunks, text } = await textProcessorWorker.processText(
         content, 
         file.type, 
         id
@@ -30,7 +30,7 @@ export async function orchestrateTextProcessing(content, file, id) {
       // Process embeddings
       const embedStatus = "Generating embeddings...";
       startPersistentStatus(embedStatus);
-      await embeddingResult(text, chunks, file, id);
+      await embeddingResult(text, chunks, positionedChunks, file, id);
       completePersistentStatus(embedStatus + " ✓");
       
       // Process summary
@@ -58,7 +58,7 @@ export async function orchestrateTextProcessing(content, file, id) {
 
 
 // Add error handling for vectorization
-async function embeddingResult(content, chunks, file, id) {
+async function embeddingResult(content, chunks, positionedChunks, file, id) {
   try {
     if (!chunks || chunks.length === 0) {
       console.error('No chunks to process for embeddings');
@@ -68,6 +68,7 @@ async function embeddingResult(content, chunks, file, id) {
     const embeddingResult = await vectorDBGateway.quickStart({
       text: content,
       processedChunks: chunks,
+      positionedChunks: positionedChunks,
       fileId: id,
       fileName: file.name,
       fileType: file.type,
