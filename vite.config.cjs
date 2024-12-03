@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
+import { resolve } from 'path';
+import fs from 'fs';
 
 export default defineConfig({
   resolve: {
@@ -8,7 +10,23 @@ export default defineConfig({
     }
   },
   plugins: [
-    wasm()
+    wasm(),
+    {
+      name: 'copy-workers',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'workers/memory_worker.js',
+          source: fs.readFileSync(resolve(__dirname, 'workers/memory_worker.js'), 'utf-8')
+        });
+        this.emitFile({
+          type: 'asset',
+          fileName: 'workers/summary_worker.js',
+          source: fs.readFileSync(resolve(__dirname, 'workers/summary_worker.js'), 'utf-8')
+        });
+        // Add other workers as needed
+      }
+    }
   ],
   optimizeDeps: {
     include: [
@@ -26,6 +44,12 @@ export default defineConfig({
     minify: 'esbuild',
     sourcemap: true,
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        'memory_worker': resolve(__dirname, 'workers/memory_worker.js'),
+        'summary_worker': resolve(__dirname, 'workers/summary_worker.js'),
+        // Add other workers here
+      },
       output: {
         manualChunks: {
           'vendor': [
@@ -40,15 +64,11 @@ export default defineConfig({
             '@codemirror/state',
             '@codemirror/view'
           ]
-        }
-      }
-    },
-    worker: {
-      format: 'es',
-      plugins: () => [wasm()],
-      rollupOptions: {
-        output: {
-          inlineDynamicImports: true
+        },
+        entryFileNames: (chunkInfo) => {
+          return chunkInfo.name.includes('worker') 
+            ? 'workers/[name].js'
+            : '[name].[hash].js';
         }
       }
     }

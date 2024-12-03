@@ -9,7 +9,8 @@
     "build": "npm run clean && vite build && npm run copy-workers",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "copy-workers": "cp -r workers dist/"
+    "copy-workers": "cp -r workers dist/",
+    "preview-build": "npm run build && npm run preview"
   },
   "keywords": [],
   "author": "",
