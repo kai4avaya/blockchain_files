@@ -83,7 +83,7 @@ function showURLInput(x, y, intersectPoint) {
   inputWrapper.style.display = 'flex';
   inputWrapper.style.gap = '8px';
   
-  const input = document.createElement('input');
+  const input = document.createElement('input');dex
   input.className = 'url-input';
   input.placeholder = 'example.com';
   

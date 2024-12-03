@@ -12,7 +12,9 @@ export default defineConfig({
     wasm(),
     topLevelAwait({
       promiseExportName: '__tla',
-      promiseImportName: i => `__tla_${i}`
+      promiseImportName: i => `__tla_${i}`,
+      swc: false,
+      babel: true
     })
   ],
   optimizeDeps: {
