@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
-// import topLevelAwait from 'vite-plugin-top-level-await';
 
 export default defineConfig({
   resolve: {
@@ -10,7 +9,6 @@ export default defineConfig({
   },
   plugins: [
     wasm(),
-   
   ],
   optimizeDeps: {
     include: [
@@ -28,7 +26,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'worker': ['./memory/local/file_worker.ts']
+          'memory_worker': ['./memory/local/file_worker.ts'],
+          'compress_worker': ['./workers/compress_worker.js'],
+          'text_stats_worker': ['./workers/text_stats_worker.js']
         }
       }
     }
@@ -38,7 +38,9 @@ export default defineConfig({
     plugins: () => [wasm()],
     rollupOptions: {
       output: {
-        inlineDynamicImports: true
+        format: 'es',
+        inlineDynamicImports: true,
+        entryFileNames: 'workers/[name].js'
       }
     }
   },
@@ -46,7 +48,15 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin'
-    }
+    },
+    middlewares: [
+      (req, res, next) => {
+        if (req.url.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
+        next();
+      }
+    ]
   },
   base: '/'
 });
