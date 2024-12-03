@@ -83,6 +83,8 @@ class P2PSync {
       this.peer = null;
       await new Promise(resolve => setTimeout(resolve, 100));
   }
+
+  this.cleanupExistingPeerPills();
         
     // Add small delay to ensure cleanup is complete
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -94,9 +96,11 @@ class P2PSync {
     this.loadKnownPeers();
 
     const peerId = localStorage.getItem("myPeerId") || userId;
-    this.peer = new Peer(peerId);
-    this.createMyPeerPill(userId);
 
+    if(peerId) {
+      this.peer = new Peer(peerId);
+      this.createMyPeerPill(userId);
+    }
     // Add localStorage listener for userIdInput
     const userIdInput = document.getElementById("userIdInput") as HTMLInputElement;
     if (userIdInput) {
@@ -108,8 +112,9 @@ class P2PSync {
       });
     }
 
-    this.peer.on("open", (id) => {
-      localStorage.setItem("myPeerId", id);
+    if(this.peer) {
+      this.peer.on("open", (id) => {
+        localStorage.setItem("myPeerId", id);
       updateStatus(`Initialized with peer ID: ${id}`);
       this.updateUserIdInput(id);
       
@@ -154,6 +159,7 @@ class P2PSync {
         console.debug("Peer unavailable:", error.type);
       }
     });
+  }
 
     // Add the peer database change handler to custom message handlers
     this.customMessageHandlers.push((message: any, peerId: string) => {
@@ -165,6 +171,13 @@ class P2PSync {
   setMouseOverlay(overlay: MouseOverlayCanvas): void {
     this.mouseOverlay = overlay;
   }
+
+
+private cleanupExistingPeerPills(): void {
+  // Remove all existing my-peer-pill-container elements
+  const existingPills = document.querySelectorAll('.my-peer-pill-container');
+  existingPills.forEach(pill => pill.remove());
+}
 
   private safeConnectToSpecificPeer(peerId: string): void {
     if (!this.peer || this.peer.destroyed) return;

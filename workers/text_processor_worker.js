@@ -14,6 +14,19 @@ function removeStopWords(text) {
     }
 }
 
+function removeBase64Content(text) {
+    try {
+        // This regex matches common base64 patterns
+        const base64Regex = /(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?/g;
+        
+        // Look for long strings that match base64 pattern (at least 50 chars)
+        return text.replace(/[A-Za-z0-9+/]{50,}={0,2}/g, ' ');
+    } catch (error) {
+        console.error("Error in removeBase64Content:", error);
+        return text;
+    }
+}
+
 function chunkText(text, chunkSize = CHUNK_SIZE) {
     if (typeof text !== 'string') {
         console.error("chunkText received non-string input:", typeof text);
@@ -35,7 +48,11 @@ async function processContent(content) {
         if (typeof content !== 'string') {
             throw new Error(`Expected text to be a string, but got ${typeof content}`);
         }
-        const textWithoutStopWords = removeStopWords(content);
+        
+        const textWithoutBase64 = removeBase64Content(content);
+        
+        const textWithoutStopWords = removeStopWords(textWithoutBase64);
+        
         const chunks = chunkText(textWithoutStopWords);
         
         // Create two versions of chunks - one with position info and one without
