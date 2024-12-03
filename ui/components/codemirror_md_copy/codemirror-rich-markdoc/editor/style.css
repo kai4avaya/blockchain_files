@@ -261,6 +261,7 @@
   transform: scale(1);
   display: block; /* Show when visible class is added */
   pointer-events: auto;
+  z-index: 2000 !important;
 }
 
 .context-menu-item {

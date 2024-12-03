@@ -60,11 +60,6 @@ document.addEventListener('keydown', (event) => {
 function createContextMenu() {
   const menuContent = document.createDocumentFragment();
   
-  // Create menu header to hold close button
-  const menuHeader = document.createElement('div');
-  menuHeader.className = 'context-menu-header';
-  menuContent.appendChild(menuHeader);
-  
   // Load File option
   const loadFileItem = document.createElement('div');
   loadFileItem.className = 'context-menu-item';
