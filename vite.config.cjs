@@ -40,9 +40,7 @@ export default defineConfig({
             '@codemirror/state',
             '@codemirror/view'
           ]
-        },
-        preserveModules: true,
-        preserveModulesRoot: 'src'
+        }
       }
     }
   },
