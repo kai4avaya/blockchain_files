@@ -128,7 +128,8 @@
 /*  ai */
 
 .cm-ai-placeholder::before {
-  content: 'type // to ask AI anything, type >> to generate a mermaid diagram';
+  content: '- type // to ask AI anything,\A - type >> to generate a mermaid diagram\A - type @ to mention keywords, files, or folders';
+  white-space: pre;
   color: #888;
   font-style: italic;
   position: absolute;
