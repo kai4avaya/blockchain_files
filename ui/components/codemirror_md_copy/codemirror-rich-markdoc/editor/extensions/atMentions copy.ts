@@ -172,23 +172,36 @@ class AtMenuWidget extends WidgetType {
   // }
 }
 
-// Create a state field to track confirmed mentions
-const mentionsState = StateField.define<RangeSet<Decoration>>({
-  create() {
-    return RangeSet.empty
-  },
-  update(mentions, tr) {
-    mentions = mentions.map(tr.changes)
-    for (let e of tr.effects) {
-      if (e.is(addMention)) {
-        mentions = mentions.update({
-          add: [Decoration.mark({class: "cm-mention"}).range(e.value.from, e.value.to)]
-        })
-      }
+
+// Update the matcher to support special characters but not spaces
+const mentionMatcher = new MatchDecorator({
+  regexp: /@([^\s@\n]+)/g,  // Match everything except whitespace, @ and newline
+  decoration: match => Decoration.mark({class: "cm-mention"})
+})
+
+// Create a plugin that handles both decorations and atomic ranges
+const mentionsPlugin = ViewPlugin.fromClass(class {
+  decorations: DecorationSet
+
+  constructor(view: EditorView) {
+    this.decorations = this.createDecorations(view)
+  }
+
+  createDecorations(view: EditorView) {
+    // Just use the matcher's decorations directly
+    return mentionMatcher.createDeco(view)
+  }
+
+  update(update: ViewUpdate) {
+    if (update.docChanged || update.viewportChanged) {
+      this.decorations = this.createDecorations(update.view)
     }
-    return mentions
-  },
-  provide: f => EditorView.decorations.from(f)
+  }
+}, {
+  decorations: instance => instance.decorations,
+  provide: plugin => EditorView.atomicRanges.of(view => {
+    return view.plugin(plugin)?.decorations || Decoration.none
+  })
 })
 
 // First, let's define our state interface clearly
@@ -431,7 +444,7 @@ const atMentionsKeymap = keymap.of([
           const selectedItem = submenuItems[state.subMenuSelectedIndex]?.textContent?.trim()
           if (selectedItem) {
             const cursorPos = view.state.selection.main.head
-            const fromPos = Math.max(0, state.pos)
+            const fromPos = Math.max(0, state.pos - 1)
             
             // First dispatch: Add the text change
             view.dispatch({
@@ -477,8 +490,8 @@ const mentionTheme = EditorView.baseTheme({
 
 export const atMentionsExtension = [
   atMenuState,
-  mentionsState,  // Add the new state field
   atMenuPlugin,
   atMentionsKeymap,
+  mentionsPlugin,
   mentionTheme
 ] 

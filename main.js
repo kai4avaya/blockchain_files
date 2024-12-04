@@ -28,6 +28,8 @@ import { eventBus } from './ui/eventBus.js';
 import { ShareManager } from "./network/share_manager";
 // import {createMiniMap} from './ui/graph_v2/createMiniMap.js';
 import { initializeSearchHandler } from './ui/components/search/searchHandler.js';
+import { SearchIndexManager } from './memory/local/search_index';
+
 
 // Call the function to set up the search handler
 
@@ -205,6 +207,10 @@ export async function initializeDatabases() {
 
     // Initialize vectorDB gateway after IndexDB is ready
     await initiate();
+
+    const searchIndexManager = SearchIndexManager.getInstance();
+    await searchIndexManager.populateSearchIndex(indexDBOverlay);
+
 
     console.log("All databases initialized successfully");
   } catch (error) {

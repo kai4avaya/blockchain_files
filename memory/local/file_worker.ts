@@ -5,6 +5,9 @@ import { generateVersionNonce } from "../../utils/utils";
 import { p2pSync } from "../../network/peer2peer_simple";
 import { generateGlobalTimestamp, incrementVersion } from "../../utils/utils";
 import in_memory_store from "./in_memory";
+import { SearchIndexManager } from './search_index';
+
+//
 let reconstructFromGraphData: (() => Promise<void>) | null = null;
 
 
@@ -691,6 +694,14 @@ class IndexDBWorkerOverlay {
           return;
         }
       }
+
+      if (!data.isDeleted && (storeName === 'summaries')) {
+        const searchIndexManager = SearchIndexManager.getInstance();
+        searchIndexManager.updateIndex(
+            data, 
+           'summary' 
+        );
+    }
 
 
       // Save the data (overwrites if key is already present)
