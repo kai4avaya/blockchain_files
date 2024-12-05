@@ -18,6 +18,8 @@ import { atMentionsExtension } from './extensions/atMentions'
 import { yCollab } from 'y-codemirror.next';
 import * as Y from 'yjs';
 import { Awareness } from 'y-protocols/awareness';
+import { universalDragExtension } from './extensions/universalDrag'
+
 
 
 // import doc from './example.md?raw'
@@ -42,6 +44,7 @@ export function createEditorState(ytext: Y.Text, awareness: Awareness) {
           outline: "none",
         },
       }),
+      universalDragExtension,
       history(),
       drawSelection(),
       rectangularSelection(),

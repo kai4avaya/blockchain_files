@@ -8,9 +8,8 @@ reorganize 3d space by smilar articles using embeddings matches
 ---
 
 2) image upload llm
-3) peers get created with new double
 4) cluster issue camera?
-
+NICE DRAG https://discuss.codemirror.net/t/implement-draggable-ranges-object-through-mouse-curser/4655/4
 
 ****
 embedding pool workers

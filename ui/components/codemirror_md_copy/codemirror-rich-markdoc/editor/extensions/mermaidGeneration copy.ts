@@ -17,8 +17,6 @@ import {  startPersistentStatus, completePersistentStatus, startMasterStatus, co
 
 import { generateUniqueId } from "../../../../../../utils/utils.js";
 
-// import { removeElementsByClassName } from "../../../../../../utils/utils.js";/
-
 // Create a skeleton loader widget
 
 class SkeletonWidget extends WidgetType {
@@ -33,21 +31,17 @@ class SkeletonWidget extends WidgetType {
     }
 
     toDOM() {
-        if (!this.content) {
-            const span = document.createElement('span');
-            span.style.display = 'none';
-            return span;
-        }
-
         const div = document.createElement('div');
         div.className = 'mermaid-skeleton-loader';
-        div.innerHTML = `
-            <div class="skeleton-container">
-                <div class="skeleton-line"></div>
-                <div class="skeleton-line"></div>
-                <div class="skeleton-line"></div>
-            </div>
-        `;
+        if (this.content) {
+            div.innerHTML = `
+                <div class="skeleton-container">
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                </div>
+            `;
+        }
         return div;
     }
 }
@@ -59,29 +53,29 @@ const skeletonDecoration = Decoration.widget({
 });
 
 // Add MermaidImageWidget class at the top
-// class MermaidImageWidget extends WidgetType {
-//     constructor(readonly url: string, readonly description: string) {
-//         super();
-//     }
+class MermaidImageWidget extends WidgetType {
+    constructor(readonly url: string, readonly description: string) {
+        super();
+    }
 
-//     eq(other: MermaidImageWidget) {
-//         return other.url === this.url;
-//     }
+    eq(other: MermaidImageWidget) {
+        return other.url === this.url;
+    }
 
-//     toDOM() {
-//         const wrapper = document.createElement('span');
-//         wrapper.className = 'cm-mermaid-image-widget';
+    toDOM() {
+        const wrapper = document.createElement('span');
+        wrapper.className = 'cm-mermaid-image-widget';
         
-//         const img = document.createElement('img');
-//         img.src = this.url;
-//         img.alt = this.description;
-//         img.style.maxWidth = '100%';
-//         img.style.maxHeight = '300px';
+        const img = document.createElement('img');
+        img.src = this.url;
+        img.alt = this.description;
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '300px';
         
-//         wrapper.appendChild(img);
-//         return wrapper;
-//     }
-// }
+        wrapper.appendChild(img);
+        return wrapper;
+    }
+}
 
 class MermaidGenerationPlugin {
     decorations: DecorationSet;
@@ -91,7 +85,6 @@ class MermaidGenerationPlugin {
     private stopButton!: HTMLButtonElement;
     private currentStreamId: string | null = null;
     private skeletonWidget: SkeletonWidget = new SkeletonWidget();
-    private skeletonDecorations: DecorationSet | null = null;
 
     constructor(view: EditorView) {
         this.view = view;
@@ -147,92 +140,6 @@ class MermaidGenerationPlugin {
         return new File([u8arr], filename, { type: mime });
     }
 
-    // private clearSkeletonLoader(view: EditorView) {
-    //     if (this.skeletonDecorations) {
-    //         this.skeletonWidget.clear();
-            
-    //         // Filter out the skeleton decoration
-    //         const filteredDecorations = this.skeletonDecorations.update({
-    //             filter: (from, to, value) => {
-
-    //                 console.log("value", value)
-    //                 console.log("value.spec.widget", value.spec.widget)
-    //                 // Return false for skeleton widgets to remove them
-    //                 return !(value.spec.widget instanceof SkeletonWidget);
-    //             }
-    //         });
-            
-    //         console.log("filteredDecorations", filteredDecorations)
-    //         view.dispatch({
-    //             effects: StateEffect.appendConfig.of([
-    //                 EditorView.decorations.of(filteredDecorations)
-    //             ])
-    //         });
-            
-    //         this.skeletonDecorations = null;
-    //     }
-    // }
-
-    // private clearSkeletonLoader(view: EditorView) {
-    //     if (this.skeletonDecorations) {
-    //         this.skeletonWidget.clear();
-            
-    //         // Find the skeleton decoration range
-    //         const iter = this.skeletonDecorations.iter();
-    //         while (iter.value) {
-    //             if (iter.value.spec.widget instanceof SkeletonWidget) {
-
-    //                 console.log("iter", iter)
-    //                 // Remove the content at the decoration's position
-    //                 view.dispatch({
-    //                     changes: { from: iter.from, to: iter.to, insert: "" }
-    //                 });
-    //                 break;
-    //             }
-    //             iter.next();
-    //         }
-            
-    //         this.skeletonDecorations = null;
-    //     }
-    // }
-
-    private clearSkeletonLoader(view: EditorView) {
-        if (this.skeletonDecorations) {
-            this.skeletonWidget.clear();
-            
-            const iter = this.skeletonDecorations.iter();
-            if (iter.value && iter.value.spec.widget instanceof SkeletonWidget) {
-                console.log(`Removing skeleton at positions ${iter.from} to ${iter.to}`);
-                
-                view.dispatch({
-                    changes: [
-                        { from: iter.from - 1, to: iter.to + 1, insert: "" }
-                    ]
-                });
-            }
-            
-            setTimeout(() => {
-                const skeletons = document.querySelectorAll('.mermaid-skeleton-loader');
-                skeletons.forEach(skeleton => {
-                    const el = skeleton as HTMLElement;
-                    
-                    // First, try to remove all attributes
-                    while (el.attributes.length > 0) {
-                        el.removeAttribute(el.attributes[0].name);
-                    }
-                    
-                    if (el.parentNode) {
-                        el.parentNode.removeChild(el);
-                    }
-                });
-                console.log("skeletons", skeletons);
-            }, 0);
-            
-            this.skeletonDecorations = null;
-        }
-    }
-
-    
     async handleMermaidGeneration(view: EditorView, line: any) {
         if (this.isGenerating) return;
         
@@ -257,10 +164,6 @@ class MermaidGenerationPlugin {
                 side: 1
             });
 
-            this.skeletonDecorations = Decoration.set([
-                skeletonDeco.range(insertPos + 1)
-            ]);
-
             view.dispatch({
                 changes: {
                     from: insertPos,
@@ -268,7 +171,9 @@ class MermaidGenerationPlugin {
                     insert: '\n\n'
                 },
                 effects: StateEffect.appendConfig.of([
-                    EditorView.decorations.of(this.skeletonDecorations)
+                    EditorView.decorations.of(Decoration.set([
+                        skeletonDeco.range(insertPos + 1)
+                    ]))
                 ])
             });
 
@@ -301,6 +206,14 @@ class MermaidGenerationPlugin {
                 `${generateUniqueId(4)+'_Mermaid_Diagram'}.svg`
             );
 
+            // Clear the skeleton loader
+            this.skeletonWidget.clear();
+            view.dispatch({
+                effects: StateEffect.appendConfig.of([
+                    EditorView.decorations.of(Decoration.none)
+                ])
+            });
+
             // Explicitly add a newline before inserting the image
             view.dispatch({
                 changes: {
@@ -311,8 +224,6 @@ class MermaidGenerationPlugin {
 
             // Let imageUpload handle the image insertion and storage
             await processImageFile(imageFile, view);
-
-            this.clearSkeletonLoader(view);
 
             // Add the description after the image with proper spacing
             view.dispatch({
@@ -332,7 +243,7 @@ class MermaidGenerationPlugin {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             
             // Clear loader and show error
-            this.clearSkeletonLoader(view);
+            this.skeletonWidget.clear();
             view.dispatch({
                 changes: {
                     from: insertPos,

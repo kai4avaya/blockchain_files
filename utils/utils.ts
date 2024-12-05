@@ -154,3 +154,22 @@ export function generateGlobalTimestamp(): number {
 export function incrementVersion(): number {
   return ++globalVersionCounter;
 }
+
+
+export function removeElementsByClassName(className: string) {
+  const elements = document.querySelectorAll('.' + className);
+  console.log(`Found ${elements.length} elements with class ${className}`);
+  
+  elements.forEach((element: Element) => {
+    try {
+      if (element && element.parentNode) {
+        element.parentNode.removeChild(element);
+        console.log(`Successfully removed element:`, element);
+      } else {
+        console.log(`Element or parent is null:`, element);
+      }
+    } catch (error) {
+      console.error(`Error removing element:`, error);
+    }
+  });
+}
