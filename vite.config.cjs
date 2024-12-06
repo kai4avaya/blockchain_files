@@ -95,9 +95,17 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin'
     },
     watch: {
-      // Add explicit watching for the codemirror_md_copy directory
+      // Remove usePolling as it can cause performance issues
       included: ['**/codemirror_md_copy/**'],
-      usePolling: true 
+      // Add these options to improve file watching
+      usePolling: false,
+      interval: 100,
+      ignored: ['**/node_modules/**', '**/dist/**']
+    },
+    // Add HMR configuration
+    hmr: {
+      overlay: true,
+      protocol: 'ws'
     }
   },
   base: '/'
