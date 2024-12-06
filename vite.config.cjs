@@ -93,6 +93,11 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin'
+    },
+    watch: {
+      // Add explicit watching for the codemirror_md_copy directory
+      included: ['**/codemirror_md_copy/**'],
+      usePolling: true 
     }
   },
   base: '/'

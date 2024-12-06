@@ -10,7 +10,7 @@ reorganize 3d space by smilar articles using embeddings matches
 2) image upload llm
 4) cluster issue camera?
 NICE DRAG https://discuss.codemirror.net/t/implement-draggable-ranges-object-through-mouse-curser/4655/4
-
+5) aalert to delete note (or stash it?) 
 ****
 embedding pool workers
 enter your name for record keeping
