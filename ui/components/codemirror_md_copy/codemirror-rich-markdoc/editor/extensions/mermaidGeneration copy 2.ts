@@ -18,8 +18,6 @@ import {  startPersistentStatus, completePersistentStatus, startMasterStatus, co
 
 
 import { generateUniqueId } from "../../../../../../utils/utils.js";
-import { safetyUtils } from './safetyUtils'
-import { handleAsciiDiagramFallback } from "./asciiDiagramGeneration.js";
 
 
 class SkeletonWidget extends WidgetType {
@@ -69,7 +67,6 @@ class MermaidGenerationPlugin {
     private currentStreamId: string | null = null;
     private skeletonWidget: SkeletonWidget = new SkeletonWidget();
     private skeletonDecorations: DecorationSet | null = null;
-    private MAX_RETRIES = 3;
 
     constructor(view: EditorView) {
         this.view = view;
@@ -131,7 +128,13 @@ class MermaidGenerationPlugin {
             
             const iter = this.skeletonDecorations.iter();
             if (iter.value && iter.value.spec.widget instanceof SkeletonWidget) {
-                safetyUtils.safeClear(view, iter.from - 1, iter.to + 1);
+                console.log(`Removing skeleton at positions ${iter.from} to ${iter.to}`);
+                
+                view.dispatch({
+                    changes: [
+                        { from: iter.from - 1, to: iter.to + 1, insert: "" }
+                    ]
+                });
             }
             
             setTimeout(() => {
@@ -159,58 +162,41 @@ class MermaidGenerationPlugin {
     async handleMermaidGeneration(view: EditorView, line: any) {
         if (this.isGenerating) return;
         
-        const insertPos = safetyUtils.safePosition(line.to + 1, view);
-        let retryCount = 0;
+        const insertPos = Math.min(line.to + 1, view.state.doc.length);
         
         try {
             this.isGenerating = true;
             this.showStopButton();
             
+            // Start the master status that will persist
             startMasterStatus("Generating diagram...");
-            const prompt = line.text.slice(0, -2);
+            
+            const prompt = line.text.slice(0, -2); // Remove '>>'
 
-            // Add skeleton loader safely
-            const success = safetyUtils.safeDispatch(view, {
-                from: insertPos,
-                insert: '\n\n'
-            });
-
-            if (!success) {
-                throw new Error("Failed to prepare editor for diagram generation");
-            }
-
+            // Start first sub-status
             const contextStatus = "Building AI response...";
             startPersistentStatus(contextStatus);
 
-            // Safely add skeleton loader
-            try {
-                const skeletonDeco = Decoration.widget({
-                    widget: this.skeletonWidget,
-                    side: 1
-                });
+            // Add skeleton loader with proper spacing
+            const skeletonDeco = Decoration.widget({
+                widget: this.skeletonWidget,
+                side: 1
+            });
 
-                // Revalidate position before adding skeleton
-                const currentDocLength = view.state.doc.length;
-                const safeInsertPos = Math.min(insertPos, currentDocLength);
+            this.skeletonDecorations = Decoration.set([
+                skeletonDeco.range(insertPos + 1)
+            ]);
 
-                this.skeletonDecorations = Decoration.set([
-                    skeletonDeco.range(safeInsertPos)
-                ]);
-
-                view.dispatch({
-                    changes: {
-                        from: safeInsertPos,
-                        to: safeInsertPos,
-                        insert: '\n\n'
-                    },
-                    effects: StateEffect.appendConfig.of([
-                        EditorView.decorations.of(this.skeletonDecorations)
-                    ])
-                });
-            } catch (error) {
-                console.error('Failed to add skeleton:', error);
-                // Continue without skeleton if it fails
-            }
+            view.dispatch({
+                changes: {
+                    from: insertPos,
+                    to: insertPos,
+                    insert: '\n\n'
+                },
+                effects: StateEffect.appendConfig.of([
+                    EditorView.decorations.of(this.skeletonDecorations)
+                ])
+            });
 
             // Get context and generate diagram
             const docContent = view.state.doc.toString();
@@ -222,125 +208,67 @@ class MermaidGenerationPlugin {
                 return;
             }
 
-            // Generate diagram with retries
+            // Start diagram generation status
             const diagramStatus = "Creating diagram...";
-            let diagram;
-            let lastError;
+            startPersistentStatus(diagramStatus, 3000);
+            const diagram = await generateAndSaveMermaidDiagram(
+                contextText ? `${contextText}\n\nBased on this context, ${prompt}` : prompt,
+                true
+            );
+            completePersistentStatus(diagramStatus + " ✓");
 
-            while (retryCount < this.MAX_RETRIES) {
-                try {
-                    startPersistentStatus(`${diagramStatus} (Attempt ${retryCount + 1}/${this.MAX_RETRIES})`);
-                    
-                    diagram = await generateAndSaveMermaidDiagram(
-                        contextText ? `${contextText}\n\nBased on this context, ${prompt}` : prompt,
-                        true
-                    );
-                    
-                    completePersistentStatus(diagramStatus + " ✓");
-                    break; // Success, exit retry loop
-                    
-                } catch (error) {
-                    lastError = error;
-                    retryCount++;
-                    
-                    if (retryCount < this.MAX_RETRIES) {
-                        toast.show(`Retry attempt ${retryCount}/${this.MAX_RETRIES}...`, 'warning');
-                        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait before retry
-                    }
-                }
-            }
-
-            if (!diagram) {
-                throw new Error(`Failed after ${this.MAX_RETRIES} attempts: ${lastError}`);
-            }
-
-            // Process image
+            // Start image processing status
             const imageStatus = "Processing image...";
             startPersistentStatus(imageStatus, 2000);
 
+            // Convert base64 to File
             const imageFile = this.base64ToFile(
                 diagram.base64,
                 `${generateUniqueId(4)+'_Mermaid_Diagram'}.svg`
             );
 
-            // Safely add newline and process image
-            try {
-                // Revalidate position before final insertion
-                const currentPos = view.state.selection.main.head;
-                if (currentPos >= 0 && currentPos <= view.state.doc.length) {
-                    view.dispatch({
-                        changes: {
-                            from: currentPos,
-                            insert: '\n'
-                        }
-                    });
-
-                    await processImageFile(imageFile, view, diagram.description || 'Mermaid Diagram');
+            // Explicitly add a newline before inserting the image
+            view.dispatch({
+                changes: {
+                    from: view.state.selection.main.head,
+                    insert: '\n'
                 }
-            } catch (error) {
-                console.error('Failed to process image:', error);
-                throw error;
-            }
+            });
 
-            // Cleanup
+            // Let imageUpload handle the image insertion and storage
+            await processImageFile(imageFile, view, diagram.description || 'Mermaid Diagram');
+
+            // Add a small delay to ensure the image is processed
             await new Promise(resolve => setTimeout(resolve, 0));
+
             this.clearSkeletonLoader(view);
+
+            // Remove the separate caption insertion since it's now handled by processImageFile
             completePersistentStatus(imageStatus + " ✓");
+
+            // Complete the master status
             completeMasterStatus("Diagram generated successfully");
             toast.show('Diagram generated successfully!', 'success');
 
         } catch (error: unknown) {
             console.error('Failed to generate diagram:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             
-            // Try ASCII fallback after all retries fail
-            if (retryCount >= this.MAX_RETRIES) {
-                toast.show('Falling back to ASCII diagram generation...', 'warning');
-                try {
-                    await handleAsciiDiagramFallback(view, line);
-                    return;
-                } catch (fallbackError) {
-                    // If fallback fails, continue with original error handling
-                    console.error('ASCII fallback also failed:', fallbackError);
-                }
-            }
-            
-            // Properly type and extract error message
-            let errorMessage: string;
-            if (error instanceof Error) {
-                errorMessage = error.message;
-            } else if (typeof error === 'string') {
-                errorMessage = error;
-            } else if (error && typeof error === 'object' && 'toString' in error) {
-                errorMessage = error.toString();
-            } else {
-                errorMessage = 'Unknown error occurred';
-            }
-            
-            try {
-                this.clearSkeletonLoader(view);
-                
-                // Show detailed error message to user
-                const userMessage = retryCount > 0 
-                    ? `Failed after ${retryCount} attempts. Last error: ${errorMessage}`
-                    : `Failed to generate diagram: ${errorMessage}`;
-                
-                // Show toast with retry count if applicable
-                toast.show(userMessage, 'error', 5000); // Longer duration for error messages
-                
-                // Only attempt to show error if the document position is valid
-                if (insertPos >= 0 && insertPos <= view.state.doc.length) {
-                    safetyUtils.safeDispatch(view, {
-                        from: insertPos,
-                        to: insertPos,
-                        insert: `\nError: ${userMessage}\n`
-                    });
-                }
-            } catch (dispatchError) {
-                console.error('Failed to show error message:', dispatchError);
-                toast.show('Failed to show error message in editor', 'error');
-            }
+            // Clear loader and show error
+            this.clearSkeletonLoader(view);
+            view.dispatch({
+                changes: {
+                    from: insertPos,
+                    to: insertPos,
+                    insert: `\nError: ${errorMessage}\n`
+                },
+                effects: StateEffect.appendConfig.of([
+                    EditorView.decorations.of(Decoration.none)
+                ])
+            });
             
             completeMasterStatus("Diagram generation failed");
+            toast.show('Failed to generate diagram', 'error');
         } finally {
             this.isGenerating = false;
             this.hideStopButton();

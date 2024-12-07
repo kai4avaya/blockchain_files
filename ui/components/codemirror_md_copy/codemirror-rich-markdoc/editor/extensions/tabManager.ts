@@ -542,7 +542,7 @@ private saveYDocToIndexedDB = debounce(async (docId: string, ydoc: Y.Doc) => {
   
   private async renameTab(index: number, newTitle: string) {
     const provider = this.yjsProviders[index];
-    const oldDocId = provider.getDocId();
+    const oldDocId = provider?.getDocId();
   
     // Update the tab title
     const tab = this.tabList.children[index];

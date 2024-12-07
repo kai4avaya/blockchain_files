@@ -12,7 +12,6 @@ class StatusIndicator {
         this.setupScrollbar();
         this.activeStatus = null;
         this.masterStatus = null;
-        this.timeoutIds = new Map();
     }
 
     setupEventListener() {
@@ -91,14 +90,9 @@ class StatusIndicator {
         this.statuses.push(statusItem);
         this.scrollToBottom();
 
-        const killTimeout = setTimeout(() => {
-            this.killStatus(statusItem, 'Operation timed out');
-        }, 30000);
-
-        this.timeoutIds.set(statusItem, killTimeout);
-
         if (isPersistent) {
             this.activeStatus = statusItem;
+            
             if (timeout) {
                 setTimeout(() => {
                     if (statusItem === this.activeStatus) {
@@ -109,7 +103,6 @@ class StatusIndicator {
                             this.activeStatus = null;
                         }
                     }
-                    this.killStatus(statusItem);
                 }, timeout);
             }
         } else {
@@ -228,43 +221,6 @@ class StatusIndicator {
             });
         }
     }
-
-    killStatus(statusItem, message = 'Operation cancelled') {
-        if (!statusItem?.isConnected) return;
-
-        const timeoutId = this.timeoutIds.get(statusItem);
-        if (timeoutId) {
-            clearTimeout(timeoutId);
-            this.timeoutIds.delete(statusItem);
-        }
-
-        const spinner = statusItem.querySelector('.spinner');
-        if (spinner) {
-            spinner.outerHTML = '<span class="error">⚠️</span>';
-            statusItem.querySelector('span').textContent += ` - ${message}`;
-            statusItem.classList.add('error');
-        }
-
-        if (statusItem === this.activeStatus) {
-            this.activeStatus = null;
-        }
-
-        this.fadeOutStatus(statusItem);
-    }
-
-    killAllStatuses() {
-        this.statuses.forEach(statusItem => {
-            if (statusItem !== this.masterStatus) {
-                this.killStatus(statusItem);
-            }
-        });
-
-        if (this.masterStatus) {
-            this.killStatus(this.masterStatus);
-            this.masterStatus = null;
-            this.container.classList.remove('has-master');
-        }
-    }
 }
 
 // Create a single instance
@@ -308,10 +264,6 @@ export function completeMasterStatus(status) {
     window.dispatchEvent(new CustomEvent('masterStatusComplete', { 
         detail: { status }
     }));
-}
-
-export function killAllProcesses() {
-    statusIndicator.killAllStatuses();
 }
 
 // If you need direct access to the StatusIndicator instance (usually not necessary)

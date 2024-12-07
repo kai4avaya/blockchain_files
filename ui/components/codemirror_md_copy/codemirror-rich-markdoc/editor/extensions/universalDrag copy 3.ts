@@ -53,37 +53,105 @@ const universalDragHandler = EditorView.domEventHandlers({
         event.preventDefault();
         view.dom.classList.remove('cm-file-drag-active');
         
+        // Add logging for drop event data
+        console.log("drop dataTransfer:", {
+            types: event.dataTransfer?.types,
+            items: Array.from(event.dataTransfer?.items || []).map(item => ({
+                kind: item.kind,
+                type: item.type
+            })),
+            files: event.dataTransfer?.files
+        });
+
         const dropPos = view.posAtCoords({ x: event.clientX, y: event.clientY });
         if (dropPos === null) return false;
 
-        // Handle files
-        const files = Array.from(event.dataTransfer?.files || []);
-        if (files.length > 0) {
-            // Get the plugin instance
-            const plugin = view.plugin(universalDragPlugin);
-            
-            // If we have a drag start position, remove the original content first
-            if (plugin?.dragStartPos) {
-                view.dispatch({
-                    changes: { 
-                        from: plugin.dragStartPos.from, 
-                        to: plugin.dragStartPos.to, 
-                        insert: '' 
-                    }
-                });
-            }
+        // Update cursor position
+        view.dispatch({
+            selection: { anchor: dropPos }
+        });
 
-            // Then process the new files
-            files.forEach(file => {
-                if (file.type.startsWith('image/')) {
-                    imageUploadProcessor(file, view);
-                }
-            });
-            
+        // Handle files from different sources
+        let files: File[] = [];
+
+        // Check DataTransfer.items first (important for Mermaid diagrams)
+        if (event.dataTransfer?.items?.length) {
+            files = Array.from(event.dataTransfer.items)
+                .filter(item => {
+                    console.log("Processing item:", item.kind, item.type);
+                    return item.kind === 'file';
+                })
+                .map(item => item.getAsFile())
+                .filter((file): file is File => file !== null);
+        }
+        // Fallback to DataTransfer.files
+        else if (event.dataTransfer?.files?.length) {
+            files = Array.from(event.dataTransfer.files);
+        }
+
+        // Process image files
+        const imageFiles = files.filter(file => file.type.startsWith('image/'));
+
+        console.log("files in drop till you flop", files)
+        if (imageFiles.length) {
+            Promise.all(imageFiles.map(file => 
+                imageUploadProcessor(file, view)
+                    .catch(error => {
+                        console.error('Error processing dropped image:', error);
+                        // Remove any existing loader message first
+                        const line = view.state.doc.lineAt(dropPos);
+                        if (line.text.includes('Loading...')) {
+                            view.dispatch({
+                                changes: {
+                                    from: line.from,
+                                    to: line.to,
+                                    insert: ''
+                                }
+                            });
+                        }
+                        // Show error to user
+                        view.dispatch({
+                            changes: {
+                                from: dropPos,
+                                insert: `\nError uploading image ${file.name}: ${error.message}\n`
+                            }
+                        });
+                    })
+            ));
             return true;
         }
 
-        // ... rest of the code ...
+        // Handle regular text drag and drop
+        const plugin = view.plugin(universalDragPlugin);
+        if (plugin?.dragStartPos && plugin.currentContent) {
+            // Handle internal drag and drop
+            if (dropPos >= plugin.dragStartPos.from && dropPos <= plugin.dragStartPos.to) {
+                return false;
+            }
+
+            const contentWithNewline = plugin.isImage 
+                ? plugin.currentContent + '\n'
+                : plugin.currentContent;
+
+            view.dispatch({
+                changes: [
+                    { from: plugin.dragStartPos.from, to: plugin.dragStartPos.to, insert: '' },
+                    { from: dropPos, insert: contentWithNewline }
+                ]
+            });
+            return true;
+        }
+
+        // Handle text from external sources
+        if (event.dataTransfer?.getData('text/plain')) {
+            const text = event.dataTransfer.getData('text/plain');
+            view.dispatch({
+                changes: { from: dropPos, insert: text }
+            });
+            return true;
+        }
+
+        return false;
     }
 });
 

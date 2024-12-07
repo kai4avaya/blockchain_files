@@ -85,29 +85,23 @@ class AIPluginView {
       this.showStopButton();
       const prompt = line.text.slice(0, -2);
       
-      // Get current document state
-      const docLength = view.state.doc.length;
-      const currentLine = safetyUtils.safeLine(line.to, view);
-      
-      // Ensure we're working with valid positions
-      const insertPos = safetyUtils.safePosition(currentLine.to, view);
-      const startPos = safetyUtils.safePosition(insertPos + 1, view);
+      const startPos = safetyUtils.safePosition(line.to + 1, view);
       let currentLength = 0;
       
-      // Safe initial dispatch with position validation
-      const generatingMsg = '\nGenerating.';
+      // Safe initial dispatch
       safetyUtils.safeDispatch(view, {
-        from: insertPos,
-        insert: generatingMsg
+        from: line.to,
+        insert: '\nGenerating.'
       });
       
       let dots = 1;
       this.generatingInterval = setInterval(() => {
-        const basePos = safetyUtils.safePosition(insertPos + generatingMsg.length, view);
-        safetyUtils.safeDispatch(view, {
-          from: basePos,
-          to: safetyUtils.safePosition(basePos + dots, view),
-          insert: '.'.repeat((dots % 3) + 1)
+        view.dispatch({
+          changes: {
+            from: line.to + 11, // "Generating" length is 10 + 1 for newline
+            to: line.to + 11 + dots,
+            insert: '.'.repeat((dots % 3) + 1)
+          }
         });
         dots = (dots % 3) + 1;
       }, 500);
@@ -118,13 +112,13 @@ class AIPluginView {
         clearInterval(this.generatingInterval);
         this.generatingInterval = null;
       }
-
-      // Clear generating message
-      safetyUtils.safeClear(
-        view, 
-        insertPos, 
-        safetyUtils.safePosition(insertPos + generatingMsg.length + 3, view)
-      );
+      view.dispatch({
+        changes: {
+          from: line.to,
+          to: line.to + 14, // Maximum length of "Generating..." + newline
+          insert: '\n'
+        }
+      });
       
       let fullText = '';
       
@@ -132,6 +126,7 @@ class AIPluginView {
         if (!this.isStreaming) break;
         
         try {
+          // Debug logging
           let content = '';
           if (typeof chunk === 'string') {
             if (chunk.startsWith('data: ')) {
@@ -159,13 +154,9 @@ class AIPluginView {
           if (content) {
             fullText += content;
             
-            // Get fresh position for each update
-            const currentDocLength = view.state.doc.length;
-            const currentStartPos = safetyUtils.safePosition(startPos, view);
-            
             safetyUtils.safeDispatch(view, {
-              from: currentStartPos,
-              to: safetyUtils.safePosition(currentStartPos + currentLength, view),
+              from: safetyUtils.safePosition(startPos, view),
+              to: safetyUtils.safePosition(startPos + currentLength, view),
               insert: fullText,
               scrollIntoView: true
             });

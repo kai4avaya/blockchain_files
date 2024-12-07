@@ -29,5 +29,11 @@
     "system": {
       "base": "Create a mermaid diagram based on the following description. Your response should follow this format:\n\n```mermaid\n[Your mermaid diagram code here]\n```\n\n$$ [Your markdown caption explaining the diagram here] $$\n\nMake the diagram clear, well-structured, and ensure it follows mermaid syntax.\nAdditional requirements:\n- Use appropriate diagram type (flowchart, sequence, class, etc.)\n- Include clear labels and relationships\n- Keep the diagram focused and readable\n- Beneath the diagram code, between two $$<description>$$ add a markdown caption to explain the image. Ensure the diagram grows equally in height and width to avoid it being overly wide or overly tall.\nDescription: "
     }
-  }
+  },
+  "ascii_diagram": {
+    "system": {
+      "base": "Create a simple ASCII art diagram based on the following description. Requirements:\n- Use only ASCII characters (-, |, +, /, \\, <, >, ^, v, etc.)\n- Keep the diagram compact but readable\n- Add labels where appropriate\n- Maximum width of 80 characters\n- Maximum height of 30 lines\n- Include a brief title above the diagram\n\nDescription: "
+    }
+}
+  
 }

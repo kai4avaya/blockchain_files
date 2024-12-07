@@ -1,4 +1,4 @@
-import { EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType, ViewUpdate, KeyBinding } from "@codemirror/view"
+import { EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType, ViewUpdate } from "@codemirror/view"
 import { StateEffect, StateField, Transaction } from "@codemirror/state"
 import indexDBOverlay from "../../../../../../memory/local/file_worker"
 import { generateUniqueId } from "../../../../../../utils/utils"
@@ -53,23 +53,18 @@ class ImageWidget extends WidgetType {
 
 // ViewPlugin to handle editor initialization and updates
 const imageLoaderPlugin = ViewPlugin.fromClass(class {
-  private processedImages: Set<string> = new Set()
-  private hasInitialized: boolean = false
-
   constructor(view: EditorView) {
-    // Initial load
+    // Initial load only
     this.processImagesInView(view)
-    this.hasInitialized = true
   }
 
   update(update: ViewUpdate) {
-    // Only process in these cases:
-    // 1. Editor becomes visible (viewportChanged)
-    // 2. Editor gains focus and hasn't been initialized
-    if ((update.viewportChanged && !this.hasInitialized) || 
-        (update.focusChanged && update.view.hasFocus && !this.hasInitialized)) {
+    // Only process if content was pasted or explicit image upload
+    if (update.transactions.some(tr => 
+      tr.annotation(Transaction.userEvent) === "paste" ||
+      tr.annotation(Transaction.userEvent) === "input.drop"
+    )) {
       this.processImagesInView(update.view)
-      this.hasInitialized = true
     }
   }
 
@@ -88,24 +83,24 @@ const imageLoaderPlugin = ViewPlugin.fromClass(class {
         const fullMatch = text.slice(fullMatchStart, match.index + match[0].length + 1)
         const imageId = match[0].match(/indexdb:\/\/(img_[^)\s]+)/)?.[1]
 
-        if (imageId && !this.processedImages.has(`${line.from}-${imageId}`)) {
+        if (imageId) {
           const from = line.from + fullMatchStart
           const to = line.from + fullMatchStart + fullMatch.length
 
           try {
             const imageData = await indexDBOverlay.getItem('images', imageId)
             if (imageData?.data) {
+              // Verify positions are still valid
               const currentDoc = view.state.doc
               if (from <= currentDoc.length && to <= currentDoc.length) {
+                // Add hiding decoration
                 newDecorations.push(Decoration.replace({}).range(from, to))
+                // Add image widget
                 newDecorations.push(Decoration.widget({
                   widget: new ImageWidget(imageData.data, imageId),
                   block: true,
                   side: 1
                 }).range(to))
-                
-                // Mark this image as processed
-                this.processedImages.add(`${line.from}-${imageId}`)
               }
             }
           } catch (error) {
@@ -241,43 +236,8 @@ const imageUploadStyle = EditorView.theme({
   }
 })
 
-// Add this paste handler function
-const handlePaste = EditorView.domEventHandlers({
-  paste(event: ClipboardEvent, view: EditorView) {
-    const items = event.clipboardData?.items
-    if (!items) return false
-
-    const imageItems = Array.from(items).filter(item => 
-      item.type.startsWith('image/')
-    )
-
-    if (imageItems.length > 0) {
-      event.preventDefault()
-      
-      const pos = view.state.selection.main.head
-      // Process each image in the clipboard
-      imageItems.forEach(async (item) => {
-        const file = item.getAsFile()
-        if (file) {
-          try {
-            await processImageFile(file, view)
-          } catch (error) {
-            console.error('Failed to process pasted image:', error)
-          }
-        }
-      })
-      
-      return true
-    }
-
-    return false
-  }
-})
-
-// Update the extension export to include the paste handler
 export const imageUploadExtension = [
   imageStateField,
   imageLoaderPlugin,
-  imageUploadStyle,
-  handlePaste
+  imageUploadStyle
 ] 

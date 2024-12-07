@@ -8,7 +8,7 @@ export interface ImageProcessingResult {
   dataUrl: string;
 }
 
-export async function processImageFile(file: File, view: EditorView, pos?: number): Promise<ImageProcessingResult> {
+export async function processImageFile(file: File, view: EditorView, pos?: number, caption?: string): Promise<ImageProcessingResult> {
   console.log('Starting shared image processing for:', file.name)
   
   const imageId = `img_${generateUniqueId(8)}`

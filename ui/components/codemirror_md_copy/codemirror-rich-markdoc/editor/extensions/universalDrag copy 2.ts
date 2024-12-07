@@ -1,165 +1,211 @@
-import { EditorView, ViewPlugin, DecorationSet, Decoration, WidgetType, ViewUpdate } from "@codemirror/view"
-import { StateEffect, EditorState, StateField } from "@codemirror/state"
-
-// Effect for the drop target and visual feedback
-const setDropTargetEffect = StateEffect.define<{
-    pos: number | null,
-    height?: number,
-    offset?: number
-}>()
+import { EditorView, ViewPlugin } from "@codemirror/view"
+// import { StateEffect, EditorState, StateField } from "@codemirror/state"
+import { processImageFile as imageUploadProcessor } from './imageUpload'
 
 // Define the drag handler first
 const universalDragHandler = EditorView.domEventHandlers({
-    dragover(event: DragEvent, view: EditorView) {
-        event.preventDefault()
-        event.stopPropagation()
-        
-        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY })
-        if (pos === null) return false
+    dragenter(event: DragEvent) {
+        event.preventDefault();
+        return false;
+    },
 
-        // Show drop target
-        const line = view.lineBlockAt(pos)
-        view.dispatch({
-            effects: setDropTargetEffect.of({ 
-                pos,
-                height: line.height
-            })
-        })
+    dragover(event: DragEvent, view: EditorView) {
+        event.preventDefault();
         
-        console.log('Drag over event triggered at pos:', pos)
-        return true
+        // Check for files in different ways
+        const hasFiles = event.dataTransfer?.types.includes('Files') ||
+                        (event.dataTransfer?.items && Array.from(event.dataTransfer.items).some(item => item.kind === 'file')) ||
+                        (event.dataTransfer?.files && event.dataTransfer.files.length > 0);
+
+        if (hasFiles) {
+            // Visual feedback that we can handle the drop
+            view.dom.classList.add('cm-file-drag-active');
+        }
+
+        // Set dropEffect based on content type
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = hasFiles ? 'copy' : 'move';
+        }
+
+        return true;
+    },
+
+    dragleave(event: DragEvent, view: EditorView) {
+        view.dom.classList.remove('cm-file-drag-active');
+        return false;
     },
     
     drop(event: DragEvent, view: EditorView) {
-        event.preventDefault()
-        event.stopPropagation()
+        event.preventDefault();
+        view.dom.classList.remove('cm-file-drag-active');
         
-        // Get the dragged content from the current plugin instance
-        const plugin = view.plugin(universalDragPlugin)
-        if (!plugin || !plugin.dragStartPos || !plugin.currentContent) {
-            console.log('No drag content available in plugin')
-            return false
-        }
+        const dropPos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (dropPos === null) return false;
 
-        const dropPos = view.posAtCoords({ x: event.clientX, y: event.clientY })
-        if (dropPos === null) {
-            console.log('Invalid drop position')
-            return false
-        }
-
-        // Don't allow dropping within the selection
-        if (dropPos >= plugin.dragStartPos.from && dropPos <= plugin.dragStartPos.to) {
-            console.log('Dropped within selection, canceling')
-            view.dispatch({ effects: setDropTargetEffect.of({ pos: null }) })
-            return false
-        }
-
-        console.log('Performing drop operation', { 
-            content: plugin.currentContent, 
-            dropPos, 
-            range: plugin.dragStartPos 
-        })
-        
-        // Add spaces around the content unless it's an image
-        const contentWithSpaces = plugin.isImage 
-            ? plugin.currentContent + '\n'
-            : ` ${plugin.currentContent} `
-        
-        // Perform the drop operation
+        // Update cursor position
         view.dispatch({
-            changes: [
-                { from: plugin.dragStartPos.from, to: plugin.dragStartPos.to, insert: '' },  // Remove from original position
-                { from: dropPos, insert: contentWithSpaces }  // Insert at new position with spaces
-            ],
-            effects: setDropTargetEffect.of({ pos: null })
-        })
-        
-        view.dom.classList.remove('cm-dragging-active')
-        return true
-    },
-    
-    dragend(event: DragEvent, view: EditorView) {
-        event.preventDefault()
-        event.stopPropagation()
-        
-        // Clean up
-        view.dom.classList.remove('cm-dragging-active')
-        view.dispatch({
-            effects: setDropTargetEffect.of({ pos: null })
-        })
-        
-        console.log('Drag end event triggered')
-        return true
-    }
-})
+            selection: { anchor: dropPos }
+        });
 
-class DropTargetWidget extends WidgetType {
-    constructor(readonly height: number) {
-        super()
-    }
+        // Handle files from different sources
+        let files: File[] = [];
 
-    toDOM() {
-        const wrapper = document.createElement('div')
-        wrapper.className = 'cm-drop-target-wrapper'
-        
-        const cursor = document.createElement('div')
-        cursor.className = 'cm-drop-target-cursor'
-        
-        wrapper.appendChild(cursor)
-        return wrapper
-    }
-}
+        // Check DataTransfer.files
+        if (event.dataTransfer?.files?.length) {
+            files = Array.from(event.dataTransfer.files);
+        }
+        // Check DataTransfer.items
+        else if (event.dataTransfer?.items?.length) {
+            files = Array.from(event.dataTransfer.items)
+                .filter(item => item.kind === 'file')
+                .map(item => item.getAsFile())
+                .filter((file): file is File => file !== null);
+        }
 
-// Create a state field to store the plugin instance
-const dragPluginField = StateField.define<UniversalDragPlugin | null>({
-    create: () => null,
-    update: (value, tr) => value
-})
+        // Process image files
+        const imageFiles = files.filter(file => file.type.startsWith('image/'));
+        if (imageFiles.length) {
+            Promise.all(imageFiles.map(file => 
+                imageUploadProcessor(file, view)
+                    .catch(error => {
+                        console.error('Error processing dropped image:', error);
+                        // Show error to user
+                        view.dispatch({
+                            changes: {
+                                from: dropPos,
+                                insert: `\nError uploading image ${file.name}: ${error.message}\n`
+                            }
+                        });
+                    })
+            ));
+            return true;
+        }
+
+        // Handle regular text drag and drop
+        const plugin = view.plugin(universalDragPlugin);
+        if (plugin?.dragStartPos && plugin.currentContent) {
+            // Handle internal drag and drop
+            if (dropPos >= plugin.dragStartPos.from && dropPos <= plugin.dragStartPos.to) {
+                return false;
+            }
+
+            const contentWithNewline = plugin.isImage 
+                ? plugin.currentContent + '\n'
+                : plugin.currentContent;
+
+            view.dispatch({
+                changes: [
+                    { from: plugin.dragStartPos.from, to: plugin.dragStartPos.to, insert: '' },
+                    { from: dropPos, insert: contentWithNewline }
+                ]
+            });
+            return true;
+        }
+
+        // Handle text from external sources
+        if (event.dataTransfer?.getData('text/plain')) {
+            const text = event.dataTransfer.getData('text/plain');
+            view.dispatch({
+                changes: { from: dropPos, insert: text }
+            });
+            return true;
+        }
+
+        return false;
+    }
+});
+
+// Add CSS for drag feedback
+const dragStyle = EditorView.theme({
+    '&.cm-file-drag-active': {
+        border: '2px dashed #007bff',
+        borderRadius: '4px',
+        background: 'rgba(0, 123, 255, 0.1)'
+    }
+});
 
 class UniversalDragPlugin {
-    decorations: DecorationSet
     dragStartPos: { from: number, to: number } | null = null
-    isImage: boolean = false
     currentContent: string = ''
-    dropTarget: number | null = null
-    lastInsertPos: { from: number, to: number } | null = null
+    isImage: boolean = false
 
     constructor(view: EditorView) {
-        this.decorations = Decoration.none
-        
-        // Make the editor draggable
-        view.dom.setAttribute('draggable', 'true')
-        
-        console.log('UniversalDragPlugin initialized')
-        
-        // Setup drag listeners
         this.setupDragListeners(view)
     }
 
     private setupDragListeners(view: EditorView) {
         view.dom.addEventListener('mousedown', (e) => {
-            console.log('mousedown event', e)
             if (e.detail === 2) return // Allow double-click text selection
             
             const target = e.target as HTMLElement
             if (target.matches('.cm-image-widget img')) {
-                console.log('Found image widget')
+                const img = target as HTMLImageElement
+                const isMermaid = img.src.startsWith('data:image/svg+xml;base64,')
+                
                 const parent = target.closest('.cm-image-widget')
                 if (parent) {
                     const imgPos = view.posAtDOM(parent)
                     if (imgPos !== null) {
                         const line = view.state.doc.lineAt(imgPos)
-                        this.dragStartPos = { from: line.from, to: line.to }
-                        this.isImage = true
-                        this.currentContent = view.state.sliceDoc(line.from, line.to)
-                        target.draggable = true
-                        view.dom.classList.add('cm-dragging-active')
-                        console.log('Image drag setup:', { content: this.currentContent, pos: this.dragStartPos })
+                        const text = line.text
+                        const imageMatch = text.match(/!\[.*?\]\(indexdb:\/\/.*?\)/)
+                        
+                        if (imageMatch) {
+                            const matchStart = line.from + text.indexOf(imageMatch[0])
+                            const matchEnd = matchStart + imageMatch[0].length
+                            
+                            // Look for caption in next line
+                            const nextLine = view.state.doc.lineAt(Math.min(line.to + 1, view.state.doc.length))
+                            const hasCaption = nextLine.text.startsWith('*Figure:')
+
+                            this.dragStartPos = {
+                                from: matchStart,
+                                to: hasCaption ? nextLine.to : matchEnd
+                            }
+                            this.isImage = true
+                            this.currentContent = view.state.sliceDoc(
+                                this.dragStartPos.from,
+                                this.dragStartPos.to
+                            )
+
+                            // Only add file handling for SVG base64 images (Mermaid)
+                            if (isMermaid) {
+                                target.addEventListener('dragstart', (dragEvent) => {
+                                    if (!dragEvent.dataTransfer) return
+                                    
+                                    // Create the file from base64
+                                    const blob = this.base64ToBlob(img.src)
+                                    const file = new File([blob], 'mermaid-diagram.svg', { type: 'image/svg+xml' })
+                                    
+                                    // Clear existing items
+                                    for (let i = dragEvent.dataTransfer.items.length - 1; i >= 0; i--) {
+                                        dragEvent.dataTransfer.items.remove(i)
+                                    }
+                                    
+                                    // Add the file using items.add()
+                                    dragEvent.dataTransfer.items.add(file)
+                                    
+                                    // Set additional data
+                                    dragEvent.dataTransfer.setData('text/plain', this.currentContent)
+                                    dragEvent.dataTransfer.setData('application/json', JSON.stringify({
+                                        type: 'mermaid-diagram',
+                                        content: this.currentContent
+                                    }))
+                                    
+                                    // Set effectAllowed to all possible operations
+                                    dragEvent.dataTransfer.effectAllowed = 'all'
+                                }, { once: true })
+                            }
+
+                            target.draggable = true
+                            view.dom.classList.add('cm-dragging-active')
+                        }
                     }
                 }
                 return
             }
 
+            // Handle regular text drag
             const pos = view.posAtCoords({ x: e.clientX, y: e.clientY })
             if (pos === null) return
 
@@ -168,111 +214,30 @@ class UniversalDragPlugin {
                 this.dragStartPos = { from: selection.from, to: selection.to }
                 this.isImage = false
                 this.currentContent = view.state.sliceDoc(selection.from, selection.to)
-                
-                // Create a draggable overlay for the selection
-                const selectionCoords = view.coordsAtPos(selection.from)
-                const endCoords = view.coordsAtPos(selection.to)
-                if (selectionCoords && endCoords) {
-                    const overlay = document.createElement('div')
-                    overlay.setAttribute('draggable', 'true')
-                    overlay.className = 'cm-drag-overlay'
-                    overlay.style.position = 'absolute'
-                    overlay.style.left = `${selectionCoords.left}px`
-                    overlay.style.top = `${selectionCoords.top}px`
-                    overlay.style.width = `${endCoords.right - selectionCoords.left}px`
-                    overlay.style.height = `${endCoords.bottom - selectionCoords.top}px`
-                    overlay.style.pointerEvents = 'all'
-                    overlay.style.cursor = 'move'
-                    
-                    view.dom.appendChild(overlay)
-                    
-                    // Add dragstart event listener to the overlay
-                    overlay.addEventListener('dragstart', (e) => {
-                        console.log('Overlay dragstart event', e)
-                        if (!this.dragStartPos || !this.currentContent) {
-                            console.log('No drag content available')
-                            return
-                        }
-                        
-                        e.dataTransfer?.setData('text/plain', this.currentContent)
-                        e.dataTransfer?.setData('application/x-editor-range', 
-                            JSON.stringify(this.dragStartPos))
-                        e.dataTransfer?.setData('application/x-is-image', String(this.isImage))
-
-                        const ghost = document.createElement('div')
-                        ghost.className = 'cm-drag-ghost'
-                        ghost.textContent = this.currentContent.length > 50 
-                            ? this.currentContent.slice(0, 47) + '...' 
-                            : this.currentContent
-                        document.body.appendChild(ghost)
-                        e.dataTransfer?.setDragImage(ghost, 10, 10)
-                        setTimeout(() => ghost.remove(), 0)
-                        
-                        console.log('Drag initiated with:', { 
-                            content: this.currentContent, 
-                            range: this.dragStartPos,
-                            isImage: this.isImage 
-                        })
-                    })
-
-                    // Remove overlay after drag starts or mouseup
-                    const cleanup = () => {
-                        overlay.remove()
-                        view.dom.removeEventListener('dragstart', cleanup)
-                        view.dom.removeEventListener('mouseup', cleanup)
-                    }
-                    
-                    view.dom.addEventListener('dragstart', cleanup)
-                    view.dom.addEventListener('mouseup', cleanup)
-                }
-                
-                view.dom.classList.add('cm-dragging-active')
-                console.log('Text drag setup:', { content: this.currentContent, pos: this.dragStartPos })
             }
         })
-
-        // Add cleanup on mouseup
-        view.dom.addEventListener('mouseup', () => {
-            // Remove any temporary draggable spans
-            view.dom.querySelectorAll('span[draggable="true"]').forEach(span => {
-                const parent = span.parentNode;
-                if (parent) {
-                    while (span.firstChild) {
-                        parent.insertBefore(span.firstChild, span);
-                    }
-                    parent.removeChild(span);
-                }
-            });
-        });
     }
 
-    update(update: ViewUpdate) {
-        for (const tr of update.transactions) {
-            for (const effect of tr.effects) {
-                if (effect.is(setDropTargetEffect)) {
-                    console.log('Drop target effect:', effect.value)
-                    this.dropTarget = effect.value.pos
-                    if (this.dropTarget !== null) {
-                        const widget = Decoration.widget({
-                            widget: new DropTargetWidget(effect.value.height || 20),
-                            side: 1
-                        })
-                        this.decorations = Decoration.set([widget.range(this.dropTarget)])
-                    } else {
-                        this.decorations = Decoration.none
-                    }
-                }
-            }
+    // Helper function to convert base64 to Blob
+    private base64ToBlob(base64: string): Blob {
+        const parts = base64.split(';base64,')
+        const contentType = parts[0].split(':')[1] || 'image/svg+xml'
+        const raw = window.atob(parts[1])
+        const rawLength = raw.length
+        const uInt8Array = new Uint8Array(rawLength)
+        
+        for (let i = 0; i < rawLength; ++i) {
+            uInt8Array[i] = raw.charCodeAt(i)
         }
+        
+        return new Blob([uInt8Array], { type: contentType })
     }
 }
 
-const universalDragPlugin = ViewPlugin.fromClass(UniversalDragPlugin, {
-    decorations: v => v.decorations
-})
+const universalDragPlugin = ViewPlugin.fromClass(UniversalDragPlugin)
 
 export const universalDragExtension = [
-    dragPluginField,
     universalDragPlugin,
-    universalDragHandler
+    universalDragHandler,
+    dragStyle
 ]

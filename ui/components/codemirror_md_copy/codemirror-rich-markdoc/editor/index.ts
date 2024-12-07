@@ -19,6 +19,7 @@ import { yCollab } from 'y-codemirror.next';
 import * as Y from 'yjs';
 import { Awareness } from 'y-protocols/awareness';
 import { universalDragExtension } from './extensions/universalDrag'
+import { createSafetyExtension } from './extensions/safetyExtension';
 
 
 
@@ -50,6 +51,8 @@ export function createEditorState(ytext: Y.Text, awareness: Awareness) {
       rectangularSelection(),
       highlightActiveLine(),
       indentOnInput(),
+      // simpleSafetyExtension(), //
+      createSafetyExtension(),
       syntaxHighlighting(defaultHighlightStyle),
       yCollab(ytext, awareness),
       EditorView.updateListener.of((update) => {

@@ -11,6 +11,12 @@ reorganize 3d space by smilar articles using embeddings matches
 4) cluster issue camera?
 NICE DRAG https://discuss.codemirror.net/t/implement-draggable-ranges-object-through-mouse-curser/4655/4
 5) aalert to delete note (or stash it?) 
+6) fix askai askAi.ts:198 Error getting response: RangeError: Invalid change range 53 to 67 (in doc of length 65)
+    at AIPluginView.handleAIRequest (askAi.ts:118:12)
+7) remve loader on diagram fail
+8) placeholdr for text in editor shows over other text
+
+
 ****
 embedding pool workers
 enter your name for record keeping

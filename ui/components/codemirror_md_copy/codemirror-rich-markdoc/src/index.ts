@@ -5,6 +5,8 @@ import { Extension } from '@codemirror/state';
 import { atMentionsExtension } from '../editor/extensions/atMentions';
 import { imageUploadExtension } from '../editor/extensions/imageUpload';
 import { mermaidGenerationExtension } from '../editor/extensions/mermaidGeneration';
+import '../editor/extensions/asciiDiagramGeneration'; // Add this import
+
 
 import tagParser from './tagParser';
 import highlightStyle from './highlightStyle';
