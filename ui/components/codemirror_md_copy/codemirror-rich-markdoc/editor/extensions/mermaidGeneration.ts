@@ -292,14 +292,17 @@ class MermaidGenerationPlugin {
         } catch (error: unknown) {
             console.error('Failed to generate diagram:', error);
             
+            // Clear skeleton before falling back to ASCII
+            this.clearSkeletonLoader(view);
+            
             // Try ASCII fallback after all retries fail
             if (retryCount >= this.MAX_RETRIES) {
                 toast.show('Falling back to ASCII diagram generation...', 'warning');
                 try {
                     await handleAsciiDiagramFallback(view, line);
+                    completeMasterStatus("ASCII diagram generated");
                     return;
                 } catch (fallbackError) {
-                    // If fallback fails, continue with original error handling
                     console.error('ASCII fallback also failed:', fallbackError);
                 }
             }

@@ -130,12 +130,12 @@ const imageStateField = StateField.define<DecorationSet>({
     return Decoration.none
   },
   update(decorations, tr) {
+    // Map existing decorations through document changes
     decorations = decorations.map(tr.changes)
     
     for (let e of tr.effects) {
       if (e.is(imageEffect)) {
-        // Create decorations array and sort by position
-        const decos = [
+        const newDecos = [
           Decoration.replace({
             inclusive: true,
             block: false
@@ -146,9 +146,13 @@ const imageStateField = StateField.define<DecorationSet>({
             block: true,
             side: 1
           }).range(e.value.to)
-        ].sort((a, b) => a.from - b.from)  // Sort by 'from' position
+        ]
         
-        return Decoration.set(decos, true)
+        // Combine new decorations with existing ones
+        decorations = decorations.update({
+          add: newDecos,
+          sort: true
+        })
       }
     }
 

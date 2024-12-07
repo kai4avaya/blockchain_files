@@ -318,29 +318,17 @@ async initialize() {
       // Prevent closing if there's only one tab open
    
 
-     // Get the tab content and title for the confirmation message
-  const content = this.editors[index].state.doc.toString().trim();
-  const title = (this.tabList.children[index].querySelector(".tab-title") as HTMLElement).textContent || "Untitled";
-  
-  // Only show confirmation if there's content in the tab
-  if (content && isDeleted) {
-    const confirmMessage = `Are you sure you want to close "${title}"? Any unsaved changes will be lost.`;
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-  }
-
-  const docId = this.yjsProviders[index].getDocId();
-
-  if (isDeleted && docId !== null) {
-    this.deleteTabFromDB(docId);
-  } else {
-    this.updateTabInDB(docId, {
-      isHidden: true,
-      draggedToCanvas: true
-    });
-  }
-
+      // const tabId = this.editors[index].dom.getAttribute('data-tab-id');
+      const docId = this.yjsProviders[index].getDocId();
+    
+      if (isDeleted && docId !== null) {
+        this.deleteTabFromDB(docId); // Delete from IndexDB
+      } else {
+          this.updateTabInDB(docId, {
+          isHidden: true,
+          draggedToCanvas: true
+      });
+      }
 
       // Remove the editor view from the DOM
       this.editors[index].destroy();
