@@ -1,5 +1,5 @@
 import { EditorView, ViewPlugin, Decoration, DecorationSet, WidgetType, ViewUpdate, KeyBinding } from "@codemirror/view"
-import { StateEffect, StateField, Transaction } from "@codemirror/state"
+import { StateEffect, StateField } from "@codemirror/state"
 import indexDBOverlay from "../../../../../../memory/local/file_worker"
 import { generateUniqueId } from "../../../../../../utils/utils"
 // import { processImageFile as sharedProcessImageFile } from './imageProcessor'
@@ -10,6 +10,12 @@ export const imageEffect = StateEffect.define<{
   to: number,
   imageData: string,
   alt: string
+}>()
+
+// Effect to handle image removal
+export const imageClearEffect = StateEffect.define<{
+  from: number,
+  to: number
 }>()
 
 // Widget to render the image preview
@@ -59,72 +65,101 @@ const imageLoaderPlugin = ViewPlugin.fromClass(class {
   constructor(view: EditorView) {
     // Initial load
     this.processImagesInView(view)
-    this.hasInitialized = true
   }
 
   update(update: ViewUpdate) {
-    // Only process in these cases:
-    // 1. Editor becomes visible (viewportChanged)
-    // 2. Editor gains focus and hasn't been initialized
-    if ((update.viewportChanged && !this.hasInitialized) || 
-        (update.focusChanged && update.view.hasFocus && !this.hasInitialized)) {
+    // Only process images when:
+    // 1. Initial load (!hasInitialized)
+    // 2. Document changes that actually modify content
+    // 3. Viewport changes that might reveal new images
+    if (
+      // !this.hasInitialized || 
+        // (update.docChanged && !update.changes.empty) || 
+        update.viewportChanged) {
+      console.log("Processing images due to:", {
+        isInitial: !this.hasInitialized,
+        docChanged: update.docChanged,
+        viewportChanged: update.viewportChanged
+      });
       this.processImagesInView(update.view)
       this.hasInitialized = true
     }
   }
 
   async processImagesInView(view: EditorView) {
+    console.log("Starting processImagesInView");
+    this.processedImages.clear()
+    
     const doc = view.state.doc
-    const newDecorations: any[] = []
     
     for (let i = 1; i <= doc.lines; i++) {
-      const line = doc.line(i)
-      const text = line.text
-      const regex = /([^[]*?)\]\((indexdb:\/\/[^)\s]+)/g
-      let match
+        const line = doc.line(i)
+        const text = line.text
+        console.log("Processing line:", {
+            lineNumber: i,
+            text
+        }); 
 
-      while ((match = regex.exec(text)) !== null) {
-        const fullMatchStart = Math.max(0, match.index - 2)
-        const fullMatch = text.slice(fullMatchStart, match.index + match[0].length + 1)
-        const imageId = match[0].match(/indexdb:\/\/(img_[^)\s]+)/)?.[1]
+        // Updated regex to match both ![] and <[] patterns
+        const regex = /[!<]\[(.*?)\]\((indexdb:\/\/[^)]+)\)/g
+        let match
 
-        if (imageId && !this.processedImages.has(`${line.from}-${imageId}`)) {
-          const from = line.from + fullMatchStart
-          const to = line.from + fullMatchStart + fullMatch.length
+        while ((match = regex.exec(text)) !== null) {
+            const fullMatchStart = line.from + match.index
+            const fullMatch = match[0]
+            const imageId = match[0].match(/indexdb:\/\/(img_[^)\s]+)/)?.[1]
+            const altText = match[1] || ''
 
-          try {
-            const imageData = await indexDBOverlay.getItem('images', imageId)
-            if (imageData?.data) {
-              const currentDoc = view.state.doc
-              if (from <= currentDoc.length && to <= currentDoc.length) {
-                newDecorations.push(Decoration.replace({}).range(from, to))
-                newDecorations.push(Decoration.widget({
-                  widget: new ImageWidget(imageData.data, imageId),
-                  block: true,
-                  side: 1
-                }).range(to))
-                
-                // Mark this image as processed
-                this.processedImages.add(`${line.from}-${imageId}`)
-              }
+            console.log("Found image match:", {
+                imageId,
+                altText,
+                fullMatch,
+                lineFrom: line.from,
+                fullMatchStart,
+                fullMatchEnd: fullMatchStart + fullMatch.length,
+                lineText: text
+            });
+
+            if (imageId && !this.processedImages.has(`${line.from}-${imageId}`)) {
+                try {
+                    console.log("Fetching image data for:", imageId);
+                    const imageData = await indexDBOverlay.getItem('images', imageId)
+                    if (imageData?.data) {
+                        const from = fullMatchStart
+                        const to = from + fullMatch.length
+
+                        console.log("Dispatching image effect:", {
+                            from,
+                            to,
+                            hasImageData: !!imageData.data,
+                            imageId
+                        });
+
+                        view.dispatch({
+                            effects: imageEffect.of({
+                                from,
+                                to,
+                                imageData: imageData.data,
+                                alt: altText
+                            })
+                        })
+                        
+                        this.processedImages.add(`${line.from}-${imageId}`)
+                        console.log("Successfully processed image:", imageId);
+                    } else {
+                        console.warn("No image data found for:", imageId);
+                    }
+                } catch (error) {
+                    console.error('Failed to load image:', imageId, error)
+                }
             }
-          } catch (error) {
-            console.error('Failed to load image:', imageId, error)
-          }
         }
-      }
     }
-
-    if (newDecorations.length > 0) {
-      view.dispatch({
-        effects: StateEffect.appendConfig.of([
-          EditorView.decorations.of(Decoration.set(newDecorations, true))
-        ])
-      })
-    }
+    console.log("Finished processImagesInView");
   }
 })
 
+// Update imageStateField to handle both initial load and drag-drop
 const imageStateField = StateField.define<DecorationSet>({
   create() {
     return Decoration.none
@@ -132,27 +167,83 @@ const imageStateField = StateField.define<DecorationSet>({
   update(decorations, tr) {
     // Map existing decorations through document changes
     decorations = decorations.map(tr.changes)
-    
+
     for (let e of tr.effects) {
       if (e.is(imageEffect)) {
-        const newDecos = [
-          Decoration.replace({
-            inclusive: true,
-            block: false
-          }).range(e.value.from, e.value.to),
-          
-          Decoration.widget({
-            widget: new ImageWidget(e.value.imageData, e.value.alt),
-            block: true,
-            side: 1
-          }).range(e.value.to)
-        ]
-        
-        // Combine new decorations with existing ones
-        decorations = decorations.update({
-          add: newDecos,
-          sort: true
+        // Check if we already have a decoration for this range
+        let hasExistingDecoration = false
+        decorations.between(e.value.from, e.value.to, () => {
+          hasExistingDecoration = true
+          return false
         })
+
+        if (!hasExistingDecoration) {
+          console.log("Adding new image decoration at:", {
+            from: e.value.from,
+            to: e.value.to,
+            alt: e.value.alt
+          });
+
+          const newDecos = [
+            Decoration.replace({
+              inclusive: true,
+              block: false
+            }).range(e.value.from, e.value.to),
+            
+            Decoration.widget({
+              widget: new ImageWidget(e.value.imageData, e.value.alt),
+              block: true,
+              side: 1
+            }).range(e.value.to)
+          ]
+          
+          decorations = decorations.update({
+            add: newDecos,
+            sort: true
+          })
+        } else {
+          console.log("Skipping duplicate decoration at:", {
+            from: e.value.from,
+            to: e.value.to
+          });
+        }
+      }
+
+      if (e.is(imageClearEffect)) {
+        const existingDecos: { from: number; to: number; type: string }[] = [];
+        decorations.between(0, tr.state.doc.length, (from, to, value) => {
+          existingDecos.push({
+            from,
+            to,
+            type: value.constructor.name
+          });
+          return false;
+        });
+
+        console.log("Attempting to clear decorations in range:", {
+          from: e.value.from,
+          to: e.value.to,
+          existingDecorations: existingDecos
+        });
+        
+        // Find the decoration that corresponds to the image markdown
+        const imageMarkdownDeco = existingDecos.find(d => 
+          Math.abs(d.from - e.value.from) < 5 || // Allow small offset
+          Math.abs(d.to - e.value.to) < 5     // Allow small offset
+        );
+
+        if (imageMarkdownDeco) {
+          console.log("Found matching decoration to remove:", imageMarkdownDeco);
+          decorations = decorations.update({
+            filter: (from, to) => {
+              const isImageDeco = Math.abs(from - imageMarkdownDeco.from) < 5 && 
+                                Math.abs(to - imageMarkdownDeco.to) < 5;
+              const keep = !isImageDeco;
+              console.log("Filtering decoration:", { from, to, isImageDeco, keep });
+              return keep;
+            }
+          });
+        }
       }
     }
 
@@ -197,6 +288,146 @@ export async function processImageFile(file: File, view: EditorView, caption?: s
     console.error('Failed to process image:', error)
     throw error
   }
+}
+
+// Add helper function to convert data URL to blob
+function dataURLtoBlob(dataURL: string): Blob {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+}
+
+// Update the drag handler part in processImageFileAtPosition
+export async function processImageFileAtPosition(
+    file: File, 
+    view: EditorView, 
+    position: number, 
+    shouldSave: boolean = true,
+    originalImage?: { from: number, to: number, imageId: string }
+) {
+    try {
+        // If we have original image info, remove it first
+        if (originalImage) {
+            console.log("Removing original image at:", originalImage);
+            
+            // Remove the original image markdown and decoration
+            view.dispatch({
+                changes: { from: originalImage.from, to: originalImage.to + 1, insert: '' }, // +1 for newline
+                effects: imageClearEffect.of({ from: originalImage.from, to: originalImage.to })
+            });
+            
+            // Wait for the removal to complete
+            await new Promise(resolve => setTimeout(resolve, 0));
+            
+            // Use the original image data
+            const originalImageData = await indexDBOverlay.getItem('images', originalImage.imageId);
+            if (originalImageData?.data) {
+                file = new File(
+                    [dataURLtoBlob(originalImageData.data)],
+                    file.name,
+                    { type: 'image/png' }
+                );
+            }
+        }
+
+        // Ensure position is within document bounds
+        const docLength = view.state.doc.length;
+        position = Math.min(position, docLength);
+        
+        console.log("Processing image at position:", {
+            requestedPosition: position,
+            docLength,
+            adjustedPosition: position,
+            shouldSave
+        });
+
+        const imageId = `img_${generateUniqueId()}`
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+        })
+
+        if (shouldSave) {
+            await indexDBOverlay.saveData('images', {
+                id: imageId,
+                data: dataUrl,
+                filename: file.name,
+                createdAt: Date.now()
+            })
+        }
+
+        const imageMarkdown = `![${file.name}](indexdb://${imageId})\n`
+
+        console.log("decorations shouldSave", shouldSave)
+
+        // Find and remove the original image if it exists (when repositioning)
+        if (!shouldSave) {
+            const doc = view.state.doc
+            const docText = doc.toString()
+            // Updated regex to be more flexible with newlines and handle escaped characters
+            const regex = new RegExp(`!\\[${file.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]\\(indexdb://[^)]+\\)\\n?`, 'g')
+            
+            let match
+            while ((match = regex.exec(docText)) !== null) {
+                const from = match.index
+                const to = from + match[0].length
+
+                // Get current decorations in a type-safe way
+                const currentDecos: { from: number; to: number; type: string }[] = [];
+                view.state.field(imageStateField).between(0, doc.length, (from, to, value) => {
+                    currentDecos.push({
+                        from,
+                        to,
+                        type: value.constructor.name
+                    });
+                    return false;
+                });
+
+                console.log("Found original image at:", { 
+                    from, 
+                    to, 
+                    matchedText: match[0],
+                    currentDecorations: currentDecos
+                })
+                
+                // Dispatch the removal separately to ensure it's processed first
+                view.dispatch({
+                    changes: { from, to, insert: '' },
+                    effects: imageClearEffect.of({ from, to })
+                })
+                
+                // Wait for next tick before adding the new image
+                await new Promise(resolve => setTimeout(resolve, 0))
+                break
+            }
+        }
+
+        console.log("Adding new image at:", { position, markdown: imageMarkdown });
+
+        // Add the image at the new position
+        view.dispatch({
+            changes: { from: position, insert: imageMarkdown },
+            effects: imageEffect.of({
+                from: position,
+                to: position + imageMarkdown.length - 1,
+                imageData: dataUrl,
+                alt: file.name
+            })
+        })
+
+        return true
+    } catch (error) {
+        console.error('Failed to process image:', error)
+        throw error
+    }
 }
 
 // Update the CSS to include the overlay
@@ -264,7 +495,8 @@ const handlePaste = EditorView.domEventHandlers({
         const file = item.getAsFile()
         if (file) {
           try {
-            await processImageFile(file, view)
+            // await processImageFile(file, view)
+            processImageFileAtPosition(file, view, pos, true)
           } catch (error) {
             console.error('Failed to process pasted image:', error)
           }

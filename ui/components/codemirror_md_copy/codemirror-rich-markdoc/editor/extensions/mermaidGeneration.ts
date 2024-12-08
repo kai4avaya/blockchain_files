@@ -357,8 +357,8 @@ class MermaidGenerationPlugin {
         let line = update.state.doc.lineAt(pos);
         
         // Only trigger if the line ends with '>>' and we're not already generating
-        if (line.text.endsWith('>>') && !this.isGenerating) {
-            console.log('Detected >>, triggering diagram generation');
+        if (line.text.endsWith('<<') && !this.isGenerating) {
+            console.log('Detected <<, triggering diagram generation');
             setTimeout(() => this.handleMermaidGeneration(update.view, line), 0);
         }
     }

@@ -128,12 +128,25 @@
 /*  ai */
 
 .cm-ai-placeholder::before {
-  content: '- type // to ask AI anything,\A - type >> to generate a mermaid diagram\A - type @ to mention keywords, files, or folders';
+  content: '- type // to ask AI anything,\A - type << to generate a mermaid diagram\A - type @ to mention keywords, files, or folders';
   white-space: pre;
   color: #888;
   font-style: italic;
   position: absolute;
   left: 4px;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.8;
+}
+
+/* Hide placeholder when line has content */
+.cm-line:not(:empty) .cm-ai-placeholder::before {
+  display: none;
+}
+
+/* New rule to hide placeholder if it intersects with other text */
+.cm-line .cm-ai-placeholder::before {
+  display: none; /* Hide if there's any text in the line */
 }
 
 .overflow-button {

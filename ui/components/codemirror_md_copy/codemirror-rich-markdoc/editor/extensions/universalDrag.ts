@@ -1,6 +1,20 @@
-import { EditorView, ViewPlugin } from "@codemirror/view"
+import { EditorView, ViewPlugin, Decoration } from "@codemirror/view"
 // import { StateEffect, EditorState, StateField } from "@codemirror/state"
-import { processImageFile as imageUploadProcessor } from './imageUpload'
+import { processImageFile as imageUploadProcessor, processImageFileAtPosition} from './imageUpload'
+import indexDBOverlay from "../../../../../../memory/local/file_worker"
+
+// Add the helper function
+function dataURLtoBlob(dataURL: string): Blob {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+}
 
 // Define the drag handler first
 const universalDragHandler = EditorView.domEventHandlers({
@@ -54,36 +68,73 @@ const universalDragHandler = EditorView.domEventHandlers({
         view.dom.classList.remove('cm-file-drag-active');
         
         const dropPos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-        if (dropPos === null) return false;
+        console.log("Drop event initiated:", { dropPos, coords: { x: event.clientX, y: event.clientY } });
+        
+        if (dropPos === null) {
+            console.log("Drop position is null, aborting");
+            return false;
+        }
 
-        // Handle files
-        const files = Array.from(event.dataTransfer?.files || []);
-        if (files.length > 0) {
-            // Get the plugin instance
+        // Check if this is an internal image drag
+        const imageId = event.dataTransfer?.getData('application/x-image-id');
+        if (imageId) {
+            // Find the plugin instance
             const plugin = view.plugin(universalDragPlugin);
-            
-            // If we have a drag start position, remove the original content first
-            if (plugin?.dragStartPos) {
-                view.dispatch({
-                    changes: { 
-                        from: plugin.dragStartPos.from, 
-                        to: plugin.dragStartPos.to, 
-                        insert: '' 
-                    }
-                });
+            if (plugin && plugin.draggedImageInfo) {
+                console.log("Processing internal image drag:", plugin.draggedImageInfo);
+                
+                // Get the image data from the drag event
+                const items = Array.from(event.dataTransfer?.items || []);
+                const imageItem = items.find(item => item.kind === 'file' && item.type.startsWith('image/'));
+                const imageFile = imageItem?.getAsFile();
+                
+                if (imageFile) {
+                    processImageFileAtPosition(
+                        imageFile,
+                        view, 
+                        dropPos, 
+                        false, 
+                        plugin.draggedImageInfo
+                    );
+                } else {
+                    console.error("No image file found in drag data");
+                }
+                
+                plugin.draggedImageInfo = null; // Clear the info
+                return true;
             }
+        }
 
-            // Then process the new files
-            files.forEach(file => {
-                if (file.type.startsWith('image/')) {
-                    imageUploadProcessor(file, view);
+        // Handle external files
+        if (event.dataTransfer?.items) {
+            const items = Array.from(event.dataTransfer.items);
+            const fileItems = items.filter(item => item.kind === 'file');
+            
+            console.log("Processing drop items:", {
+                totalItems: items.length,
+                fileItems: fileItems.map(item => ({
+                    kind: item.kind,
+                    type: item.type
+                }))
+            });
+            
+            fileItems.forEach(item => {
+                const file = item.getAsFile();
+                if (file && file.type.startsWith('image/')) {
+                    console.log("Processing image file:", file.name);
+                    // Pass shouldSave: false for internal drags
+                    processImageFileAtPosition(file, view, dropPos, false) // will need to fix
+                        .catch(error => {
+                            console.error("Error processing dropped image:", error);
+                        });
                 }
             });
             
             return true;
         }
 
-        // ... rest of the code ...
+        console.log("No valid items in dataTransfer");
+        return false;
     }
 });
 
@@ -100,6 +151,9 @@ class UniversalDragPlugin {
     dragStartPos: { from: number, to: number } | null = null
     currentContent: string = ''
     isImage: boolean = false
+    draggedImageInfo: { from: number, to: number, imageId: string } | null = null
+    isDragging: boolean = false
+    draggedFile: File | null = null
 
     constructor(view: EditorView) {
         this.setupDragListeners(view)
@@ -122,67 +176,83 @@ class UniversalDragPlugin {
     
     private setupDragListeners(view: EditorView) {
         view.dom.addEventListener('mousedown', (e) => {
-            if (e.detail === 2) return; // Allow double-click text selection
+            if (e.detail === 2) return;
 
             const target = e.target as HTMLElement;
             if (target.matches('.cm-image-widget img')) {
-                const img = target as HTMLImageElement;
-                const isMermaid = img.src.startsWith('data:image/svg+xml;base64,');
-                const parent = target.closest('.cm-image-widget');
-
-                console.log("MERMAID MOUSEDOWN isMermaid?", isMermaid);
-                
-                if (parent && isMermaid) {
-                    try {
-                        // Create the file immediately in mousedown
-                        const blob = this.base64ToBlob(img.src);
-                        const file = new File([blob], 'mermaid-diagram.svg', { type: 'image/svg+xml' });
+                const widget = target.closest('.cm-image-widget');
+                if (widget) {
+                    const pos = view.posAtDOM(widget);
+                    if (pos !== null) {
+                        const line = view.state.doc.lineAt(pos);
+                        const text = line.text;
+                        const imageMatch = text.match(/!\[.*?\]\(indexdb:\/\/(img_[^)\s]+)\)/);
                         
-                        console.log("MOUSEDOWN Created file:", {
-                            name: file.name,
-                            size: file.size,
-                            type: file.type
-                        });
+                        if (imageMatch) {
+                            // Store the exact coordinates of the original image
+                            const from = line.from + text.indexOf(imageMatch[0]);
+                            const to = from + imageMatch[0].length;
+                            const imageId = imageMatch[1];
 
-                        // Store the file in the instance for use in dragstart
-                        const storedFile = file;  // Keep reference to file
-
-                        // Set up dragstart with the already created file
-                        target.addEventListener('dragstart', (dragEvent) => {
-                            if (!dragEvent.dataTransfer) return;
-
-                            console.log("DRAGSTART: Beginning file transfer setup");
+                            console.log("Image drag started:", { from, to, imageId });
+                            this.draggedImageInfo = { from, to, imageId };
+                            this.isDragging = false;
                             
-                            try {
-                                // Clear existing data
-                                dragEvent.dataTransfer.clearData();
+                            target.addEventListener('dragstart', async (dragEvent) => {
+                                if (!dragEvent.dataTransfer) return;
+                                this.isDragging = true;
                                 
-                                // Add the file as a file type
-                                dragEvent.dataTransfer.setData('application/x-mermaid-file', 'dummy');  // Needed to register file type
-                                dragEvent.dataTransfer.items.add(storedFile);
+                                // Get the original image data from indexDB
+                                const originalImageData = await indexDBOverlay.getItem('images', imageId);
+                                if (originalImageData?.data) {
+                                    this.draggedFile = new File(
+                                        [dataURLtoBlob(originalImageData.data)],
+                                        'image.png',
+                                        { type: 'image/png' }
+                                    );
+                                }
                                 
-                                console.log("DRAGSTART: File transfer setup complete", {
-                                    file: storedFile,
-                                    types: dragEvent.dataTransfer.types,
-                                    items: Array.from(dragEvent.dataTransfer.items).map(item => ({
-                                        kind: item.kind,
-                                        type: item.type
-                                    }))
-                                });
+                                const clone = target.cloneNode() as HTMLImageElement;
+                                dragEvent.dataTransfer.setDragImage(clone, 0, 0);
+                                dragEvent.dataTransfer.effectAllowed = 'move';
+                            }, { once: true });
 
-                            } catch (error) {
-                                console.error("Error in dragstart:", error);
-                            }
+                            // Handle both mouseup and dragend
+                            const dragEndHandler = async (event: MouseEvent | DragEvent) => {
+                                if (this.isDragging && this.draggedImageInfo) {
+                                    console.log("Processing drag end at position");
+                                    const dropPos = view.posAtCoords({ 
+                                        x: event.clientX, 
+                                        y: event.clientY 
+                                    });
+                                    
+                                    if (dropPos !== null && this.draggedFile) {
+                                        try {
+                                            await processImageFileAtPosition(
+                                                this.draggedFile,
+                                                view,
+                                                dropPos,
+                                                false,
+                                                this.draggedImageInfo
+                                            );
+                                        } catch (error) {
+                                            console.error("Failed to process dragged image:", error);
+                                        }
+                                    }
+                                }
+                                this.isDragging = false;
+                                this.draggedImageInfo = null;
+                                this.draggedFile = null;
+                                document.removeEventListener('mouseup', dragEndHandler);
+                                document.removeEventListener('dragend', dragEndHandler);
+                            };
 
-                            dragEvent.dataTransfer.effectAllowed = 'copyMove';
-                        }, { once: true });
-
-                        target.draggable = true;
-                        view.dom.classList.add('cm-dragging-active');
-                    } catch (error) {
-                        console.error("Error creating file in mousedown:", error);
+                            document.addEventListener('mouseup', dragEndHandler);
+                            document.addEventListener('dragend', dragEndHandler);
+                        }
                     }
                 }
+                target.draggable = true;
                 return;
             }
 
