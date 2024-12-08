@@ -1091,10 +1091,171 @@ private setupEditorButtons(editor: EditorView, index: number) {
     this.downloadFile(content, `${title}.md`, 'text/markdown');
   };
 
-  const handleDownloadPdf = async () => {
-    const activeEditor = this.editors[this.activeTabIndex];
+// Helper function to convert SVG to PNG data URL
+async function svgToPngDataUrl(svgDataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const scale = 2; // Increase resolution
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d')!;
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = reject;
+    img.src = svgDataUrl;
+  });
+}
+
+async function createPDFWithImages(view: EditorView) {
+  const doc = new jsPDF({
+    unit: 'pt',
+    format: 'a4'
+  });
+  
+  let yOffset = 20;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 20;
+  const textWidth = pageWidth - (2 * margin);
+
+  // Set default styles
+  doc.setFont("helvetica");
+  doc.setFontSize(11);
+  
+  // Get content directly from editor
+  const content = view.state.doc.toString();
+  
+  // Process content line by line
+  const lines = content.split('\n');
+  
+  for (const line of lines) {
+    // Check for heading markers
+    if (line.startsWith('# ')) {
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      const text = line.replace('# ', '');
+      const textLines = doc.splitTextToSize(text, textWidth);
+      
+      // Add extra space before heading
+      yOffset += 10;
+      
+      // Check for page break
+      if (yOffset + (textLines.length * 14) > doc.internal.pageSize.getHeight() - margin) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      
+      doc.text(textLines, margin, yOffset);
+      yOffset += (textLines.length * 14) + 10;
+      
+      // Reset font
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      continue;
+    }
+
+    // Check for image markdown syntax
+    const imageMatch = line.match(/!\[(.*?)\]\(indexdb:\/\/(.*?)\)/);
+    
+    if (imageMatch) {
+      const [_, altText, imageId] = imageMatch;
+      try {
+        const imageData = await indexDBOverlay.getItem('images', imageId);
+        if (imageData?.data) {
+          // Check for page break
+          if (yOffset > doc.internal.pageSize.getHeight() - 100) {
+            doc.addPage();
+            yOffset = 20;
+          }
+
+          // Create temporary image to get dimensions
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = imageData.data;
+          });
+
+          // Calculate dimensions
+          const maxWidth = textWidth;
+          const maxHeight = 300;
+          let { width, height } = img;
+
+          // Maintain aspect ratio
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+
+          // Center the image
+          const xOffset = margin + (textWidth - width) / 2;
+
+          // Add image to PDF
+          doc.addImage(
+            imageData.data,
+            imageData.data.includes('data:image/png') ? 'PNG' : 'JPEG',
+            xOffset,
+            yOffset,
+            width,
+            height
+          );
+
+          yOffset += height + 10;
+
+          // Add caption if exists
+          if (altText) {
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            const captionLines = doc.splitTextToSize(`Figure: ${altText}`, textWidth);
+            doc.text(captionLines, margin, yOffset, { align: 'center' });
+            doc.setFontSize(11);
+            doc.setTextColor(0);
+            yOffset += (captionLines.length * 12) + 10;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to process image:', imageId, error);
+      }
+    } else if (line.trim()) {
+      // Regular text handling
+      const textLines = doc.splitTextToSize(line, textWidth);
+      
+      // Check for page break
+      if (yOffset + (textLines.length * 14) > doc.internal.pageSize.getHeight() - margin) {
+        doc.addPage();
+        yOffset = 20;
+      }
+      
+      doc.text(textLines, margin, yOffset);
+      yOffset += (textLines.length * 14) + 5;
+    }
+  }
+
+  return doc;
+}
+
+// Helper function to determine text style based on markdown
+function getTextStyle(line: string): { fontSize: number; fontStyle: string } {
+  if (line.startsWith('# ')) return { fontSize: 24, fontStyle: 'bold' };
+  if (line.startsWith('## ')) return { fontSize: 20, fontStyle: 'bold' };
+  if (line.startsWith('### ')) return { fontSize: 16, fontStyle: 'bold' };
+  if (line.match(/^```/)) return { fontSize: 9, fontStyle: 'normal' };
+  return { fontSize: 11, fontStyle: 'normal' };
+}
+
+const handleDownloadPdf = async () => {
+  const activeEditor = this.editors[this.activeTabIndex];
+  const title = this.getTabTitle(this.activeTabIndex);
+  
+  try {
     const content = activeEditor.state.doc.toString();
-    const title = this.getTabTitle(this.activeTabIndex);
     const htmlContent = `
       <style>
         body {
@@ -1109,24 +1270,113 @@ private setupEditorButtons(editor: EditorView, index: number) {
         p { margin: 4pt 0; white-space: normal; }
         pre, code { font-size: 8pt; padding: 2pt; }
       </style>
-      ${marked(content, { breaks: true, gfm: true })}
     `;
 
+    // Create temporary div to hold content
+    const tempDiv = document.createElement('div');
+    // @ts-ignore
+    tempDiv.innerHTML = marked(content, { breaks: true, gfm: true });
+
+    // Process images before adding to HTML
+    const images = tempDiv.getElementsByTagName('img');
+    for (const img of Array.from(images)) {
+      const match = img.src.match(/indexdb:\/\/(.*)/);
+      if (match) {
+        const imageId = match[1];
+        try {
+          const imageData = await indexDBOverlay.getItem('images', imageId);
+          if (imageData?.data) {
+            // Create temporary image to get dimensions
+            const tempImg = new Image();
+            await new Promise((resolve, reject) => {
+              tempImg.onload = resolve;
+              tempImg.onerror = reject;
+              tempImg.src = imageData.data;
+            });
+
+            // Calculate scaled dimensions
+            const maxWidth = 500;
+            const maxHeight = 300;
+            let width = tempImg.width;
+            let height = tempImg.height;
+
+            // Scale down if necessary while maintaining aspect ratio
+            if (width > maxWidth) {
+              height = (height * maxWidth) / width;
+              width = maxWidth;
+            }
+            if (height > maxHeight) {
+              width = (width * maxHeight) / height;
+              height = maxHeight;
+            }
+
+            // Create a wrapper div for centering
+            const wrapper = document.createElement('div');
+            wrapper.style.textAlign = 'center';
+            wrapper.style.margin = '10px 0';
+            
+            // Set dimensions and center the image
+            img.src = imageData.data;
+            img.style.width = `${width}px`;
+            img.style.height = `${height}px`;
+            img.width = width;
+            img.height = height;
+            
+            // Replace the image with the wrapped version
+            img.parentNode?.replaceChild(wrapper, img);
+            wrapper.appendChild(img);
+          }
+        } catch (error) {
+          console.error('Failed to process image:', imageId, error);
+        }
+      }
+    }
+
+    // Create final HTML
+    const finalHtml = htmlContent + tempDiv.innerHTML;
+
+    // Create PDF
     const doc = new jsPDF({
       unit: 'pt',
       format: 'a4'
     });
     
-    doc.html(htmlContent, {
-      callback: function(pdf) {
-        pdf.save(`${title}.pdf`);
-      },
-      margin: [20, 20, 20, 20],
-      autoPaging: true,
-      width: 500,
-      windowWidth: 800
+    // Calculate page width
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const effectiveWidth = pageWidth - 80; // 40pt margins on each side
+
+    // Use html method with proper settings
+    await new Promise((resolve, reject) => {
+      doc.html(finalHtml, {
+        callback: function(doc) {
+          try {
+            doc.save(`${title}.pdf`);
+            resolve(true);
+          } catch (error) {
+            reject(error);
+          }
+        },
+        margin: [20, 40, 20, 40], // [top, right, bottom, left]
+        autoPaging: true,
+        width: effectiveWidth,
+        windowWidth: effectiveWidth,
+        image: {
+          type: 'jpeg',
+          quality: 0.98,
+        },
+        html2canvas: {
+          scale: 1,
+          logging: false,
+          useCORS: true
+        }
+      });
     });
-  };
+
+    console.log("PDF created successfully");
+  } catch (error) {
+    console.error('Failed to create PDF:', error);
+  }
+};
 
   // Remove old listeners and create new elements
   const newCopyBtn = copyBtn?.cloneNode(true);

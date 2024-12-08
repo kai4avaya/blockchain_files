@@ -510,6 +510,7 @@ const handlePaste = EditorView.domEventHandlers({
   }
 })
 
+
 // Update the extension export to include the paste handler
 export const imageUploadExtension = [
   imageStateField,
