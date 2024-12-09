@@ -2,6 +2,7 @@ import { Boarding } from "boarding.js";
 import "boarding.js/styles/main.css";
 // optionally include the base theme
 import "boarding.js/styles/themes/basic.css";
+import gsap from 'gsap';
 
 // export function initializeIntro() {
 //     console.log("[Intro] Starting initialization");
@@ -86,7 +87,6 @@ export function initializeProjectTour() {
     boarding.defineSteps([
         // 1. Welcome - Updated with icon and more description
         {
-            title: 'Welcome to Lumi',
             element: '#ui-layer',
             popover: {
                 title: 'Welcome to Lumi',
@@ -114,10 +114,21 @@ export function initializeProjectTour() {
                                       d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
                             </svg>
                         </div>
-                        Welcome to your 3D collaborative research environment powered by AI. Lumi is designed with a local-first architecture, meaning your data stays on your device while enabling seamless collaboration with peers. Create, organize, and explore your research in an interactive 3D space while leveraging AI assistance for deeper insights. Connect with colleagues in real-time while maintaining data sovereignty and privacy. Let's take a quick tour of the main features!
-                    </div>`,
+                        Welcome to your <span class="highlight-term">3D collaborative</span> research environment powered by <span class="highlight-term">AI</span>. Lumi is designed with a <span class="highlight-term">local-first</span> architecture, meaning your data stays on your device while enabling seamless <span class="highlight-term">collaboration</span> with peers. Create, organize, and explore your research in an interactive <span class="highlight-term">3D space</span> while leveraging <span class="highlight-term">AI assistance</span> for deeper insights. Connect with colleagues in <span class="highlight-term">real-time</span> while maintaining data <span class="highlight-term">sovereignty</span> and <span class="highlight-term">privacy</span>. Let's take a quick tour of the main features!
+                    </div>
+                    <style>
+                        .highlight-term {
+                            position: relative;
+                            display: inline-block;
+                            color: #3b82f6;
+                            font-weight: 500;
+                            background-color: rgba(255, 105, 180, 0.15);
+                            padding: 0 2px;
+                            border-radius: 3px;
+                        }
+                    </style>`,
                 position: 'center'
-                }
+    }
         },
         // 2. Graph View
         {
