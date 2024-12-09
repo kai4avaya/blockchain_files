@@ -29,6 +29,7 @@ import { ShareManager } from "./network/share_manager";
 // import {createMiniMap} from './ui/graph_v2/createMiniMap.js';
 import { initializeSearchHandler } from './ui/components/search/searchHandler.js';
 import { SearchIndexManager } from './memory/local/search_index';
+import { initializeProjectTour } from './ui/intro/intro.js';
 
 
 // Call the function to set up the search handler
@@ -107,6 +108,7 @@ async function main() {
   p2pSync_instance.setMouseOverlay(mouseOverlay);
 
   addEventListeners(canvas);
+  initializeProjectTour();
 }
 const handleQuickClick = throttle(async (event) => {
   const selectedObject = getObjectUnderPointer(event, "sphere");
