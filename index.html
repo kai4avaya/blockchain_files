@@ -246,7 +246,7 @@
             <path stroke-linecap="round" stroke-linejoin="round"
               d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
           </svg>
-        <span class="tooltip">Copy content</span>
+          <span class="tooltip">Copy content</span>
         </button>
         <button class="editor-btn share-btn" title="Share via email">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
@@ -283,7 +283,7 @@
 
 
         </div>
-<!-- 
+        <!-- 
 
         <div class="switch-container">
           <div class="switch-toggle">
@@ -300,197 +300,197 @@
           </div>
           <span class="tooltip">Add Diagrams in AI response</span>
           </div> -->
-        </div> 
-
-
-      </div>
-
-      <div id="canvas-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
-        <!-- Three.js canvas will render here -->
       </div>
 
 
-      <script>
-        const toggleButton = document.getElementById('toggleButton');
-        const fileTreeBtn = document.getElementById('fileTreeBtn');
-        const fileTree = document.getElementById('fileTree');
-        const tests = document.getElementById('tests');
-        const peerConnBtn = document.getElementById('peer-btn-connect');
-        const modal = document.querySelector('.modal'); // Used by peer-btn-connect
-        const leftSlideout = document.getElementById('leftSlideout');
-        const chatSlideout = document.getElementById('chatSlideout');
-        const homeIcon = document.getElementById('homeIcon');
-        const icons = document.querySelectorAll('.sidebar-icon');
+    </div>
+
+    <div id="canvas-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
+      <!-- Three.js canvas will render here -->
+    </div>
 
 
-        // Create a separate modal for homeIcon
-        const homeModal = document.createElement('div');
-        homeModal.classList.add('modal');
+    <script>
+      const toggleButton = document.getElementById('toggleButton');
+      const fileTreeBtn = document.getElementById('fileTreeBtn');
+      const fileTree = document.getElementById('fileTree');
+      const tests = document.getElementById('tests');
+      const peerConnBtn = document.getElementById('peer-btn-connect');
+      const modal = document.querySelector('.modal'); // Used by peer-btn-connect
+      const leftSlideout = document.getElementById('leftSlideout');
+      const chatSlideout = document.getElementById('chatSlideout');
+      const homeIcon = document.getElementById('homeIcon');
+      const icons = document.querySelectorAll('.sidebar-icon');
+
+
+      // Create a separate modal for homeIcon
+      const homeModal = document.createElement('div');
+      homeModal.classList.add('modal');
+      homeModal.style.display = 'none';
+      document.body.appendChild(homeModal);
+
+      let activeIcon = null;
+
+      // leftSlideout.classList.remove('active');
+
+
+      fileTreeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeAllModals({ leftSlideout: true });
+
+        // Check if slideout is currently active
+        const isActive = leftSlideout.classList.contains('active');
+
+        // Remove active class from all slideouts first
+        leftSlideout.classList.remove('active');
+        chatSlideout.classList.remove('active');
+
+
+        // Only add active class if it wasn't active before
+        if (!isActive) {
+          leftSlideout.classList.add('active');
+        }
+      });
+      // Keep the close arrow handler
+      const closeArrow = document.querySelector('.close-arrow');
+      closeArrow.addEventListener('click', (e) => {
+        e.stopPropagation();
+        leftSlideout.classList.remove('active');
+      });
+
+      // Update closeAllModals function to handle all modals consistently
+      function closeAllModals(flags = {}) {
+        // Hide all slideouts
+
+        if (!flags.leftSlideout) {
+          leftSlideout.classList.remove('active');
+        }
+
+        // Hide all standard modals
+        hidePeerModal();
+        hideHomeModal();
+        hideSettingsModal();
+        hideSearchModal();
+
+        // Hide databases modal with animation
+        const databasesModal = document.getElementById('databasesModal');
+        if (databasesModal) {
+          databasesModal.classList.remove('show');
+          const overlay = document.getElementById('overlay');
+          overlay.classList.remove('show');
+
+          // Wait for animation to complete before hiding
+          setTimeout(() => {
+            databasesModal.style.display = 'none';
+            overlay.style.display = 'none';
+          }, 300); // Match your CSS transition duration
+        }
+      }
+
+
+      function closeAllModals_notDBModal(flags = {}) {
+        // Hide all slideouts
+
+        if (!flags.leftSlideout) {
+          leftSlideout.classList.remove('active');
+        }
+
+        // Hide all standard modals
+        hidePeerModal();
+        hideHomeModal();
+        hideSettingsModal();
+        hideSearchModal();
+
+        // Hide databases modal with animation
+      }
+
+
+      window.closeAllModals_notDBModal = closeAllModals_notDBModal;
+
+      // Functions for peer-btn-connect modal
+      function showPeerModal() {
+        const iconRect = peerConnBtn.getBoundingClientRect();
+        modal.style.top = `${iconRect.top - 15}px`;
+        modal.style.display = 'flex';
+
+        modal.offsetHeight; // Trigger reflow
+
+        requestAnimationFrame(() => {
+          modal.classList.add('active');
+        });
+
+        const arrowOffset = iconRect.height / 2;
+        modal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
+        activeIcon = peerConnBtn;
+      }
+
+      function hidePeerModal() {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+        activeIcon = null;
+      }
+
+      // Functions for homeIcon modal
+      function showHomeModal() {
+        const iconRect = homeIcon.getBoundingClientRect();
+        homeModal.style.top = `${iconRect.top - 15}px`;
+        homeModal.style.display = 'flex';
+
+        homeModal.innerHTML = getHomeModalContent();
+        attachHomeModalListeners();
+
+        homeModal.offsetHeight; // Trigger reflow
+
+        requestAnimationFrame(() => {
+          homeModal.classList.add('active');
+        });
+
+        const arrowOffset = iconRect.height / 2;
+        homeModal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
+        activeIcon = homeIcon;
+      }
+
+      function hideHomeModal() {
         homeModal.style.display = 'none';
-        document.body.appendChild(homeModal);
+        homeModal.classList.remove('active');
+        activeIcon = null;
+      }
 
-        let activeIcon = null;
+      // Event Listeners for Icons
+      peerConnBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
 
-        // leftSlideout.classList.remove('active');
+        // Check if modal is currently visible by checking both display and active class
+        const isModalVisible = modal.classList.contains('active');
 
-
-        fileTreeBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          closeAllModals({ leftSlideout: true });
-
-          // Check if slideout is currently active
-          const isActive = leftSlideout.classList.contains('active');
-
-          // Remove active class from all slideouts first
-          leftSlideout.classList.remove('active');
-          chatSlideout.classList.remove('active');
-
-
-          // Only add active class if it wasn't active before
-          if (!isActive) {
-            leftSlideout.classList.add('active');
-          }
-        });
-        // Keep the close arrow handler
-        const closeArrow = document.querySelector('.close-arrow');
-        closeArrow.addEventListener('click', (e) => {
-          e.stopPropagation();
-          leftSlideout.classList.remove('active');
-        });
-
-        // Update closeAllModals function to handle all modals consistently
-        function closeAllModals(flags = {}) {
-          // Hide all slideouts
-
-          if (!flags.leftSlideout) {
-            leftSlideout.classList.remove('active');
-          }
-
-          // Hide all standard modals
+        if (!isModalVisible) {
+          closeAllModals();
+          showPeerModal();
+        } else {
           hidePeerModal();
+        }
+
+        // Close slideouts if open
+        leftSlideout.classList.remove('active');
+        chatSlideout.classList.remove('active');
+      });
+
+      homeIcon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        if (homeModal.style.display === 'none') {
+          closeAllModals();
+          showHomeModal();
+        } else {
           hideHomeModal();
-          hideSettingsModal();
-          hideSearchModal();
-
-          // Hide databases modal with animation
-          const databasesModal = document.getElementById('databasesModal');
-          if (databasesModal) {
-            databasesModal.classList.remove('show');
-            const overlay = document.getElementById('overlay');
-            overlay.classList.remove('show');
-
-            // Wait for animation to complete before hiding
-            setTimeout(() => {
-              databasesModal.style.display = 'none';
-              overlay.style.display = 'none';
-            }, 300); // Match your CSS transition duration
-          }
         }
+      });
 
-
-        function closeAllModals_notDBModal(flags = {}) {
-          // Hide all slideouts
-
-          if (!flags.leftSlideout) {
-            leftSlideout.classList.remove('active');
-          }
-
-          // Hide all standard modals
-          hidePeerModal();
-          hideHomeModal();
-          hideSettingsModal();
-          hideSearchModal();
-
-          // Hide databases modal with animation
-        }
-
-
-        window.closeAllModals_notDBModal = closeAllModals_notDBModal;
-
-        // Functions for peer-btn-connect modal
-        function showPeerModal() {
-          const iconRect = peerConnBtn.getBoundingClientRect();
-          modal.style.top = `${iconRect.top - 15}px`;
-          modal.style.display = 'flex';
-
-          modal.offsetHeight; // Trigger reflow
-
-          requestAnimationFrame(() => {
-            modal.classList.add('active');
-          });
-
-          const arrowOffset = iconRect.height / 2;
-          modal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
-          activeIcon = peerConnBtn;
-        }
-
-        function hidePeerModal() {
-          modal.style.display = 'none';
-          modal.classList.remove('active');
-          activeIcon = null;
-        }
-
-        // Functions for homeIcon modal
-        function showHomeModal() {
-          const iconRect = homeIcon.getBoundingClientRect();
-          homeModal.style.top = `${iconRect.top - 15}px`;
-          homeModal.style.display = 'flex';
-
-          homeModal.innerHTML = getHomeModalContent();
-          attachHomeModalListeners();
-
-          homeModal.offsetHeight; // Trigger reflow
-
-          requestAnimationFrame(() => {
-            homeModal.classList.add('active');
-          });
-
-          const arrowOffset = iconRect.height / 2;
-          homeModal.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
-          activeIcon = homeIcon;
-        }
-
-        function hideHomeModal() {
-          homeModal.style.display = 'none';
-          homeModal.classList.remove('active');
-          activeIcon = null;
-        }
-
-        // Event Listeners for Icons
-        peerConnBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-
-          // Check if modal is currently visible by checking both display and active class
-          const isModalVisible = modal.classList.contains('active');
-
-          if (!isModalVisible) {
-            closeAllModals();
-            showPeerModal();
-          } else {
-            hidePeerModal();
-          }
-
-          // Close slideouts if open
-          leftSlideout.classList.remove('active');
-          chatSlideout.classList.remove('active');
-        });
-
-        homeIcon.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-
-          if (homeModal.style.display === 'none') {
-            closeAllModals();
-            showHomeModal();
-          } else {
-            hideHomeModal();
-          }
-        });
-
-        // Function to get homeModal content
-        function getHomeModalContent() {
-          return `
+      // Function to get homeModal content
+      function getHomeModalContent() {
+        return `
     <div class="modal-icons">
   <div class="modal-card" data-action="visualize-embeddings">
     <div class="modal-icon">
@@ -553,110 +553,123 @@
   </div>
 </div>
     `
-        }
+      }
 
-        // Event Handlers for homeModal Icons
-        // Event Handlers for homeModal Icons
-        function attachHomeModalListeners() {
-          homeModal.querySelectorAll('.modal-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-              e.stopPropagation();
-              const action = card.dataset.action;
-              console.log("Card clicked!", action);
+      // Event Handlers for homeModal Icons
+      // Event Handlers for homeModal Icons
+      function attachHomeModalListeners() {
+        homeModal.querySelectorAll('.modal-card').forEach(card => {
+          card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = card.dataset.action;
+            console.log("Card clicked!", action);
 
-              if (action) {
-                // Add a brief visual feedback
-                card.style.backgroundColor = '#e2e8f0';
-                setTimeout(() => {
-                  card.style.backgroundColor = '';
-                }, 200);
+            if (action) {
+              // Add a brief visual feedback
+              card.style.backgroundColor = '#e2e8f0';
+              setTimeout(() => {
+                card.style.backgroundColor = '';
+              }, 200);
 
-                console.log("Dispatching", action);
-                const event = new CustomEvent('modalAction', { detail: { action } });
-                document.dispatchEvent(event);
+              console.log("Dispatching", action);
+              const event = new CustomEvent('modalAction', { detail: { action } });
+              document.dispatchEvent(event);
 
-                // Hide the modal
-                const modal = card.closest('.modal');
-                if (modal) {
-                  modal.classList.remove('active');
-                }
+              // Hide the modal
+              const modal = card.closest('.modal');
+              if (modal) {
+                modal.classList.remove('active');
               }
-            });
-          });
-        }
-
-        function showSpinner(iconElement) {
-          // Remove any existing spinner first
-          const existingSpinner = iconElement.querySelector('.spinner');
-          if (existingSpinner) {
-            existingSpinner.remove();
-          }
-
-          const svgIcon = iconElement.querySelector('svg');
-          const spinner = document.createElement('div');
-          spinner.className = 'spinner';
-          svgIcon.style.display = 'none';
-          iconElement.insertBefore(spinner, svgIcon);
-
-          // Remove spinner after timeout or when operation completes
-          setTimeout(() => {
-            if (spinner && spinner.parentNode) {
-              spinner.remove();
-              svgIcon.style.display = '';
             }
-          }, 4000);
+          });
+        });
+      }
+
+      function showSpinner(iconElement) {
+        // Remove any existing spinner first
+        const existingSpinner = iconElement.querySelector('.spinner');
+        if (existingSpinner) {
+          existingSpinner.remove();
         }
 
-        // Hide modals when clicking outside
-        document.addEventListener('click', (e) => {
-          if (!modal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
-            hidePeerModal();
+        const svgIcon = iconElement.querySelector('svg');
+        const spinner = document.createElement('div');
+        spinner.className = 'spinner';
+        svgIcon.style.display = 'none';
+        iconElement.insertBefore(spinner, svgIcon);
+
+        // Remove spinner after timeout or when operation completes
+        setTimeout(() => {
+          if (spinner && spinner.parentNode) {
+            spinner.remove();
+            svgIcon.style.display = '';
           }
-          if (!homeModal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
-            hideHomeModal();
-          }
+        }, 4000);
+      }
+
+      // Hide modals when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!modal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
+          hidePeerModal();
+        }
+        if (!homeModal.contains(e.target) && !e.target.closest('.sidebar-icon')) {
+          hideHomeModal();
+        }
+      });
+
+      // Ensure modal events don't propagate
+      modal.addEventListener('pointerdown', (e) => e.stopPropagation());
+      modal.addEventListener('click', (e) => e.stopPropagation());
+      homeModal.addEventListener('pointerdown', (e) => e.stopPropagation());
+      homeModal.addEventListener('click', (e) => e.stopPropagation());
+
+      // Tooltips for sidebar icons
+      document.querySelectorAll('.sidebar-icon').forEach(icon => {
+        icon.addEventListener('mouseenter', () => {
+          icon.querySelector('.tooltip').style.opacity = '1';
         });
-
-        // Ensure modal events don't propagate
-        modal.addEventListener('pointerdown', (e) => e.stopPropagation());
-        modal.addEventListener('click', (e) => e.stopPropagation());
-        homeModal.addEventListener('pointerdown', (e) => e.stopPropagation());
-        homeModal.addEventListener('click', (e) => e.stopPropagation());
-
-        // Tooltips for sidebar icons
-        document.querySelectorAll('.sidebar-icon').forEach(icon => {
-          icon.addEventListener('mouseenter', () => {
-            icon.querySelector('.tooltip').style.opacity = '1';
-          });
-          icon.addEventListener('mouseleave', () => {
-            icon.querySelector('.tooltip').style.opacity = '0';
-          });
+        icon.addEventListener('mouseleave', () => {
+          icon.querySelector('.tooltip').style.opacity = '0';
         });
-      </script>
+      });
+    </script>
 
 
-      <script>
-        // Add settings modal functionality
-        const settingsIcon = document.getElementById('settingsIcon');
-        const settingsModal = document.getElementById('settingsModal');
+    <script>
+      // Add settings modal functionality
+      const settingsIcon = document.getElementById('settingsIcon');
+      const settingsModal = document.getElementById('settingsModal');
 
-        // Create a separate modal for settings
-        const settingsModalContainer = document.createElement('div');
-        settingsModalContainer.classList.add('modal');
-        settingsModalContainer.style.display = 'none';
-        document.body.appendChild(settingsModalContainer);
+      // Create a separate modal for settings
+      const settingsModalContainer = document.createElement('div');
+      settingsModalContainer.classList.add('modal');
+      settingsModalContainer.style.display = 'none';
+      document.body.appendChild(settingsModalContainer);
 
-        function showSettingsModal() {
-          closeAllModals(); // Close all other modals first
+      function showSettingsModal() {
+        closeAllModals(); // Close all other modals first
 
-          const iconRect = settingsIcon.getBoundingClientRect();
-          settingsModalContainer.style.top = `${iconRect.top - 15}px`;
-          settingsModalContainer.style.display = 'flex';
+        const iconRect = settingsIcon.getBoundingClientRect();
+        settingsModalContainer.style.top = `${iconRect.top - 15}px`;
+        settingsModalContainer.style.display = 'flex';
 
-          const useCustomProvider = localStorage.getItem('useCustomProvider') === 'true';
-          // Updated settings modal content with better design
-          settingsModalContainer.innerHTML = `
+        
+
+        const useCustomProvider = localStorage.getItem('useCustomProvider') === 'true';
+        // Updated settings modal content with better design
+        settingsModalContainer.innerHTML = `
        <div class="settings-header">
+<div class="icon-container_settings">
+        <div class="sidebar-icon_settings" id="settingsHelpIcon" onclick="window.open('https://www.youtube.com/watch?v=dQ1AdALuXQE', '_blank')">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+          </svg>
+          <span class="info-tooltip">
+            Lumi Research Assistant is an AI-powered tool that helps you explore, colleaborate and understand your research documents. You can contribute to the project here https://github.com/kai4avaya/blockchain_files
+          </span>
+        </div>
+</div>
+
             <div class="model-switch-container">
                 <label class="switch">
                     <input type="checkbox" id="providerToggle" ${useCustomProvider ? 'checked' : ''}>
@@ -684,183 +697,195 @@
         <div class="settings-status"></div>
   `;
 
-          const toggle = settingsModalContainer.querySelector('#providerToggle');
-          const inputs = settingsModalContainer.querySelectorAll('.settings-input');
-          const modelSelect = settingsModalContainer.querySelector('#aiModelSelect');
-
-          toggle.addEventListener('change', (e) => {
-            const useCustom = e.target.checked;
-            inputs.forEach(input => input.disabled = !useCustom);
-            modelSelect.disabled = useCustom;
-            localStorage.setItem('useCustomProvider', useCustom);
-          });
-
-          // Trigger pill rendering
-          window.eventBus.dispatchEvent(new CustomEvent('renderExistingPills'));
+        const toggle = settingsModalContainer.querySelector('#providerToggle');
+        const inputs = settingsModalContainer.querySelectorAll('.settings-input');
+        const modelSelect = settingsModalContainer.querySelector('#aiModelSelect');
 
 
-          settingsModalContainer.offsetHeight;
-          requestAnimationFrame(() => {
-            settingsModalContainer.classList.add('active');
-          });
+      // Add this new section after your existing event listeners
+      const helpIcon = document.getElementById('settingsHelpIcon');
 
-          const arrowOffset = iconRect.height / 2;
-          settingsModalContainer.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
-          activeIcon = settingsIcon;
+      helpIcon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log('Help clicked');
+        // Add your help click handler here
+      });
 
-          const saveButton = settingsModalContainer.querySelector('#saveSettingsButton');
-          saveButton.addEventListener('click', saveSettings);
-        }
+   
 
-        function hideSettingsModal() {
-          settingsModalContainer.style.display = 'none';
-          settingsModalContainer.classList.remove('active');
-          activeIcon = null;
-        }
+        toggle.addEventListener('change', (e) => {
+          const useCustom = e.target.checked;
+          inputs.forEach(input => input.disabled = !useCustom);
+          modelSelect.disabled = useCustom;
+          localStorage.setItem('useCustomProvider', useCustom);
+        });
 
-        // function saveSettings() {
-        //   // const provider = document.getElementById('aiProviderInput').value;
-        //   // const model = document.getElementById('aiModelSelect').value;
-        //   // const apiKey = document.getElementById('apiKeyInput').value;
-
-        //   console.log("NERDDDDD")
-        //   // Save settings to localStorage or your preferred storage
-        //   // localStorage.setItem('aiProvider', provider);
-        //   //       localStorage.setItem('apiKey', apiKey);
-        //   //       localStorage.setItem('aiModel', model);
-
-        //         const url = document.getElementById('aiProviderInput').value.trim();
-        //         const apiKey = document.getElementById('apiKeyInput').value.trim();
-
-        //         // if (url && apiKey) {
-        //         //   console.log('Dispatching addProvider event');
-        //         //   window.dispatchEvent(new CustomEvent('addProvider', { detail: { url, apiKey } }));
-        //         // }
-
-        //         console.log("ai provider", url)
-        //         console.log("api key", apiKey)
-
-        //         if (url && apiKey) {
-        //       console.log('Dispatching addProvider event');
-        //       window.eventBus.dispatchEvent(new CustomEvent('addProvider', { 
-        //         detail: { url, apiKey } 
-        //       }));
-        //     } else {
-        //       console.warn('URL or API key is missing');
-        //     }
-
-        //         console.log('Settings saved successfully');
-        //         // hideSettingsModal();
-
-        //         // Dispatch event for other parts of the application
-        //         // window.dispatchEvent(new CustomEvent('settingsUpdated', {
-        //         //   detail: { provider, model }
-        //         // }));
+        // Trigger pill rendering
+        window.eventBus.dispatchEvent(new CustomEvent('renderExistingPills'));
 
 
-        //         // if (url && apiKey) {
-        //         //   window.dispatchEvent(new CustomEvent('addProvider', { detail: { url: provider, apiKey } }));
-        //         // }
+        settingsModalContainer.offsetHeight;
+        requestAnimationFrame(() => {
+          settingsModalContainer.classList.add('active');
+        });
 
-        //   // hideSettingsModal();
-        // }
-        function saveSettings() {
-          const url = document.getElementById('aiProviderInput').value.trim();
-          const apiKey = document.getElementById('apiKeyInput').value.trim();
+        const arrowOffset = iconRect.height / 2;
+        settingsModalContainer.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
+        activeIcon = settingsIcon;
 
-          if (url && apiKey) {
-            console.log('Dispatching addProvider event');
+        const saveButton = settingsModalContainer.querySelector('#saveSettingsButton');
+        saveButton.addEventListener('click', saveSettings);
+      }
 
-            // Check for existing provider
-            const existingProviders = JSON.parse(localStorage.getItem('apiProviders') || '[]');
-            const isDuplicate = existingProviders.some(p =>
-              p.url.toLowerCase() === url.toLowerCase()
-            );
+      function hideSettingsModal() {
+        settingsModalContainer.style.display = 'none';
+        settingsModalContainer.classList.remove('active');
+        activeIcon = null;
+      }
 
-            if (isDuplicate) {
-              // Show update message
-              const statusDiv = settingsModalContainer.querySelector('.settings-status');
-              if (statusDiv) {
-                statusDiv.textContent = 'Updating existing provider...';
-                statusDiv.style.color = '#2196F3';
-                setTimeout(() => {
-                  statusDiv.textContent = '';
-                }, 2000);
-              }
-            }
+      // function saveSettings() {
+      //   // const provider = document.getElementById('aiProviderInput').value;
+      //   // const model = document.getElementById('aiModelSelect').value;
+      //   // const apiKey = document.getElementById('apiKeyInput').value;
 
-            window.eventBus.dispatchEvent(new CustomEvent('addProvider', {
-              detail: { url, apiKey }
-            }));
+      //   console.log("NERDDDDD")
+      //   // Save settings to localStorage or your preferred storage
+      //   // localStorage.setItem('aiProvider', provider);
+      //   //       localStorage.setItem('apiKey', apiKey);
+      //   //       localStorage.setItem('aiModel', model);
 
-            // Clear inputs after successful save
-            document.getElementById('aiProviderInput').value = '';
-            document.getElementById('apiKeyInput').value = '';
+      //         const url = document.getElementById('aiProviderInput').value.trim();
+      //         const apiKey = document.getElementById('apiKeyInput').value.trim();
+
+      //         // if (url && apiKey) {
+      //         //   console.log('Dispatching addProvider event');
+      //         //   window.dispatchEvent(new CustomEvent('addProvider', { detail: { url, apiKey } }));
+      //         // }
+
+      //         console.log("ai provider", url)
+      //         console.log("api key", apiKey)
+
+      //         if (url && apiKey) {
+      //       console.log('Dispatching addProvider event');
+      //       window.eventBus.dispatchEvent(new CustomEvent('addProvider', { 
+      //         detail: { url, apiKey } 
+      //       }));
+      //     } else {
+      //       console.warn('URL or API key is missing');
+      //     }
+
+      //         console.log('Settings saved successfully');
+      //         // hideSettingsModal();
+
+      //         // Dispatch event for other parts of the application
+      //         // window.dispatchEvent(new CustomEvent('settingsUpdated', {
+      //         //   detail: { provider, model }
+      //         // }));
 
 
-          } else {
-            console.warn('URL or API key is missing');
-            // Show error message
+      //         // if (url && apiKey) {
+      //         //   window.dispatchEvent(new CustomEvent('addProvider', { detail: { url: provider, apiKey } }));
+      //         // }
+
+      //   // hideSettingsModal();
+      // }
+      function saveSettings() {
+        const url = document.getElementById('aiProviderInput').value.trim();
+        const apiKey = document.getElementById('apiKeyInput').value.trim();
+
+        if (url && apiKey) {
+          console.log('Dispatching addProvider event');
+
+          // Check for existing provider
+          const existingProviders = JSON.parse(localStorage.getItem('apiProviders') || '[]');
+          const isDuplicate = existingProviders.some(p =>
+            p.url.toLowerCase() === url.toLowerCase()
+          );
+
+          if (isDuplicate) {
+            // Show update message
             const statusDiv = settingsModalContainer.querySelector('.settings-status');
             if (statusDiv) {
-              statusDiv.textContent = 'Please enter both URL and API key';
-              statusDiv.style.color = '#f44336';
+              statusDiv.textContent = 'Updating existing provider...';
+              statusDiv.style.color = '#2196F3';
               setTimeout(() => {
                 statusDiv.textContent = '';
               }, 2000);
             }
           }
-        }
-        // Add click handler for settings icon
-        settingsIcon.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
 
-          if (settingsModalContainer.style.display === 'none') {
-            closeAllModals();
-            showSettingsModal();
-          } else {
-            hideSettingsModal();
+          window.eventBus.dispatchEvent(new CustomEvent('addProvider', {
+            detail: { url, apiKey }
+          }));
+
+          // Clear inputs after successful save
+          document.getElementById('aiProviderInput').value = '';
+          document.getElementById('apiKeyInput').value = '';
+
+
+        } else {
+          console.warn('URL or API key is missing');
+          // Show error message
+          const statusDiv = settingsModalContainer.querySelector('.settings-status');
+          if (statusDiv) {
+            statusDiv.textContent = 'Please enter both URL and API key';
+            statusDiv.style.color = '#f44336';
+            setTimeout(() => {
+              statusDiv.textContent = '';
+            }, 2000);
           }
+        }
+      }
+      // Add click handler for settings icon
+      settingsIcon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
 
-          // Close other modals/slideouts
+        if (settingsModalContainer.style.display === 'none') {
+          closeAllModals();
+          showSettingsModal();
+        } else {
+          hideSettingsModal();
+        }
+
+        // Close other modals/slideouts
+        hidePeerModal();
+        hideHomeModal();
+        hideSearchModal();
+        leftSlideout.classList.remove('active');
+        chatSlideout.classList.remove('active');
+      });
+
+      // Update document click handler to include settings modal
+      document.addEventListener('click', (e) => {
+        if (!modal.contains(e.target) &&
+          !homeModal.contains(e.target) &&
+          !settingsModalContainer.contains(e.target) &&
+          !e.target.closest('.sidebar-icon')) {
           hidePeerModal();
           hideHomeModal();
-          hideSearchModal();
-          leftSlideout.classList.remove('active');
-          chatSlideout.classList.remove('active');
-        });
+          hideSettingsModal();
+        }
+      });
+    </script>
 
-        // Update document click handler to include settings modal
-        document.addEventListener('click', (e) => {
-          if (!modal.contains(e.target) &&
-            !homeModal.contains(e.target) &&
-            !settingsModalContainer.contains(e.target) &&
-            !e.target.closest('.sidebar-icon')) {
-            hidePeerModal();
-            hideHomeModal();
-            hideSettingsModal();
-          }
-        });
-      </script>
+    <script>
+      // Add search modal functionality
+      const searchBtn = document.getElementById('search-btn');
+      const searchModalContainer = document.createElement('div');
+      searchModalContainer.classList.add('modal');
+      searchModalContainer.style.display = 'none';
+      document.body.appendChild(searchModalContainer);
 
-      <script>
-        // Add search modal functionality
-        const searchBtn = document.getElementById('search-btn');
-        const searchModalContainer = document.createElement('div');
-        searchModalContainer.classList.add('modal');
-        searchModalContainer.style.display = 'none';
-        document.body.appendChild(searchModalContainer);
+      function showSearchModal() {
+        closeAllModals(); // Close all other modals first
 
-        function showSearchModal() {
-          closeAllModals(); // Close all other modals first
+        const iconRect = searchBtn.getBoundingClientRect();
+        searchModalContainer.style.top = `${iconRect.top - 15}px`;
+        searchModalContainer.style.display = 'flex';
 
-          const iconRect = searchBtn.getBoundingClientRect();
-          searchModalContainer.style.top = `${iconRect.top - 15}px`;
-          searchModalContainer.style.display = 'flex';
-
-          // Search modal content
-          searchModalContainer.innerHTML = `
+        // Search modal content
+        searchModalContainer.innerHTML = `
       <div class="search-header">
         <input type="text" 
                class="search-input" 
@@ -888,26 +913,44 @@
       <div class="search-status"></div>
     `;
 
-          searchModalContainer.offsetHeight;
-          requestAnimationFrame(() => {
-            searchModalContainer.classList.add('active');
+        searchModalContainer.offsetHeight;
+        requestAnimationFrame(() => {
+          searchModalContainer.classList.add('active');
+        });
+
+        const arrowOffset = iconRect.height / 2;
+        searchModalContainer.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
+        activeIcon = searchBtn;
+
+        const searchButton = document.getElementById('searchButton');
+        const searchInput = document.getElementById('searchInput');
+        const searchTypeSelect = document.getElementById('searchTypeSelect');
+
+        // Enable search button when input has content
+        searchInput.addEventListener('input', (e) => {
+          searchButton.disabled = !e.target.value.trim();
+        });
+
+        // Dispatch search event when button is clicked
+        searchButton.addEventListener('click', () => {
+          searchButton.classList.add('loading');
+          const searchEvent = new CustomEvent('initiateSearch', {
+            detail: {
+              query: searchInput.value.trim(),
+              searchType: searchTypeSelect.value
+            }
           });
+          window.dispatchEvent(searchEvent);
+        });
 
-          const arrowOffset = iconRect.height / 2;
-          searchModalContainer.style.setProperty('--arrow-top', `${arrowOffset + 10}px`);
-          activeIcon = searchBtn;
+        // Listen for search completion to remove loading state
+        window.addEventListener('searchComplete', () => {
+          searchButton.classList.remove('loading');
+        });
 
-          const searchButton = document.getElementById('searchButton');
-          const searchInput = document.getElementById('searchInput');
-          const searchTypeSelect = document.getElementById('searchTypeSelect');
-
-          // Enable search button when input has content
-          searchInput.addEventListener('input', (e) => {
-            searchButton.disabled = !e.target.value.trim();
-          });
-
-          // Dispatch search event when button is clicked
-          searchButton.addEventListener('click', () => {
+        // Also trigger search on Enter key
+        searchInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter' && searchInput.value.trim()) {
             searchButton.classList.add('loading');
             const searchEvent = new CustomEvent('initiateSearch', {
               detail: {
@@ -916,172 +959,157 @@
               }
             });
             window.dispatchEvent(searchEvent);
-          });
+          }
+        });
+      }
 
-          // Listen for search completion to remove loading state
-          window.addEventListener('searchComplete', () => {
-            searchButton.classList.remove('loading');
-          });
+      function hideSearchModal() {
+        searchModalContainer.style.display = 'none';
+        searchModalContainer.classList.remove('active');
+        activeIcon = null;
+      }
 
-          // Also trigger search on Enter key
-          searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && searchInput.value.trim()) {
-              searchButton.classList.add('loading');
-              const searchEvent = new CustomEvent('initiateSearch', {
-                detail: {
-                  query: searchInput.value.trim(),
-                  searchType: searchTypeSelect.value
-                }
-              });
-              window.dispatchEvent(searchEvent);
+      function handleSearch() {
+        const searchInput = document.getElementById('searchInput');
+        const searchType = document.getElementById('searchTypeSelect').value;
+        const query = searchInput.value.trim();
+        const resultsContainer = document.getElementById('searchResults');
+
+        if (query) {
+          // Dispatch search event for other parts of the application
+          window.eventBus.dispatchEvent(new CustomEvent('search', {
+            detail: {
+              query,
+              type: searchType
             }
-          });
+          }));
+        } else {
+          resultsContainer.innerHTML = '';
+        }
+      }
+
+      // Add click handler for search button
+      searchBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        if (searchModalContainer.style.display === 'none') {
+          closeAllModals();
+          showSearchModal();
+        } else {
+          hideSearchModal();
         }
 
-        function hideSearchModal() {
-          searchModalContainer.style.display = 'none';
-          searchModalContainer.classList.remove('active');
-          activeIcon = null;
-        }
+        // Close other modals/slideouts
+        hidePeerModal();
+        hideHomeModal();
+        hideSettingsModal();
+        leftSlideout.classList.remove('active');
+        chatSlideout.classList.remove('active');
+      });
 
-        function handleSearch() {
-          const searchInput = document.getElementById('searchInput');
-          const searchType = document.getElementById('searchTypeSelect').value;
-          const query = searchInput.value.trim();
-          const resultsContainer = document.getElementById('searchResults');
-
-          if (query) {
-            // Dispatch search event for other parts of the application
-            window.eventBus.dispatchEvent(new CustomEvent('search', {
-              detail: {
-                query,
-                type: searchType
-              }
-            }));
-          } else {
-            resultsContainer.innerHTML = '';
-          }
-        }
-
-        // Add click handler for search button
-        searchBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-
-          if (searchModalContainer.style.display === 'none') {
-            closeAllModals();
-            showSearchModal();
-          } else {
-            hideSearchModal();
-          }
-
-          // Close other modals/slideouts
-          hidePeerModal();
-          hideHomeModal();
-          hideSettingsModal();
-          leftSlideout.classList.remove('active');
-          chatSlideout.classList.remove('active');
-        });
-
-        // Update document click handler to include search modal
-        document.addEventListener('click', (e) => {
-          if (!modal.contains(e.target) &&
-            !homeModal.contains(e.target) &&
-            !settingsModalContainer.contains(e.target) &&
-            !searchModalContainer.contains(e.target) &&
-            !e.target.closest('.sidebar-icon')) {
-            hidePeerModal();
-            hideHomeModal();
-            hideSettingsModal();
-            hideSearchModal();
-          }
-        });
-
-        // Update closeAllModals function
-        function closeAllModals(flags = {}) {
-          // Hide all slideouts
-          if (!flags.leftSlideout) {
-            leftSlideout.classList.remove('active');
-          }
-
-          // Hide all standard modals
+      // Update document click handler to include search modal
+      document.addEventListener('click', (e) => {
+        if (!modal.contains(e.target) &&
+          !homeModal.contains(e.target) &&
+          !settingsModalContainer.contains(e.target) &&
+          !searchModalContainer.contains(e.target) &&
+          !e.target.closest('.sidebar-icon')) {
           hidePeerModal();
           hideHomeModal();
           hideSettingsModal();
           hideSearchModal();
-
-          // Hide databases modal with animation
-          const databasesModal = document.getElementById('databasesModal');
-          if (databasesModal) {
-            databasesModal.classList.remove('show');
-            const overlay = document.getElementById('overlay');
-            overlay.classList.remove('show');
-
-            setTimeout(() => {
-              databasesModal.style.display = 'none';
-              overlay.style.display = 'none';
-            }, 300);
-          }
         }
-      </script>
+      });
 
-      <script>
-        // Get required elements
-        const resizeHandle = chatSlideout.querySelector('.resize-handle');
-        let isResizing = false;
-        let startWidth;
-        let startX;
-
-        // Handle resize start
-        resizeHandle.addEventListener('mousedown', (e) => {
-          if (!chatSlideout.classList.contains('active')) return;
-
-          isResizing = true;
-          startX = e.pageX;
-          startWidth = chatSlideout.offsetWidth;
-
-          resizeHandle.classList.add('dragging');
-
-          // Add temporary document listeners only while dragging
-          document.addEventListener('mousemove', handleMove);
-          document.addEventListener('mouseup', handleUp);
-
-          e.stopPropagation();
-        });
-
-        // Handle dragging
-        function handleMove(e) {
-          if (!isResizing) return;
-
-          const width = startWidth - (e.pageX - startX);
-          if (width >= 200 && width <= 800) {
-            chatSlideout.style.width = `${width}px`;
-          }
+      // Update closeAllModals function
+      function closeAllModals(flags = {}) {
+        // Hide all slideouts
+        if (!flags.leftSlideout) {
+          leftSlideout.classList.remove('active');
         }
 
-        // Handle resize end
-        function handleUp() {
-          if (!isResizing) return;
+        // Hide all standard modals
+        hidePeerModal();
+        hideHomeModal();
+        hideSettingsModal();
+        hideSearchModal();
 
-          isResizing = false;
-          resizeHandle.classList.remove('dragging');
+        // Hide databases modal with animation
+        const databasesModal = document.getElementById('databasesModal');
+        if (databasesModal) {
+          databasesModal.classList.remove('show');
+          const overlay = document.getElementById('overlay');
+          overlay.classList.remove('show');
 
-          // Remove temporary document listeners
-          document.removeEventListener('mousemove', handleMove);
-          document.removeEventListener('mouseup', handleUp);
+          setTimeout(() => {
+            databasesModal.style.display = 'none';
+            overlay.style.display = 'none';
+          }, 300);
         }
+      }
+    </script>
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    closeAllModals();
-  }
-});
-        
-      </script>
+    <script>
+      // Get required elements
+      const resizeHandle = chatSlideout.querySelector('.resize-handle');
+      let isResizing = false;
+      let startWidth;
+      let startX;
+
+      // Handle resize start
+      resizeHandle.addEventListener('mousedown', (e) => {
+        if (!chatSlideout.classList.contains('active')) return;
+
+        isResizing = true;
+        startX = e.pageX;
+        startWidth = chatSlideout.offsetWidth;
+
+        resizeHandle.classList.add('dragging');
+
+        // Add temporary document listeners only while dragging
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleUp);
+
+        e.stopPropagation();
+      });
+
+      // Handle dragging
+      function handleMove(e) {
+        if (!isResizing) return;
+
+        const width = startWidth - (e.pageX - startX);
+        if (width >= 200 && width <= 800) {
+          chatSlideout.style.width = `${width}px`;
+        }
+      }
+
+      // Handle resize end
+      function handleUp() {
+        if (!isResizing) return;
+
+        isResizing = false;
+        resizeHandle.classList.remove('dragging');
+
+        // Remove temporary document listeners
+        document.removeEventListener('mousemove', handleMove);
+        document.removeEventListener('mouseup', handleUp);
+      }
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeAllModals();
+        }
+      });
+
+
+    </script>
 
 
 
-      <script type="module" src="/main.js"></script>
+
+
+    <script type="module" src="/main.js"></script>
 
 </body>
 

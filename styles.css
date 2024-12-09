@@ -1352,9 +1352,6 @@ color: #0066cc;
 display: block;
 }
 
-.label {
-/* z-index: 99999 !important; */
-}
 
 .file-label {
   z-index: 9000 !important;
@@ -2327,8 +2324,9 @@ mark {
   box-sizing: border-box;
 }
 
+/* IS THIS CAUSING ISSUES HERE? KAI */
 .modal-card:hover {
-  background-color: #e2e8f0;
+  /* background-color: #e2e8f0;   */
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -2492,11 +2490,11 @@ mark {
   margin-bottom: 8px;
 }
 
-.modal > div:hover {
+/* .modal > div:hover {
   background-color: #e2e8f0;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
+} */
 
 /* Apply consistent text styling */
 .modal h2,
@@ -3140,9 +3138,9 @@ mark {
     cursor: pointer !important;
 }
 
-.boarding-close-btn {
+/* .boarding-close-btn {
     background: #6c757d !important;
-}
+} */
 
 /* Boarding.js custom styles */
 .boarding-highlighted-element {
@@ -3186,3 +3184,84 @@ mark {
 .boarding-button:hover {
     background: #0056b3 !important;
 }
+
+
+
+
+.icon-container_settings {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+  
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  gap: 10px;
+  flex-direction: column;
+}
+
+.icon-container_settings {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+  align-items: center;
+}
+
+.sidebar-icon_settings{
+  position: relative;
+  color: #333;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.sidebar-icon_settings:hover {
+  color: #007bff;
+}
+
+.info-tooltip {
+  position: fixed !important; /* Force fixed positioning */
+  left: auto !important; /* Reset left positioning */
+  right: 20px !important; /* Position from right instead */
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  background-color: #f8f9fa;
+  color: #333;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: normal;
+  width: fit-content;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+  z-index: 2500 !important; /* Ensure it's above other modal content */
+}
+
+/* Update the hover state */
+#settingsHelpIcon:hover .info-tooltip {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateY(-50%) !important;
+}
+
+/* Ensure the modal doesn't clip the tooltip */
+.modal {
+  overflow: visible !important;
+}
+
+.settings-header {
+  overflow: visible !important;
+}
+
+
