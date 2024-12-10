@@ -507,15 +507,22 @@ private saveYDocToIndexedDB = debounce(async (docId: string, ydoc: Y.Doc) => {
 
 
   private async saveTabsToIndexedDB() {
-    const tabsData = this.yjsProviders.map((provider, index) => ({
-      title: (this.tabList.children[index].querySelector(".tab-title") as HTMLElement).textContent,
-      docId: provider.getDocId(),
-      order: index,
-      isHidden: false 
-    }));
+    const tabsData = this.yjsProviders.map((provider, index) => {
+      // Add safety checks for tab element and title
+      const tabElement = this.tabList.children[index];
+      const titleElement = tabElement?.querySelector(".tab-title");
+      const title = titleElement?.textContent || 'Untitled';
+
+      return {
+        title,
+        docId: provider.getDocId(),
+        order: index,
+        isHidden: false 
+      };
+    });
   
     await indexDBOverlay.saveData("tabs", tabsData);
-    await this.triggerFullSyncToPeers(); // Add this line
+    await this.triggerFullSyncToPeers();
   }
 
   private async triggerFullSyncToPeers() {

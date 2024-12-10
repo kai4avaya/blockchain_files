@@ -1,7 +1,7 @@
 import { SCRAPER_ENDPOINT, LOCAL_SCRAPER_ENDPOINT, NODE_ENV } from "../../configs/env_configs.js";
 import { generateUniqueId } from "../../utils/utils";
 // import { createSphere, randomColorGenerator } from "./create.js";
-
+import Toast from '../components/toast-alert.js'
 // Add this after other global variables
 export let contextMenu = null;
 let currentIntersectPoint = null; // Store the intersection point
@@ -190,15 +190,29 @@ function showURLInput(x, y, intersectPoint) {
       });
 
       console.log('Received response:', response.status);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const text = await response.text();
       console.log('Received text length:', text.length);
 
       if (!abortController.signal.aborted) {
-        // Extract hostname or use timestamp
+        if (!text.trim()) {
+          throw new Error('No content received from the website...');
+        }
+
+        // Extract filename from URL
         let fileName;
         try {
           const urlObj = new URL(formattedUrl);
-          fileName = urlObj.hostname || `website_${Date.now()}`;
+          // Get the pathname without leading/trailing slashes and replace remaining slashes with underscores
+          const pathName = urlObj.pathname.replace(/^\/|\/$/g, '').replace(/\//g, '_');
+          // Combine hostname with pathname if it exists, otherwise just use hostname
+          fileName = pathName ? `${urlObj.hostname}_${pathName}` : urlObj.hostname;
+          // Remove any special characters that might cause issues in filenames
+          fileName = fileName.replace(/[^a-zA-Z0-9-_\.]/g, '_');
         } catch (e) {
           fileName = `website_${Date.now()}`;
         }
@@ -253,9 +267,18 @@ function showURLInput(x, y, intersectPoint) {
       }
     } catch (error) {
       console.error('Fetch error:', error);
-      if (!error.name === 'AbortError') {
-        console.error('Error scraping website:', error);
+      if (error.name !== 'AbortError') {
+        let errorMessage = 'Failed to scrape the website. ';
+        if (error.message.includes('security restrictions')) {
+          errorMessage += error.message;
+        } else if (error.message.includes('HTTP error')) {
+          errorMessage += 'The website may be unavailable or blocking access.';
+        } else {
+          errorMessage += 'Please check the URL and try again.';
+        }
+        Toast.show(errorMessage, 'error', 5000); // Show error toast for 5 seconds
       }
+      return; // Prevent node creation on error
     } finally {
       if (!abortController.signal.aborted) {
         console.log('Cleaning up after fetch');

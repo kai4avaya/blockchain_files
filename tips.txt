@@ -1,6 +1,0 @@
-General Tips#
-Object creation in JavaScript is expensive, so don’t create objects in a loop. Instead, create a single object such as a Vector3 and use vector.set() or similar methods to reuse a that inside the loop.
-The same goes for your render loop. To make sure your app runs at a buttery smooth sixty frames per second, do as little work as possible in your render loop. Don’t create new objects every frame.
-Always use BufferGeometry instead of Geometry, it’s faster.
-The same goes for the pre-built objects, always use the buffer geometry version ( BoxBufferGeometry rather than BoxGeometry).
-Always try to reuse objects such as objects, materials, textures etc. (although updating some things may be slower than creating new ones, see texture tips below).

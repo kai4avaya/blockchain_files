@@ -67,8 +67,13 @@ async function main() {
   
   initializeSearchHandler();
 
+  // Add check for first-time visitors
+  const hasSeenTour = localStorage.getItem('hasSeenTour');
+  if (!hasSeenTour) {
+    initializeProjectTour();
+    localStorage.setItem('hasSeenTour', 'true');
+  }
 
-  
   try {
     await setupMarkdownEditor();
     console.log("Markdown editor setup completed");
@@ -108,7 +113,6 @@ async function main() {
   p2pSync_instance.setMouseOverlay(mouseOverlay);
 
   addEventListeners(canvas);
-  initializeProjectTour();
 }
 const handleQuickClick = throttle(async (event) => {
   const selectedObject = getObjectUnderPointer(event, "sphere");
