@@ -1,6 +1,6 @@
 import indexDBOverlay from "../memory/local/file_worker";
 import { p2pSync } from "./peer2peer_simple";
-import in_memory_store from "../memory/local/in_memory";
+// import in_memory_store from "../memory/local/in_memory";
 
 class DBSyncManager {
     private static instance: DBSyncManager | null = null;

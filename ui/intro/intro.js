@@ -127,7 +127,7 @@ export function initializeProjectTour() {
                             border-radius: 3px;
                         }
                     </style>`,
-                position: 'center'
+                position: 'top'
     }
         },
         // 2. Graph View

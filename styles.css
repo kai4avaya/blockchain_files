@@ -2308,7 +2308,7 @@ mark {
   flex-direction: column;
   gap: 12px;
   padding: 8px;
-  width: 100%;
+  width: 90%;
 }
 
 .modal-card {

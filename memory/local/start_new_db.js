@@ -33,7 +33,7 @@ export async function createAndInitializeNewDatabaseInstance(customName = null) 
         // Clear file metadata - Initialize as Map instead of object
         window.fileMetadata = new Map();
 
-        p2pSync.disconnectFromAllPeers();
+        p2pSync.destroyConnection();
         
         // Step 2: Close current database connection first
         // const currentDb = config.dbName;
@@ -166,7 +166,9 @@ export async function openDatabase(dbName) {
         window.fileMetadata = new Map();
         
         // Step 1: Disconnect from all peers first
-        await p2pSync.disconnectFromAllPeers();
+        await p2pSync.destroyConnection();
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Longer delay
+        
         
         // Step 2: Close current database connections
         await indexDBOverlay.closeAllConnections(config.dbName);
@@ -191,7 +193,7 @@ export async function openDatabase(dbName) {
         // Step 5: Reinitialize p2pSync with new database
         // Add small delay to ensure previous connections are fully closed
         await new Promise(resolve => setTimeout(resolve, 100));
-        await p2pSync.initialize(localStorage.getItem('myPeerId'));
+        await p2pSync.initialize('', dbName);
         await p2pSync.loadAndDisplayAllPeers();
 
         await initiate(true)

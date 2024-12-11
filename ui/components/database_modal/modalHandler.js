@@ -553,19 +553,22 @@ async function handleDatabaseOpen(dbName, loadButton) {
         try {
             // Clear scene state first
             // sceneState.clearState();
+
+            localStorage.setItem('latestDBName', dbName);
+
             
             // Proceed with database switch
             await openDatabase(dbName);
             
             
             // Reinitialize p2pSync with the new database context
-            await p2pSync.initialize(localStorage.getItem('myPeerId'));
+            // await p2pSync.initialize(localStorage.getItem('myPeerId'));
             
             // Initialize vector database with isNewDB = false for existing databases
             await initiateVectorDB(false);
             
             // Update localStorage
-            localStorage.setItem('latestDBName', dbName);
+            // localStorage.setItem('latestDBName', dbName);
             
             // Update UI - find the clicked database element
             const allDatabases = document.querySelectorAll('.accordion');
@@ -611,6 +614,14 @@ async function handleDatabaseOpen(dbName, loadButton) {
         showNotification(`✗ Failed to open database:\n   ${error.message}`);
         loadButton.innerHTML = originalContent;
         loadButton.disabled = false;
+    } finally {
+        // Clear the timeout since operation completed successfully
+        clearTimeout(timeoutId);
+         // Add a small delay before reload
+        //  await new Promise(resolve => setTimeout(resolve, 500));
+        
+        //  // Reload the page
+        //  window.location.reload();
     }
 }
 

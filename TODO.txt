@@ -10,6 +10,8 @@ reorganize 3d space by smilar articles using embeddings matches
 2) load website name
 3) peer does not reconnect when we reload the db
 4) no error but sometimes new db acting up
+5) inputs pushing past modal size
+6) qr code should disappear on reclick... 
 
 ****
 embedding pool workers

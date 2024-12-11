@@ -1,11 +1,14 @@
 // network\peer2peer_simple.ts
 
-import { Peer, DataConnection } from "peerjs";
+import { Peer, DataConnection, PeerError } from "peerjs";
 import MousePositionManager from "../memory/collaboration/mouse_colab";
 import { TabManager } from "../ui/components/codemirror_md_copy/codemirror-rich-markdoc/editor/extensions/tabManager";
 import leaderCoordinator from './elections';
 import dbSyncManager from './sync_db';
 import indexDBOverlay from '../memory/local/file_worker';
+import config from '../configs/config.json';
+import { generateUniqueId } from '../utils/utils';
+
 let isInitialized = false;
 
 interface SceneState {
@@ -33,22 +36,26 @@ interface CustomMessage {
 }
 
 // Add new interface for peer status
-interface PeerStatus {
-  connected: boolean;
-  connecting: boolean;
-}
+// interface PeerStatus {
+//   connected: boolean;
+//   connecting: boolean;
+// }
 
 class P2PSync {
   private static instance: P2PSync | null = null;
   private tabManager: TabManager | null = null;
-
   private peer: Peer | null = null;
   public connections: Map<string, DataConnection> = new Map();
   private sceneState: SceneState | null = null;
   public knownPeers: Set<string> = new Set();
-  private heartbeatInterval: number = 5000; // Heartbeat every 5 seconds
-  private heartbeatTimer: number | null = null;
-  private reconnectInterval: number = 10000;
+  private baseReconnectDelay: number = 1000; // Start with 1 second
+  private maxReconnectDelay: number = 30000; // Max 30 seconds
+  private maxReconnectAttempts: number = 5;
+  private reconnectStates: Map<string, {
+    attempts: number;
+    lastAttempt: number;
+    backoffDelay: number;
+  }> = new Map();
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
   private mousePositionManager: MousePositionManager | null = null;
   private mouseOverlay: MouseOverlayCanvas | null = null;
@@ -56,6 +63,7 @@ class P2PSync {
   private customMessageHandlers: Array<(message: any, peerId: string) => void> = [];
 
   private peerConnectHandlers: Set<PeerConnectHandler> = new Set();
+  private newdb: string | null | undefined = null;
 
   // private peerStatuses: Map<string, PeerStatus> = new Map();
 
@@ -75,91 +83,157 @@ class P2PSync {
     return P2PSync.instance;
   }
 
-  async initialize(userId: string): Promise<void> {
-
+  async initialize(userId: string | null | undefined, newdb?: string | null): Promise<void> {
     if (this.peer) {
-      this.peer.removeAllListeners();
-      this.peer.destroy();
-      this.peer = null;
-      // await new Promise(env => setTimeout(resolve, 100));
-  }
+        this.peer.removeAllListeners();
+        this.peer.destroy();
+        this.peer = null;
+        // Add longer delay after destroying peer
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
 
-  this.cleanupExistingPeerPills();
-        
-    // Add small delay to ensure cleanup is complete
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-
+    this.cleanupExistingPeerPills();
     await this.disconnectFromAllPeers();
 
-    // this.sceneState = sceneState;
-    this.loadKnownPeers();
+    console.log("INITIALIZE NEWDB", newdb, "userId", userId);
 
-    const peerId = localStorage.getItem("myPeerId") || userId;
+    // NEW: Get database-specific peer ID
+    const dbName = newdb || localStorage.getItem("latestDBName") || config.dbName;
+    const dbSpecificPeerId = localStorage.getItem(`peerId_${dbName}`);
+    this.newdb = newdb;
+    // Priority: passed userId > database-specific > general stored > new
 
-    if(peerId) {
-      this.peer = new Peer(peerId);
-      this.createMyPeerPill(userId);
-    }
-    // Add localStorage listener for userIdInput
-    const userIdInput = document.getElementById("userIdInput") as HTMLInputElement;
-    if (userIdInput) {
-      userIdInput.value = peerId;
-      userIdInput.addEventListener('input', (e) => {
-        const newUserId = (e.target as HTMLInputElement).value;
-        localStorage.setItem("myPeerId", newUserId);
-        localStorage.setItem("login_block", newUserId);
-      });
-    }
 
-    if(this.peer) {
-      this.peer.on("open", (id) => {
-        localStorage.setItem("myPeerId", id);
-      updateStatus(`Initialized with peer ID: ${id}`);
-      this.updateUserIdInput(id);
-      
-      // Load and display all peers when peer is initialized
-      this.loadAndDisplayAllPeers();
-      
-      this.startHeartbeat();
-      // dbSyncManager.startSync();
-      dbSyncManager.resetEquilibrium(id);
-      dbSyncManager.initiateSync(id);
+    let peerId = userId || dbSpecificPeerId || undefined;
 
-      this.updateButtonStates();
-    });
+    // if(newdb)
+    //   peerId = peerId + "_" + generateUniqueId(3);
 
-    this.peer.on("connection", (conn) => {
-      if (conn.open) {
-        this.handleConnection(conn);
+    console.log("peerId INITALIZE", peerId);
+
+    const createPeer = (id?: string) => {
+      if (id) {
+          try {
+              this.peer = new Peer(id, {
+                  debug: 3,
+                  config: {
+                      iceServers: [
+                          { urls: 'stun:stun.l.google.com:19302' }
+                      ]
+                  }
+              });
+  
+              // Update the error handler with the correct type
+              this.peer.on('error', (error: PeerError<string>) => {
+                  if (error.type === 'unavailable-id' || error.type === 'peer-unavailable') {
+                      console.warn('ID taken, creating peer with modified ID');
+                      this.peer?.destroy();
+                      const newId = `${id}_${generateUniqueId(3)}`;
+                      console.log('Trying new ID:', newId);
+                      this.peer = new Peer(newId, {
+                          debug: 3,
+                          config: {
+                              iceServers: [
+                                  { urls: 'stun:stun.l.google.com:19302' }
+                              ]
+                          }
+                      });
+                  }
+              });
+  
+              // NEW: Add connection timeout
+              setTimeout(() => {
+                  if (!this.peer?.id) {
+                      console.warn('Connection timeout, creating new peer');
+                      this.peer?.destroy();
+                      const randomId = generateUniqueId(6);
+                      this.peer = new Peer(randomId);
+                  }
+              }, 3000); // 3 second timeout
+  
+          } catch (error) {
+              console.warn('Failed to create peer with ID:', id, error);
+              const randomId = `${id}_${generateUniqueId(3)}`;
+              this.peer = new Peer(randomId);
+          }
       } else {
-        conn.on("open", () => this.handleConnection(conn));
+          // Create with random ID
+          const randomId = generateUniqueId(6);
+          this.peer = new Peer(randomId);
       }
-    });
+  };
+  
 
-    this.peer.on("disconnected", () => {
-      updateStatus("Peer disconnected. Attempting to reconnect...");
-      if (this.peer && !this.peer.destroyed) {
-        this.peer.reconnect();
-      }
-    });
+    try {
+        // Add type guard to ensure peerId is string
+        if (peerId) {
+            createPeer(peerId);
+            this.createMyPeerPill(peerId);
+        } else {
+            // Handle case where peerId is undefined
+            const randomId = generateUniqueId(6);
+            createPeer(randomId);
+            this.createMyPeerPill(randomId);
+        }
+    } catch (error) {
+        console.warn('Error creating peer, retrying with new ID:', error);
+        const randomId = generateUniqueId(6);
+        createPeer(randomId);
+        this.createMyPeerPill(randomId);
+    }
 
-    this.peer.on("close", () => {
-      updateStatus("Peer connection closed");
-      this.stopHeartbeat();
-    });
+    if (this.peer) {
 
-    this.peer.on("error", (error) => {
-      // Only log connection errors if they're not related to peer unavailability
-      if (!error.type.includes("Could not connect to peer")) {
-        console.error("PeerJS error:", error);
-        updateStatus(`PeerJS error: ${error.type}`);
-      } else {
-        // Optionally log to debug level if needed
-        console.debug("Peer unavailable:", error.type);
-      }
-    });
-  }
+  // @ts-ignore
+        this.peer.on("error", (error:any) => {
+            if (error.type === 'unavailable-id' || error.type === 'peer-unavailable') {
+                console.warn('Peer ID unavailable, retrying with new ID');
+                const newId = `${peerId}_${Date.now()}`;
+                createPeer(newId);
+            } else if (!error.type.includes("Could not connect to peer")) {
+                console.error("PeerJS error:", error);
+                updateStatus(`PeerJS error: ${error.type}`);
+            }
+        });
+
+  // @ts-ignore
+        this.peer.on("open", (id: string) => {
+            const currentDb =  this.newdb ||localStorage.getItem("latestDBName") || config.dbName;
+            
+            // Save the successful peer ID
+            localStorage.setItem(`peerId_${currentDb}`, id);
+            localStorage.setItem("myPeerId", id);
+            localStorage.setItem("login_block", id);
+            
+            updateStatus(`Initialized with peer ID: ${id}`);
+            this.updateUserIdInput(id);
+            
+            this.loadAndDisplayAllPeers();
+            this.updateButtonStates();
+            dbSyncManager.resetEquilibrium(id);
+            dbSyncManager.initiateSync(id);
+        });
+  // @ts-ignore
+        this.peer.on("connection", (conn: DataConnection) => {
+            if (conn.open) {
+                this.handleConnection(conn);
+            } else {
+                conn.on("open", () => this.handleConnection(conn));
+            }
+        });
+
+  // @ts-ignore
+        this.peer.on("disconnected", () => {
+            updateStatus("Peer disconnected. Attempting to reconnect...");
+            if (this.peer && !this.peer.destroyed) {
+                this.peer.reconnect();
+            }
+        });
+  // @ts-ignore
+        this.peer.on("close", () => {
+            updateStatus("Peer connection closed");
+        });
+    }
 
     // Add the peer database change handler to custom message handlers
     this.customMessageHandlers.push((message: any, peerId: string) => {
@@ -253,6 +327,10 @@ private cleanupExistingPeerPills(): void {
   private handleConnection(conn: DataConnection): void {
     console.log('Connection established with:', conn.peer);
     
+    // Reset reconnection state when connection is successful
+    this.reconnectStates.delete(conn.peer);
+    this.clearReconnectTimer(conn.peer);
+
     // Ensure connection is in the map
     this.connections.set(conn.peer, conn);
     
@@ -438,10 +516,10 @@ private cleanupExistingPeerPills(): void {
       this.updatePeerPillStatus(conn.peer, false);
     });
 
-    conn.on("error", (err) => {
+    conn.on("error", (err: Error) => {
       console.error(`Connection error with peer ${conn.peer}:`, err);
       updateStatus(`Connection error with peer ${conn.peer}: ${err.message}`);
-      dbSyncManager.resetEquilibrium(conn.peer);  // Reset equilibrium on error
+      dbSyncManager.resetEquilibrium(conn.peer);
       this.scheduleReconnect(conn.peer);
     });
 
@@ -499,20 +577,58 @@ private cleanupExistingPeerPills(): void {
   }
 
   private scheduleReconnect(peerId: string): void {
-    // Clear any existing reconnect timer
+    // Clear any existing timer
     this.clearReconnectTimer(peerId);
 
-    // Only schedule reconnect if the peer is in knownPeers
-    if (this.knownPeers.has(peerId)) {
-      const timer = setTimeout(() => {
-        // Verify peer is still known before attempting reconnect
-        if (this.knownPeers.has(peerId)) {
-          this.safeConnectToSpecificPeer(peerId);
-        }
-      }, this.reconnectInterval);
-      
-      this.reconnectTimers.set(peerId, timer);
+    // Only attempt reconnect if peer is still known
+    if (!this.knownPeers.has(peerId)) {
+      return;
     }
+
+    // Get or initialize reconnect state
+    let state = this.reconnectStates.get(peerId);
+    if (!state) {
+      state = {
+        attempts: 0,
+        lastAttempt: Date.now(),
+        backoffDelay: this.baseReconnectDelay
+      };
+      this.reconnectStates.set(peerId, state);
+    }
+
+    // Check if we've hit max attempts
+    if (state.attempts >= this.maxReconnectAttempts) {
+      console.log(`Max reconnection attempts reached for peer: ${peerId}`);
+      this.removeKnownPeer(peerId);
+      this.reconnectStates.delete(peerId);
+      return;
+    }
+
+    // Calculate delay with exponential backoff and jitter
+    const jitter = 0.2; // 20% jitter
+    const randomFactor = 1 - jitter + (Math.random() * jitter * 2);
+    const delay = Math.min(
+      state.backoffDelay * randomFactor,
+      this.maxReconnectDelay
+    );
+
+    // Schedule reconnection attempt
+    const timer = setTimeout(() => {
+      if (this.knownPeers.has(peerId)) {
+        console.log(`Attempting reconnection to ${peerId}, attempt ${state!.attempts + 1}`);
+        this.safeConnectToSpecificPeer(peerId);
+        
+        // Update state for next attempt
+        state!.attempts += 1;
+        state!.lastAttempt = Date.now();
+        state!.backoffDelay = Math.min(
+          this.baseReconnectDelay * Math.pow(2, state!.attempts),
+          this.maxReconnectDelay
+        );
+      }
+    }, delay);
+
+    this.reconnectTimers.set(peerId, timer);
   }
 
    // Add a method to safely remove a known peer
@@ -520,35 +636,6 @@ private cleanupExistingPeerPills(): void {
     this.knownPeers.delete(peerId);
     this.clearReconnectTimer(peerId);
     localStorage.setItem("knownPeers", JSON.stringify(Array.from(this.knownPeers)));
-  }
-
-  private startHeartbeat(): void {
-    if (this.heartbeatTimer) {
-        clearInterval(this.heartbeatTimer);
-    }
-
-    this.heartbeatTimer = window.setInterval(async () => {
-        try {
-            // Get all non-deleted peers from the database
-            const peers = await indexDBOverlay.getData('peers');
-            peers.forEach((peer: any) => {
-                if (!peer.isDeleted && !this.connections.has(peer.peerId)) {
-                    // Quietly attempt to connect to disconnected peers
-                    this.safeConnectToSpecificPeer(peer.peerId);
-                }
-            });
-        } catch (error) {
-            // Silently handle any connection errors
-            console.debug('Heartbeat connection attempt failed:', error);
-        }
-    }, this.heartbeatInterval);
-  }
-
-  private stopHeartbeat(): void {
-    if (this.heartbeatTimer !== null) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
   }
 
   private saveKnownPeer(peerId: string): void {
@@ -579,9 +666,9 @@ private cleanupExistingPeerPills(): void {
     if (this.peer && !this.peer.destroyed) {
       this.peer.destroy();
     }
-    this.stopHeartbeat();
     this.reconnectTimers.forEach((timer) => clearTimeout(timer));
     this.reconnectTimers.clear();
+    this.reconnectStates.clear();
     this.updateConnectionStatus();
     this.updateButtonStates();
   }
@@ -644,10 +731,10 @@ private cleanupExistingPeerPills(): void {
     });
   }
 
-  private handlePeerInputChange(input: string): void {
-    // No longer needed - connection only happens on button click
-    return;
-  }
+  // private handlePeerInputChange(input: string): void {
+  //   // No longer needed - connection only happens on button click
+  //   return;
+  // }
 
   private async addPeerToDatabase(peerId: string): Promise<void> {
     try {
@@ -847,6 +934,105 @@ private cleanupExistingPeerPills(): void {
     }
 }
 
+private resetP2PState(): void {
+  // Clear all connections
+  this.connections.clear();
+  
+  // Clear peer state
+  if (this.peer && !this.peer.destroyed) {
+      this.peer.removeAllListeners();
+      this.peer.destroy();
+  }
+  this.peer = null;
+
+  // Clear all timers and states
+  this.reconnectTimers.forEach(timer => clearTimeout(timer));
+  this.reconnectTimers.clear();
+  this.reconnectStates.clear();
+  
+  // Clear peers
+  this.knownPeers.clear();
+  
+  // Reset managers and overlays
+  this.mousePositionManager = null;
+  this.mouseOverlay = null;
+  this.tabManager = null;
+  this.sceneState = null;
+  
+  // Clear handlers
+  this.customMessageHandlers = [];
+  this.peerConnectHandlers.clear();
+  
+  // Reset database reference
+  this.newdb = null;
+
+  // Clear any stored peer IDs
+  // localStorage.removeItem('myPeerId');
+  // localStorage.removeItem('knownPeers');
+}
+
+
+async destroyConnection() {
+  try {
+      // Disconnect from the PeerJS server
+      if (this.peer) {
+          // First close all existing connections
+          for (const [peerId, conn] of this.connections.entries()) {
+              if (conn) {
+                  conn.removeAllListeners();
+                  conn.close();
+              }
+          }
+          
+          this.connections.clear();
+          
+          // Remove all peer listeners
+          this.peer.removeAllListeners();
+          
+          // Disconnect and destroy
+          this.peer.disconnect();
+          this.peer.destroy();
+          
+          // Clear any remaining ICE/STUN/TURN connections
+          if ((window as any).RTCPeerConnection) {
+              const pc = new (window as any).RTCPeerConnection();
+              pc.close();
+          }
+          
+          this.peer = null;
+
+          // Clear ALL stored IDs and state
+          localStorage.removeItem('myPeerId');
+          localStorage.removeItem('login_block');
+          localStorage.removeItem('knownPeers');
+          
+          // NEW: Clear any reconnect timers
+          this.reconnectTimers.forEach(timer => clearTimeout(timer));
+          this.reconnectTimers.clear();
+
+          // NEW: Clear heartbeat
+          // if (this.heartbeatTimer) {
+          //     clearInterval(this.heartbeatTimer);
+          //     this.heartbeatTimer = null;
+          // }
+
+          // NEW: Force garbage collection of peer object
+          (window as any).peer = null;
+
+          this.resetP2PState();
+          
+          // NEW: Longer delay to ensure cleanup
+          await new Promise(resolve => setTimeout(resolve, 500));
+      }
+  } catch (error) {
+      console.error('Error disconnecting from peers:', error);
+  } finally {
+      this.connections.clear();
+      this.peer = null;
+      this.knownPeers.clear();
+  }
+}
+
 
   // Add this method to load peers from IndexedDB
   private async loadAndDisplayAllPeers(): Promise<void> {
@@ -1003,10 +1189,10 @@ private async stopSharing(): Promise<void> {
       // Reset all connection-related state
       this.connections.clear();
       this.knownPeers.clear();
-      if (this.heartbeatTimer) {
-          clearInterval(this.heartbeatTimer);
-          this.heartbeatTimer = null;
-      }
+      // if (this.heartbeatTimer) {
+      //     clearInterval(this.heartbeatTimer);
+      //     this.heartbeatTimer = null;
+      // }
       
       // Clear all reconnect timers
       this.reconnectTimers.forEach((timer) => clearTimeout(timer));

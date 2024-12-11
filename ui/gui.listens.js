@@ -208,7 +208,11 @@ export function initiate_gui_controls() {
     actionPanel.querySelector('.screenshot-btn').addEventListener('click', async () => {
         try {
             const { share3dDat } = await import('./graph_v2/create.js');
-            const { renderer } = share3dDat();
+            const { renderer, scene, camera } = share3dDat();
+            
+            // Ensure scene is rendered before capturing
+            renderer.render(scene, camera);
+            
             const link = document.createElement('a');
             link.download = 'scene-screenshot.png';
             link.href = renderer.domElement.toDataURL('image/png');
