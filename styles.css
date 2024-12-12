@@ -1142,6 +1142,18 @@ vertical-align: middle;
   pointer-events: auto;
 }
 
+#labels-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;  /* Important for labels not to interfere with mouse interactions */
+  /* z-index: 2; Lower than slideouts */
+  z-index: 10000;
+}
+
+
 #canvas-container {
   position: fixed;
   top: 0;
@@ -3229,8 +3241,6 @@ mark {
 .info-tooltip {
   position: fixed !important; /* Force fixed positioning */
   left: auto !important; /* Reset left positioning */
-  right: 20px !important; /* Position from right instead */
-  top: 50% !important;
   transform: translateY(-50%) !important;
   background-color: #f8f9fa;
   color: #333;

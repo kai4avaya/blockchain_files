@@ -244,7 +244,12 @@ labelRenderer.setSize(window.innerWidth, window.innerHeight);
 labelRenderer.domElement.style.position = "absolute";
 labelRenderer.domElement.style.top = "0px";
 labelRenderer.domElement.style.pointerEvents = "none"; // Allows mouse events to pass through
-document.body.appendChild(labelRenderer.domElement);
+
+const labelsContainer = document.getElementById('labels-container');
+// labelsContainer.appendChild(labelDiv);
+labelsContainer.appendChild(labelRenderer.domElement);
+
+// document.body.appendChild(labelRenderer.domElement);
 
 // const controls = new OrbitControls(camera, renderer.domElement);
 const controls = new OrbitControls(
@@ -758,6 +763,8 @@ export function createSphere(convertedData) {
   removeExistingLabel(filename);
 
   const labelDiv = document.createElement("div");
+  const labelsContainer = document.getElementById('labels-container');
+  labelsContainer.appendChild(labelDiv);
   labelDiv.className = "label file-label"; 
   labelDiv.textContent = filename;
   labelDiv.style.color = "#4169E1"; // Royal blue
@@ -804,83 +811,6 @@ finalComposer.addPass(new RenderPass(scene, camera)); // Add a render pass for t
 finalComposer.addPass(bloomTexturePass); // Add a texture pass for the bloom scene
 finalComposer.addPass(nonBloomTexturePass); // Add a texture pass for the non-bloom scene
 
-// kai render
-// export function render_cull() {
-
-//   projScreenMatrix
-//     .copy(camera.projectionMatrix)
-//     .multiply(camera.matrixWorldInverse);
-//   frustum.setFromProjectionMatrix(projScreenMatrix);
-
-//   scene.traverse((object) => {
-//     if (object.isMesh) {
-//       let isVisible;
-
-//       if (object.geometry && object.geometry.boundingSphere) {
-//         // Update the object's bounding sphere
-//         if (!object.boundingSphere) {
-//           object.boundingSphere = new THREE.Sphere();
-//         }
-//         object.boundingSphere
-//           .copy(object.geometry.boundingSphere)
-//           .applyMatrix4(object.matrixWorld);
-
-//         // Add a small buffer to the bounding sphere radius
-//         const bufferFactor = 1.1; // Adjust this value as needed
-//         const bufferedRadius = object.boundingSphere.radius * bufferFactor;
-
-//         isVisible = frustum.intersectsSphere(
-//           new THREE.Sphere(object.boundingSphere.center, bufferedRadius)
-//         );
-//       } else {
-//         // For large objects like cubes, use a more lenient culling method
-//         isVisible =
-//           frustum.intersectsObject(object) ||
-//           object.position.distanceTo(camera.position) <
-//             (object.geometry.boundingSphere?.radius || 100);
-//       }
-
-//       object.visible = isVisible;
-
-//       if (isVisible && !object.layers.test(bloomLayer)) {
-//         darkenNonBloomed(object);
-//       }
-//     }
-//   });
-
-//   bloomComposer.render();
-//   scene.traverse(restoreMaterial);
-
-//   nonBloomScene.traverse((object) => {
-//     if (object.isMesh) {
-//       if (object.geometry && object.geometry.boundingSphere) {
-//         // Update the object's bounding sphere
-//         if (!object.boundingSphere) {
-//           object.boundingSphere = new THREE.Sphere();
-//         }
-//         object.boundingSphere
-//           .copy(object.geometry.boundingSphere)
-//           .applyMatrix4(object.matrixWorld);
-
-//         object.visible = frustum.intersectsSphere(object.boundingSphere);
-//       } else {
-//         // Fallback to using intersectsObject if boundingSphere is not available
-//         object.visible = frustum.intersectsObject(object);
-//       }
-//     }
-//   });
-
-//   renderer.setRenderTarget(nonBloomRT);
-//   renderer.clear();
-//   renderer.render(nonBloomScene, camera);
-//   labelRenderer.render(scene, camera);
-
-//   finalComposer.render();
-// }
-
-
-// First, store the original render_cull function implementation
-// const originalRenderCull = render_cull;
 
 // Then redefine render_cull with fallback handling while preserving original functionality
 export function render_cull() {
@@ -1361,17 +1291,17 @@ function animate() {
 animate();
 
 // Placeholder functions for exporting
-export function isRendererReady() {
-  return true;
-}
+// export function isRendererReady() {
+//   return true;
+// }
 
-export function graphInit(initScene, initCamera, initRenderer) {
-  // Placeholder implementation
-}
+// export function graphInit(initScene, initCamera, initRenderer) {
+//   // Placeholder implementation
+// }
 
-export function updateGraph(newNodes, newLinks) {
-  // Placeholder implementation
-}
+// export function updateGraph(newNodes, newLinks) {
+//   // Placeholder implementation
+// }
 
 export function addNode(
   id,
@@ -1421,20 +1351,6 @@ export function removeEmptyCubes(scene, nonBloomScene) {
   // Remove the identified cubes
   cubesToRemove.forEach((box) => {
     const boxId = box.wireframe.userData.id;
-
-    // // Remove wireframe
-    // if (box.wireframe) {
-    //   nonBloomScene.remove(box.wireframe);
-    //   box.wireframe.geometry.dispose();
-    //   box.wireframe.material.dispose();
-    // }
-
-    // // Remove solid
-    // if (box.solid) {
-    //   nonBloomScene.remove(box.solid);
-    //   box.solid.geometry.dispose();
-    //   box.solid.material.dispose();
-    // }
 
     // Remove from the snapshot
     const boxIndex = snapshot.boxes.findIndex(
