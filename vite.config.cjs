@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
-import { resolve } from 'path';
+// import { resolve } from 'path';
 import fs from 'fs';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -15,7 +15,7 @@ export default defineConfig({
       includeAssets: ['icons/*'],
       manifest,
       workbox: {
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8MB - increased from 5MB
         globPatterns: [
           '**/*.{js,css,html}',
           'icons/*.{ico,png,svg}',
@@ -61,14 +61,27 @@ export default defineConfig({
     })
   ],
   build: {
-    chunkSizeWarningLimit: 4000, // 4MB
-    target: ['esnext'], // Updated target for top-level await support
+    chunkSizeWarningLimit: 8000, // 8MB
+    target: ['esnext'],
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
+        manualChunks: {
+          // Split vendor chunk into smaller pieces
+          'vendor-core': ['three', '@codemirror/view', '@codemirror/state', '@codemirror/language'],
+          'vendor-utils': ['marked', 'mermaid', 'compromise'],
+          'vendor-ml': ['@xenova/transformers', 'onnxruntime-web'],
+          'vendor-ui': ['gsap', 'boarding.js'],
+          'vendor-network': ['socket.io-client', 'peerjs', 'y-webrtc'],
+          // Other dependencies will go into a default vendor chunk
+          'vendor-other': [
+            'jspdf',
+            'qrcode',
+            'umap-js',
+            'wink-nlp',
+            'yjs',
+            'density-clustering',
+            'ml-knn'
+          ]
         }
       }
     }
