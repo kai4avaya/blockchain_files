@@ -127,7 +127,8 @@ export function initializeProjectTour() {
                             border-radius: 3px;
                         }
                     </style>`,
-                position: 'top'
+                position: 'top',
+                alignment: 'center' // This ensures the popover is centered horizontall
     }
         },
         // 2. Graph View
