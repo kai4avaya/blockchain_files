@@ -2,6 +2,10 @@ import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
 import { resolve } from 'path';
 import fs from 'fs';
+import { VitePWA } from 'vite-plugin-pwa';
+
+// Read manifest from file
+const manifest = JSON.parse(fs.readFileSync('./manifest.json', 'utf-8'));
 
 export default defineConfig({
   resolve: {
@@ -11,6 +15,53 @@ export default defineConfig({
   },
   plugins: [
     wasm(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      manifest,
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          }
+        ]
+      },
+      devOptions: {
+        enabled: true,
+        type: 'module'
+      },
+      pwaAssets: {
+        disable: false,
+        preset: {
+          name: 'minimal-2023',
+          shortName: 'Lumi',
+          backgroundColor: '#ffffff',
+          themeColor: '#007bff',
+          preferRelatedApplications: false,
+          screenshots: [],
+          iconPurpose: ['any', 'maskable']
+        },
+        custom: {
+          baseIcon: './src/assets/logo.svg',
+          outDir: './public/icons',
+          sizes: [72, 96, 128, 144, 152, 192, 384, 512],
+          favicons: [16, 32],
+          appleTouchIcon: 180
+        }
+      }
+    }),
     {
       name: 'copy-workers',
       generateBundle() {
@@ -24,7 +75,6 @@ export default defineConfig({
           fileName: 'workers/summary_worker.js',
           source: fs.readFileSync(resolve(__dirname, 'workers/summary_worker.js'), 'utf-8')
         });
-        // Add other workers as needed
       }
     }
   ],

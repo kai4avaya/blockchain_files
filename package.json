@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "copy-workers": "cp -r workers dist/",
-    "preview-build": "npm run build && npm run preview"
+    "preview-build": "npm run build && npm run preview",
+    "generate-icons": "cd icon-generator && npm install && npm run generate && cd .."
   },
   "keywords": [],
   "author": "",

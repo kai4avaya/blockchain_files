@@ -1,7 +1,7 @@
 {
-    "name": "Your App Name",
-    "short_name": "App",
-    "description": "Your app description",
+    "name": "Lumi",
+    "short_name": "Lumi",
+    "description": "Interactive 3D document visualization and analysis",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#ffffff",
