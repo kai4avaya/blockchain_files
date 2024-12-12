@@ -20,7 +20,9 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest,
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globIgnores: ['**/summary_worker*.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -33,6 +35,17 @@ export default defineConfig({
               },
               cacheableResponse: {
                 statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /\/workers\/.*\.js$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'workers-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 // 1 day
               }
             }
           }
@@ -121,7 +134,8 @@ export default defineConfig({
             : '[name].[hash].js';
         }
       }
-    }
+    },
+    chunkSizeWarningLimit: 4000, // 4MB
   },
   worker: {
     format: 'es',
