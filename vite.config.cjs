@@ -1,13 +1,13 @@
 import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
-// import { resolve } from 'path';
+import { resolve } from 'path';
 import fs from 'fs';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // Read manifest from file
 const manifest = JSON.parse(fs.readFileSync('./manifest.json', 'utf-8'));
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     wasm(),
     VitePWA({
@@ -15,16 +15,19 @@ export default defineConfig({
       includeAssets: ['icons/*'],
       manifest,
       workbox: {
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
         globPatterns: [
+          '*.{js,css,html}',
           '**/*.{js,css,html}',
-          'icons/*.{ico,png,svg}',
-          'assets/*.{woff2,png,svg}'
+          'icons/*.{png,ico,svg}',
+          'assets/*'
         ],
         globIgnores: [
           '**/summary_worker*.js',
-          'sw.js',
-          'workbox-*.js'
+          '**/sw.js',
+          '**/workbox-*.js',
+          '**/*.wasm',
+          'assets/ort-wasm-*'
         ],
         runtimeCaching: [
           {
@@ -48,7 +51,21 @@ export default defineConfig({
               cacheName: 'workers-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 // 1 day
+                maxAgeSeconds: 60 * 60 * 24
+              }
+            }
+          },
+          {
+            urlPattern: /\.wasm$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'wasm-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 30
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
               }
             }
           }
@@ -56,7 +73,8 @@ export default defineConfig({
       },
       devOptions: {
         enabled: true,
-        type: 'module'
+        type: 'module',
+        navigateFallback: 'index.html'
       }
     })
   ],
@@ -135,5 +153,6 @@ export default defineConfig({
     minifySyntax: true,
     minifyWhitespace: true,
     treeShaking: true,
-  }
-});
+  },
+  publicDir: command === 'serve' ? 'dev-dist' : 'public',
+}));

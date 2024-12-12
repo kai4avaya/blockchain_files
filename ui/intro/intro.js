@@ -2,70 +2,6 @@ import { Boarding } from "boarding.js";
 import "boarding.js/styles/main.css";
 // optionally include the base theme
 import "boarding.js/styles/themes/basic.css";
-import gsap from 'gsap';
-
-// export function initializeIntro() {
-//     console.log("[Intro] Starting initialization");
-    
-//     const hasSeenIntro = localStorage.getItem('hasSeenIntro');
-//     console.log("[Intro] Has seen intro:", hasSeenIntro);
-    
-//     if (hasSeenIntro) {
-//         console.log("[Intro] User has seen intro before, skipping");
-//         return;
-//     }
-
-//     // Create a dedicated container for boarding
-//     const boardingContainer = document.createElement('div');
-//     boardingContainer.id = 'boarding-container';
-//     document.body.appendChild(boardingContainer);
-
-//     try {
-//         console.log("[Intro] Creating boarding instance");
-//         const boarding = new Boarding({
-//             container: boardingContainer,
-//             animate: true,
-//             opacity: 0.75,
-//             padding: 10,
-//             allowClose: true,
-//             overlayClickNext: false,
-//             keyboardControl: true,
-//             showButtons: true,
-//             doneBtnText: 'Got it!',
-//             closeBtnText: 'Skip',
-//             nextBtnText: 'Next →',
-//             prevBtnText: '← Previous',
-//             onStart: () => {
-//                 console.log("[Intro] Tour started");
-//             },
-//             onNext: () => {
-//                 console.log("[Intro] Moving to next step");
-//             },
-//             onReset: () => {
-//                 console.log("[Intro] Tour reset");
-//                 localStorage.setItem('hasSeenIntro', 'true');
-//             }
-//         });
-
-//         // First, test with a simple highlight
-//         console.log("[Intro] Testing simple highlight");
-//         boarding.highlight({
-//             element: '#homeIcon',
-//             popover: {
-//                 title: 'Test Highlight',
-//                 description: 'Testing if highlight works'
-//             }
-//         });
-
-//         console.log("[Intro] Initial highlight complete");
-
-//     } catch (err) {
-//         console.error("[Intro] Error during intro setup:", err);
-//         console.error("[Intro] Stack trace:", err.stack);
-//         localStorage.setItem('hasSeenIntro', 'true');
-//     }
-// }
-
 
 export function initializeProjectTour() {
     const boarding = new Boarding({
@@ -127,7 +63,8 @@ export function initializeProjectTour() {
                             border-radius: 3px;
                         }
                     </style>`,
-                position: 'top',
+                // position: 'top',
+                prefferedPosition: 'top',
                 alignment: 'center' // This ensures the popover is centered horizontall
     }
         },

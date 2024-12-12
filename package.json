@@ -6,10 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "vite",
-    "build": "npm run clean && vite build && npm run copy-workers",
+    "build": "npm run clean && vite build && npm run copy-assets",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "copy-workers": "cp -r workers dist/",
+    "copy-assets": "mkdir -p dist/icons && cp -r icons/* dist/icons/ && cp -r workers dist/",
     "preview-build": "npm run build && npm run preview",
     "generate-icons": "cd icon-generator && npm install && npm run generate && cd .."
   },
