@@ -16,8 +16,16 @@ export default defineConfig({
       manifest,
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        globIgnores: ['**/summary_worker*.js'],
+        globPatterns: [
+          '**/*.{js,css,html}',
+          'icons/*.{ico,png,svg}',
+          'assets/*.{woff2,png,svg}'
+        ],
+        globIgnores: [
+          '**/summary_worker*.js',
+          'sw.js',
+          'workbox-*.js'
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -53,6 +61,16 @@ export default defineConfig({
     })
   ],
   build: {
-    chunkSizeWarningLimit: 4000 // 4MB
+    chunkSizeWarningLimit: 4000, // 4MB
+    target: ['esnext'], // Updated target for top-level await support
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        }
+      }
+    }
   }
 });
