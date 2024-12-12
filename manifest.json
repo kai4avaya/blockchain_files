@@ -6,6 +6,8 @@
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#007bff",
+    "orientation": "any",
+    "categories": ["productivity", "utilities"],
     "icons": [
       {
         "src": "/icons/icon-72x72.png",
@@ -47,6 +49,22 @@
         "src": "/icons/icon-512x512.png",
         "sizes": "512x512",
         "type": "image/png"
+      }
+    ],
+    "shortcuts": [
+      {
+        "name": "Search Documents",
+        "url": "/?action=search",
+        "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+      }
+    ],
+    "screenshots": [
+      {
+        "src": "/screenshots/app.png",
+        "sizes": "1280x720",
+        "type": "image/png",
+        "platform": "wide",
+        "label": "Lumi Document Analysis"
       }
     ]
   }

@@ -15,7 +15,7 @@ export default defineConfig({
       includeAssets: ['icons/*'],
       manifest,
       workbox: {
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8MB - increased from 5MB
         globPatterns: [
           '**/*.{js,css,html}',
           'icons/*.{ico,png,svg}',
@@ -61,30 +61,18 @@ export default defineConfig({
     })
   ],
   build: {
-    chunkSizeWarningLimit: 8000,
+    chunkSizeWarningLimit: 8000, // 8MB
     target: ['esnext'],
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.trace'],
-      },
-      mangle: {
-        safari10: true,
-      },
-      format: {
-        comments: false,
-      },
-    },
     rollupOptions: {
       output: {
         manualChunks: {
+          // Split vendor chunk into smaller pieces
           'vendor-core': ['three', '@codemirror/view', '@codemirror/state', '@codemirror/language'],
           'vendor-utils': ['marked', 'mermaid', 'compromise'],
           'vendor-ml': ['@xenova/transformers', 'onnxruntime-web'],
           'vendor-ui': ['gsap', 'boarding.js'],
           'vendor-network': ['socket.io-client', 'peerjs', 'y-webrtc'],
+          // Other dependencies will go into a default vendor chunk
           'vendor-other': [
             'jspdf',
             'qrcode',
@@ -94,46 +82,8 @@ export default defineConfig({
             'density-clustering',
             'ml-knn'
           ]
-        },
-        chunkFileNames: (chunkInfo) => {
-          const id = chunkInfo.facadeModuleId || chunkInfo.moduleIds[0];
-          if (id && id.includes('node_modules')) {
-            const name = id.toString().split('node_modules/')[1].split('/')[0].replace('@', '');
-            return `assets/${name}-[hash].js`;
-          }
-          return 'assets/[name]-[hash].js';
-        },
-        assetFileNames: (assetInfo) => {
-          const { name } = assetInfo;
-          if (/\.(png|jpe?g|gif|svg|ico)$/.test(name ?? '')) {
-            return 'assets/images/[name]-[hash][extname]';
-          }
-          if (/\.(woff2?|ttf|eot)$/.test(name ?? '')) {
-            return 'assets/fonts/[name]-[hash][extname]';
-          }
-          return 'assets/[name]-[hash][extname]';
-        },
-      },
-      treeshake: {
-        moduleSideEffects: true,
-        propertyReadSideEffects: false,
-        tryCatchDeoptimization: false
-      },
-    },
-    sourcemap: false,
-    cssCodeSplit: true,
-    cssMinify: true,
-    reportCompressedSize: true,
-    assetsInlineLimit: 4096,
-  },
-  esbuild: {
-    drop: ['console', 'debugger'],
-    pure: ['console.log', 'console.info', 'console.debug', 'console.trace'],
-    legalComments: 'none',
-    minify: true,
-    minifyIdentifiers: true,
-    minifySyntax: true,
-    minifyWhitespace: true,
-    treeShaking: true,
+        }
+      }
+    }
   }
 });
