@@ -113,6 +113,7 @@ async function main() {
   p2pSync_instance.setMouseOverlay(mouseOverlay);
 
   addEventListeners(canvas);
+  handleKeyPressShortcuts();
 }
 const handleQuickClick = throttle(async (event) => {
   const selectedObject = getObjectUnderPointer(event, "sphere");
@@ -133,7 +134,49 @@ const handleQuickClick = throttle(async (event) => {
 }, 300);
 
 
-
+function handleKeyPressShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    console.log("Key pressed", e.key)
+    if (e.key === 'Escape') {
+      closeAllModals();
+    }
+    
+    // Use Alt key instead of Ctrl to avoid browser shortcuts
+    if (e.altKey) {
+      console.log("Alt key pressed", e.key)
+      switch(e.key.toLowerCase()) {
+        case 'g': // Alt + G for Graph View
+          e.preventDefault();
+          document.getElementById('homeIcon').click();
+          break;
+        case 's': // Alt + S for Search
+          e.preventDefault(); 
+          document.getElementById('search-btn').click();
+          break;
+        case 'c': // Alt + C for Connect (Peer)
+          e.preventDefault();
+          document.getElementById('peer-btn-connect').click();
+          break;
+        case 'b': // Alt + B for databases
+          e.preventDefault();
+          document.getElementById('saved-db-btn').click();
+          break;
+        case 'f': // Alt + F for File Tree
+          e.preventDefault();
+          document.getElementById('fileTreeBtn').click();
+          break;
+        case 'p': // Alt + P for Settings
+          e.preventDefault();
+          document.getElementById('settingsIcon').click();
+          break;
+        case 'e': // Alt + E for Editor/Chat
+          e.preventDefault();
+          document.getElementById('toggleButton').click();
+          break;
+      }
+    }
+  });
+}
 
 // export async function initializeDatabases() {
 //   try {
